@@ -1546,59 +1546,56 @@ def show_reports():
         """, unsafe_allow_html=True)
     
         # คำอธิบาย ICD-10 Stroke
+       
         with st.expander("📖 นิยามและรหัส ICD-10 — Stroke", expanded=False):
-            st.markdown(f"""
-            <div style="display:grid;grid-template-columns:1fr 1fr;
-                        gap:1rem;padding:0.5rem 0;">
-    
-                <div style="background:#E8EAF6;padding:1rem;border-radius:8px;
-                            border-left:4px solid #3949AB;">
-                    <b style="color:#283593;font-size:1rem;">🔵 Ischemic Stroke</b>
-                    <p style="color:#37474F;font-size:0.85rem;margin:0.6rem 0 0 0;
-                               line-height:1.7;">
-                        <b>นิยาม:</b> Stroke จากการอุดตันของหลอดเลือด<br>
-                        สมอง ทำให้เนื้อสมองขาดเลือด (Infarction)<br><br>
-                        <b>รหัส ICD-10:</b><br>
-                        <code>I63.x</code> – Cerebral infarction (ทุก subtype)<br>
-                        <code>I64</code> &nbsp;– Stroke, not specified as<br>
-                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;haemorrhage or infarction (NOS)<br>
-                        <code>I65.x</code> – Occlusion/stenosis precerebral arteries<br>
-                        <code>I66.x</code> – Occlusion/stenosis cerebral arteries<br><br>
-                        <b>สัดส่วน:</b> ~80-85% ของ stroke ทั้งหมด<br>
-                        <b>การรักษา:</b> tPA, Thrombectomy
-                    </p>
-                </div>
-    
-                <div style="background:#FCE4EC;padding:1rem;border-radius:8px;
-                            border-left:4px solid #C62828;">
-                    <b style="color:#B71C1C;font-size:1rem;">🔴 Hemorrhagic Stroke</b>
-                    <p style="color:#37474F;font-size:0.85rem;margin:0.6rem 0 0 0;
-                               line-height:1.7;">
-                        <b>นิยาม:</b> Stroke จากการแตกของหลอดเลือด<br>
-                        ในสมองหรือรอบสมอง (Bleeding)<br><br>
-                        <b>รหัส ICD-10:</b><br>
-                        <code>I60.x</code> – Subarachnoid haemorrhage (SAH)<br>
-                        <code>I61.x</code> – Intracerebral haemorrhage (ICH)<br>
-                        <code>I62.x</code> – Other nontraumatic intracranial<br>
-                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;haemorrhage (SDH, EDH)<br><br>
-                        <b>สัดส่วน:</b> ~15-20% ของ stroke ทั้งหมด<br>
-                        <b>การรักษา:</b> BP control, Surgery (กรณีจำเป็น)
-                    </p>
-                </div>
-    
-            </div>
+            st.markdown("""
+            <table style="width:100%;border-collapse:separate;border-spacing:8px;
+                          padding:0.5rem 0;">
+            <tr>
+
+              <td style="background:#E8EAF6;padding:1rem;border-radius:8px;
+                         border-left:4px solid #3949AB;vertical-align:top;width:50%;">
+                <b style="color:#283593;font-size:1rem;">🔵 Ischemic Stroke</b><br><br>
+                <span style="color:#37474F;font-size:0.85rem;line-height:1.8;">
+                  <b>นิยาม:</b> Stroke จากการอุดตันของหลอดเลือดสมอง
+                  ทำให้เนื้อสมองขาดเลือด (Infarction)<br><br>
+                  <b>รหัส ICD-10:</b><br>
+                  I63.x – Cerebral infarction (ทุก subtype)<br>
+                  I64 – Stroke, not specified as haemorrhage or infarction (NOS)<br>
+                  I65.x – Occlusion/stenosis precerebral arteries<br>
+                  I66.x – Occlusion/stenosis cerebral arteries<br><br>
+                  <b>สัดส่วน:</b> ~80-85% ของ stroke ทั้งหมด<br>
+                  <b>การรักษา:</b> tPA, Thrombectomy
+                </span>
+              </td>
+
+              <td style="background:#FCE4EC;padding:1rem;border-radius:8px;
+                         border-left:4px solid #C62828;vertical-align:top;width:50%;">
+                <b style="color:#B71C1C;font-size:1rem;">🔴 Hemorrhagic Stroke</b><br><br>
+                <span style="color:#37474F;font-size:0.85rem;line-height:1.8;">
+                  <b>นิยาม:</b> Stroke จากการแตกของหลอดเลือดในสมองหรือรอบสมอง (Bleeding)<br><br>
+                  <b>รหัส ICD-10:</b><br>
+                  I60.x – Subarachnoid haemorrhage (SAH)<br>
+                  I61.x – Intracerebral haemorrhage (ICH)<br>
+                  I62.x – Other nontraumatic intracranial haemorrhage (SDH, EDH)<br><br>
+                  <b>สัดส่วน:</b> ~15-20% ของ stroke ทั้งหมด<br>
+                  <b>การรักษา:</b> BP control, Surgery (กรณีจำเป็น)
+                </span>
+              </td>
+
+            </tr>
+            </table>
             <div style="margin-top:0.8rem;padding:0.6rem 1rem;
                         background:rgba(33,33,33,0.05);border-radius:6px;
                         border-left:3px solid #78909C;">
-                <span style="color:#455A64;font-size:0.85rem;">
-                    ⚠️ <b>ข้อจำกัด:</b> รายงานนี้จำแนกโดยใช้ <b>รหัส pdx เท่านั้น</b>
-                    ไม่ได้ยืนยันจาก CT/MRI
-                    I64 (Stroke NOS) ถูกนับใน Ischemic เนื่องจากสถิติชี้ว่า
-                    ส่วนใหญ่เป็น Ischemic — ควร review กับทีมแพทย์
-                </span>
+              <span style="color:#455A64;font-size:0.85rem;">
+                ⚠️ <b>ข้อจำกัด:</b> รายงานนี้จำแนกโดยใช้ <b>รหัส pdx เท่านั้น</b>
+                ไม่ได้ยืนยันจาก CT/MRI —
+                ควร review กับทีมแพทย์
+              </span>
             </div>
             """, unsafe_allow_html=True)
-    
+            
         # สร้างและแสดง Stroke Matrix
         df_stroke = build_matrix(
             df_sa,
@@ -1722,62 +1719,62 @@ def show_reports():
         </div>
         """, unsafe_allow_html=True)
     
-        # คำอธิบาย ICD-10 ACS
+        # คำอธิบาย ICD-10 ACS 
         with st.expander("📖 นิยามและรหัส ICD-10 — ACS", expanded=False):
-            st.markdown(f"""
-            <div style="display:grid;grid-template-columns:1fr 1fr;
-                        gap:1rem;padding:0.5rem 0;">
-    
-                <div style="background:#FBE9E7;padding:1rem;border-radius:8px;
-                            border-left:4px solid #BF360C;">
-                    <b style="color:#BF360C;font-size:1rem;">🔴 STEMI</b>
-                    <p style="color:#37474F;font-size:0.85rem;margin:0.6rem 0 0 0;
-                               line-height:1.7;">
-                        <b>นิยาม:</b> ST-Elevation Myocardial Infarction<br>
-                        หลอดเลือดหัวใจอุดตันสมบูรณ์ — <b>ฉุกเฉินสูงสุด</b><br><br>
-                        <b>รหัส ICD-10:</b><br>
-                        <code>I21.0</code> – Anterior wall STEMI<br>
-                        <code>I21.1</code> – Inferior wall STEMI<br>
-                        <code>I21.2</code> – Other specified STEMI<br>
-                        <code>I21.3</code> – STEMI, unspecified site<br>
-                        <code>I22.0</code> – Subsequent anterior STEMI<br>
-                        <code>I22.1</code> – Subsequent inferior STEMI<br>
-                        <code>I22.8</code> – Subsequent STEMI, other<br>
-                        <code>I22.9</code> – Subsequent STEMI, unspecified<br><br>
-                        <b>Door-to-balloon:</b> เป้าหมาย &lt; 90 นาที<br>
-                        <b>Mortality:</b> ~5-10% (in-hospital)
-                    </p>
-                </div>
-    
-                <div style="background:#FFF8E1;padding:1rem;border-radius:8px;
-                            border-left:4px solid #F9A825;">
-                    <b style="color:#F57F17;font-size:1rem;">🟡 NSTEMI / UA</b>
-                    <p style="color:#37474F;font-size:0.85rem;margin:0.6rem 0 0 0;
-                               line-height:1.7;">
-                        <b>นิยาม:</b> Non-ST-Elevation MI และ Unstable Angina<br>
-                        หลอดเลือดอุดตันบางส่วน — <b>ฉุกเฉินสูง</b><br><br>
-                        <b>รหัส ICD-10:</b><br>
-                        <code>I21.4</code> – NSTEMI (specific)<br>
-                        <code>I21.9</code> – Acute MI, unspecified<br>
-                        <code>I22.2</code> – Subsequent NSTEMI<br>
-                        <code>I20.0</code> – Unstable angina<br>
-                        <code>I24.0</code> – Coronary thrombosis (no MI)<br>
-                        <code>I24.8</code> – Other acute ischaemic HD<br>
-                        <code>I24.9</code> – Acute ischaemic HD, unspecified<br><br>
-                        <b>เป้าหมาย:</b> Early invasive strategy &lt; 24-72 ชม.<br>
-                        <b>Mortality:</b> ~3-5% (in-hospital)
-                    </p>
-                </div>
-    
-            </div>
+            st.markdown("""
+            <table style="width:100%;border-collapse:separate;border-spacing:8px;
+                          padding:0.5rem 0;">
+            <tr>
+
+              <td style="background:#FBE9E7;padding:1rem;border-radius:8px;
+                         border-left:4px solid #BF360C;vertical-align:top;width:50%;">
+                <b style="color:#BF360C;font-size:1rem;">🔴 STEMI</b><br><br>
+                <span style="color:#37474F;font-size:0.85rem;line-height:1.8;">
+                  <b>นิยาม:</b> ST-Elevation Myocardial Infarction<br>
+                  หลอดเลือดหัวใจอุดตันสมบูรณ์ — <b>ฉุกเฉินสูงสุด</b><br><br>
+                  <b>รหัส ICD-10:</b><br>
+                  I21.0 – Anterior wall STEMI<br>
+                  I21.1 – Inferior wall STEMI<br>
+                  I21.2 – Other specified STEMI<br>
+                  I21.3 – STEMI, unspecified site<br>
+                  I22.0 – Subsequent anterior STEMI<br>
+                  I22.1 – Subsequent inferior STEMI<br>
+                  I22.8 – Subsequent STEMI, other<br>
+                  I22.9 – Subsequent STEMI, unspecified<br><br>
+                  <b>Door-to-balloon:</b> เป้าหมาย &lt; 90 นาที<br>
+                  <b>Mortality:</b> ~5-10% (in-hospital)
+                </span>
+              </td>
+
+              <td style="background:#FFF8E1;padding:1rem;border-radius:8px;
+                         border-left:4px solid #F9A825;vertical-align:top;width:50%;">
+                <b style="color:#F57F17;font-size:1rem;">🟡 NSTEMI / UA</b><br><br>
+                <span style="color:#37474F;font-size:0.85rem;line-height:1.8;">
+                  <b>นิยาม:</b> Non-ST-Elevation MI และ Unstable Angina<br>
+                  หลอดเลือดอุดตันบางส่วน — <b>ฉุกเฉินสูง</b><br><br>
+                  <b>รหัส ICD-10:</b><br>
+                  I21.4 – NSTEMI (specific)<br>
+                  I21.9 – Acute MI, unspecified<br>
+                  I22.2 – Subsequent NSTEMI<br>
+                  I20.0 – Unstable angina<br>
+                  I24.0 – Coronary thrombosis (no MI)<br>
+                  I24.8 – Other acute ischaemic HD<br>
+                  I24.9 – Acute ischaemic HD, unspecified<br><br>
+                  <b>เป้าหมาย:</b> Early invasive strategy &lt; 24-72 ชม.<br>
+                  <b>Mortality:</b> ~3-5% (in-hospital)
+                </span>
+              </td>
+
+            </tr>
+            </table>
             <div style="margin-top:0.8rem;padding:0.6rem 1rem;
                         background:rgba(33,33,33,0.05);border-radius:6px;
                         border-left:3px solid #FF8F00;">
-                <span style="color:#E65100;font-size:0.85rem;">
-                    ⚠️ <b>หมายเหตุ:</b> I21.9 (Acute MI unspecified) ถูกนับใน NSTEMI/UA
-                    เนื่องจากมักใช้เมื่อยังไม่ได้ระบุประเภทชัดเจน
-                    ควรตรวจสอบกับ Cardiology team เพื่อ Coding ที่ถูกต้อง
-                </span>
+              <span style="color:#E65100;font-size:0.85rem;">
+                ⚠️ <b>หมายเหตุ:</b> I21.9 (Acute MI unspecified) ถูกนับใน NSTEMI/UA
+                เนื่องจากมักใช้เมื่อยังไม่ได้ระบุประเภทชัดเจน —
+                ควรตรวจสอบกับ Cardiology team
+              </span>
             </div>
             """, unsafe_allow_html=True)
     
