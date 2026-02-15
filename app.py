@@ -2749,43 +2749,11 @@ with st.sidebar:
             </div>
         </div>
     """, unsafe_allow_html=True)
-        menu = st.session_state.get('selected_menu', '🏠 หน้าแรก')
+    menu = st.session_state.get('selected_menu', '🏠 หน้าแรก')
  
      
         
-        # Info cards
-        current_date = datetime.now()
-        st.markdown(f"""
-            <div style="background:rgba(255,255,255,0.1);padding:0.8rem;
-                        border-radius:8px;margin-bottom:0.5rem;">
-                <div style="color:#B3E5FC;font-size:0.75rem;margin-bottom:0.2rem;">
-                    📅 CURRENT DATE
-                </div>
-                <div style="color:white;font-weight:600;font-size:0.9rem;">
-                    {current_date.strftime('%d %B %Y')}
-                </div>
-            </div>
-            
-            <div style="background:rgba(255,255,255,0.1);padding:0.8rem;
-                        border-radius:8px;margin-bottom:0.5rem;">
-                <div style="color:#B3E5FC;font-size:0.75rem;margin-bottom:0.2rem;">
-                    🔄 VERSION
-                </div>
-                <div style="color:white;font-weight:600;font-size:0.9rem;">
-                    v2.0.0 (Enterprise)
-                </div>
-            </div>
-            
-            <div style="background:rgba(76,175,80,0.2);padding:0.8rem;
-                        border-radius:8px;border:1px solid rgba(76,175,80,0.4);">
-                <div style="color:#C8E6C9;font-size:0.75rem;margin-bottom:0.2rem;">
-                    ✅ STATUS
-                </div>
-                <div style="color:#4CAF50;font-weight:600;font-size:0.9rem;">
-                    System Online
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
+      
     
     # ========================================
     # ROUTE TO PAGES
