@@ -600,7 +600,28 @@ def show_import():
         'xlrd': False,
         'html': True
     }
-    
+    try:
+        client = init_supabase()
+        
+        # เพิ่มส่วนนี้เพื่อ debug
+        st.write("🔍 **Debug Info:**")
+        st.write(f"- Supabase URL: {SUPABASE_URL}")
+        st.write(f"- API Key: {SUPABASE_KEY[:20]}...{SUPABASE_KEY[-10:]}")
+        
+        # ดึงข้อมูล month_year ที่ไม่ซ้ำพร้อมสถิติ
+        with st.spinner("กำลังโหลดข้อมูลในระบบ..."):
+            result = client.select('ipd_monthly', columns='month_year,fiscal_year,an,created_at')
+        
+        # เพิ่มส่วนนี้เพื่อดู response
+        st.write(f"- Result: {result}")
+        st.write(f"- Error: {result.get('error', 'None')}")
+        st.write(f"- Data count: {len(result.get('data', []))}")
+        
+        if result['data'] and len(result['data']) > 0:
+
+
+
+ 
     try:
         import openpyxl
         available_engines['openpyxl'] = True
