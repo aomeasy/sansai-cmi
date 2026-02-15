@@ -139,9 +139,16 @@ class SupabaseClient:
     def select(self, table, columns="*", filters=None):
         """Select data from table"""
         url = f"{self.url}/rest/v1/{table}?select={columns}"
+
+        if limit:
+            url += f"&limit={limit}"
         if filters:
             for key, value in filters.items():
                 url += f"&{key}=eq.{value}"
+             
+        headers = self.headers.copy()
+        headers["Range-Unit"] = "items"
+     
         response = requests.get(url, headers=self.headers)
         if response.status_code == 200:
             return {"data": response.json(), "count": len(response.json()), "error": None}
@@ -625,7 +632,7 @@ def show_import():
         
         # ดึงข้อมูล month_year ที่ไม่ซ้ำพร้อมสถิติ
         with st.spinner("กำลังโหลดข้อมูลในระบบ..."):
-            result = client.select('ipd_monthly', columns='month_year,fiscal_year,an,created_at')
+            result = client.select('ipd_monthly', columns='month_year,fiscal_year,an,created_at', limit=600000)
         
         if result['data'] and len(result['data']) > 0:
             df_existing = pd.DataFrame(result['data'])
@@ -934,7 +941,7 @@ def show_reports():
     # ── โหลดข้อมูล ────────────────────────────────────────
     client = init_supabase()
     with st.spinner("กำลังโหลดข้อมูล..."):
-        result = client.select('ipd_monthly')
+        result = client.select('ipd_monthly', limit=100000)
 
     if result['error'] or not result['data']:
         st.warning("⚠️ ไม่พบข้อมูลในระบบ กรุณานำเข้าข้อมูลก่อน")
