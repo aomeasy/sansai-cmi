@@ -547,23 +547,33 @@ def show_reports():
         - 📉 แนวโน้มและกราฟ
     """)
 
+
+
 def show_import():
     """หน้านำเข้าข้อมูล"""
     st.markdown("## 📥 นำเข้าข้อมูล IPD Monthly")
+    
+    # ✅ เพิ่ม: ตรวจสอบว่ามี openpyxl หรือไม่
+    try:
+        import openpyxl
+        excel_available = True
+    except ImportError:
+        excel_available = False
+        st.warning("⚠️ ระบบไม่สามารถอ่านไฟล์ Excel ได้ กรุณาใช้ไฟล์ CSV แทน")
     
     # คำแนะนำ
     with st.expander("📖 คำแนะนำการนำเข้าข้อมูล", expanded=True):
         st.markdown("""
         ### รูปแบบไฟล์ที่รองรับ:
-        - Excel (.xlsx, .xls)
-        - CSV (.csv)
+        - Excel (.xlsx, .xls) """ + ("✅" if excel_available else "❌ ไม่พร้อมใช้งาน") + """
+        - CSV (.csv) ✅
         
         ### 🔴 สำคัญ: รูปแบบชื่อไฟล์
-        ชื่อไฟล์ต้องมีรูปแบบ: **`ipd-[เดือน].[ปี].xlsx`**
+        ชื่อไฟล์ต้องมีรูปแบบ: **`ipd-[เดือน].[ปี].xlsx`** หรือ **`ipd-[เดือน].[ปี].csv`**
         
         ตัวอย่าง:
         - `3_ipd-ธ.ค.68.xlsx` → ธันวาคม 2568 (2025-12-01)
-        - `ipd-ม.ค.69.xlsx` → มกราคม 2569 (2026-01-01)
+        - `ipd-ม.ค.69.csv` → มกราคม 2569 (2026-01-01)
         - `ipd-ก.พ.68.xlsx` → กุมภาพันธ์ 2568 (2025-02-01)
         
         เดือนที่รองรับ: ม.ค., ก.พ., มี.ค., เม.ย., พ.ค., มิ.ย., ก.ค., ส.ค., ก.ย., ต.ค., พ.ย., ธ.ค.
@@ -585,14 +595,29 @@ def show_import():
         - ระบบจะคำนวณ **fiscal_year** ให้อัตโนมัติ
         - ข้อมูลที่มี AN ซ้ำในเดือนเดียวกันจะไม่สามารถนำเข้าได้
         """)
+        
+        # ✅ เพิ่ม: คำแนะนำแปลง Excel เป็น CSV
+        if not excel_available:
+            st.info("""
+            💡 **วิธีแปลงไฟล์ Excel เป็น CSV:**
+            1. เปิดไฟล์ Excel
+            2. คลิก **File** → **Save As**
+            3. เลือก **File Format** เป็น **"CSV UTF-8 (Comma delimited) (.csv)"**
+            4. กด **Save** แล้วอัปโหลดไฟล์ CSV ที่นี่
+            """)
     
     st.markdown("---")
     
     # อัพโหลดไฟล์
+    # ✅ แก้ไข: เปลี่ยน type ตามสถานะของ openpyxl
+    allowed_types = ['csv']
+    if excel_available:
+        allowed_types.extend(['xlsx', 'xls'])
+    
     uploaded_file = st.file_uploader(
         "เลือกไฟล์ข้อมูล",
-        type=['xlsx', 'xls', 'csv'],
-        help="อัพโหลดไฟล์ Excel หรือ CSV ที่ตั้งชื่อตามรูปแบบ: ipd-ธ.ค.68.xlsx"
+        type=allowed_types,
+        help="อัพโหลดไฟล์ " + ("Excel หรือ " if excel_available else "") + "CSV ที่ตั้งชื่อตามรูปแบบ: ipd-ธ.ค.68" + (".xlsx" if excel_available else ".csv")
     )
     
     if uploaded_file is not None:
@@ -608,11 +633,50 @@ def show_import():
                 st.error("❌ ไม่สามารถอ่าน month_year จากชื่อไฟล์ได้ กรุณาตั้งชื่อไฟล์ให้ถูกต้อง")
                 st.stop()
             
-            # อ่านไฟล์
-            if uploaded_file.name.endswith('.csv'):
-                df = pd.read_csv(uploaded_file)
-            else:
-                df = pd.read_excel(uploaded_file)
+            # ✅ แก้ไข: อ่านไฟล์ด้วย error handling ที่ดีขึ้น
+            try:
+                if uploaded_file.name.endswith('.csv'):
+                    df = pd.read_csv(uploaded_file)
+                elif uploaded_file.name.endswith(('.xlsx', '.xls')):
+                    if not excel_available:
+                        st.error("❌ ระบบไม่สามารถอ่านไฟล์ Excel ได้ กรุณาแปลงเป็น CSV ก่อน")
+                        st.stop()
+                    
+                    # ลองใช้ engine ต่างๆ
+                    try:
+                        df = pd.read_excel(uploaded_file, engine='openpyxl')
+                    except Exception as e1:
+                        try:
+                            # ลอง xlrd สำหรับไฟล์ .xls เก่า
+                            df = pd.read_excel(uploaded_file, engine='xlrd')
+                        except Exception as e2:
+                            st.error(f"""
+                            ❌ ไม่สามารถอ่านไฟล์ Excel ได้
+                            
+                            **ข้อผิดพลาด:**
+                            - openpyxl: {str(e1)[:100]}
+                            - xlrd: {str(e2)[:100]}
+                            
+                            **แนะนำ:** ลองแปลงไฟล์เป็น CSV ก่อนอัปโหลด
+                            """)
+                            st.stop()
+                else:
+                    st.error(f"❌ ไฟล์นามสกุล .{uploaded_file.name.split('.')[-1]} ไม่รองรับ")
+                    st.stop()
+                    
+            except Exception as e:
+                st.error(f"❌ เกิดข้อผิดพลาดในการอ่านไฟล์: {str(e)}")
+                if not uploaded_file.name.endswith('.csv'):
+                    st.info("""
+                    💡 **แนะนำ:** ลองแปลงไฟล์ Excel เป็น CSV แล้วลองใหม่อีกครั้ง
+                    
+                    **วิธีแปลง:**
+                    1. เปิดไฟล์ Excel
+                    2. File → Save As
+                    3. เลือก Format: CSV UTF-8
+                    4. Save และอัปโหลดใหม่
+                    """)
+                st.stop()
             
             st.success(f"✅ อ่านไฟล์สำเร็จ!")
             
@@ -691,8 +755,10 @@ def show_import():
                         st.rerun()
         
         except Exception as e:
-            st.error(f"❌ เกิดข้อผิดพลาดในการอ่านไฟล์: {str(e)}")
+            st.error(f"❌ เกิดข้อผิดพลาดที่ไม่คาดคิด: {str(e)}")
             st.exception(e)
+
+ 
 
 # เรียกใช้งาน
 if __name__ == "__main__":
