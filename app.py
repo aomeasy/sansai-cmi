@@ -1,9 +1,6 @@
 import streamlit as st
 import pandas as pd
-try:
-    from supabase import create_client, Client
-except ImportError:
-    from supabase.client import create_client, Client
+from supabase import create_client
 from datetime import datetime
 import io
 
