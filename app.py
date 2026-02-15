@@ -4,6 +4,7 @@ from datetime import datetime
 import io
 import requests
 import json
+import re
 
 # ตั้งค่าหน้าเว็บ
 st.set_page_config(
@@ -162,6 +163,62 @@ def init_supabase():
     """เชื่อมต่อ Supabase"""
     return SupabaseClient(SUPABASE_URL, SUPABASE_KEY)
 
+def parse_month_year_from_filename(filename):
+    """
+    แปลงชื่อไฟล์เป็น month_year
+    ตัวอย่าง: "3_ipd-ธ.ค.68.xlsx" -> "2025-12-01"
+    """
+    # Dictionary สำหรับแปลงเดือนภาษาไทยเป็นตัวเลข
+    thai_months = {
+        'ม.ค.': 1, 'มกราคม': 1, 'ม.ค': 1,
+        'ก.พ.': 2, 'กุมภาพันธ์': 2, 'ก.พ': 2,
+        'มี.ค.': 3, 'มีนาคม': 3, 'มี.ค': 3,
+        'เม.ย.': 4, 'เมษายน': 4, 'เม.ย': 4,
+        'พ.ค.': 5, 'พฤษภาคม': 5, 'พ.ค': 5,
+        'มิ.ย.': 6, 'มิถุนายน': 6, 'มิ.ย': 6,
+        'ก.ค.': 7, 'กรกฎาคม': 7, 'ก.ค': 7,
+        'ส.ค.': 8, 'สิงหาคม': 8, 'ส.ค': 8,
+        'ก.ย.': 9, 'กันยายน': 9, 'ก.ย': 9,
+        'ต.ค.': 10, 'ตุลาคม': 10, 'ต.ค': 10,
+        'พ.ย.': 11, 'พฤศจิกายน': 11, 'พ.ย': 11,
+        'ธ.ค.': 12, 'ธันวาคม': 12, 'ธ.ค': 12,
+    }
+    
+    try:
+        # ลบนามสกุลไฟล์
+        name = filename.replace('.xlsx', '').replace('.xls', '').replace('.csv', '')
+        
+        # หาเดือนภาษาไทย
+        month_num = None
+        for thai_month, num in thai_months.items():
+            if thai_month in name:
+                month_num = num
+                break
+        
+        if month_num is None:
+            return None
+        
+        # หาปี (หาตัวเลข 2 หลักหลังจากเดือน)
+        year_match = re.search(r'(\d{2})(?:\.xlsx|\.xls|\.csv|$)', name)
+        if year_match:
+            year_buddhist = int(year_match.group(1))
+            # แปลงจากปี พ.ศ. 2 หลัก เป็น ค.ศ.
+            # 68 = 2568 - 543 = 2025
+            if year_buddhist >= 0 and year_buddhist <= 99:
+                year_christian = 2500 + year_buddhist - 543
+            else:
+                return None
+            
+            # สร้างวันที่ (วันแรกของเดือน)
+            month_year = f"{year_christian}-{month_num:02d}-01"
+            return month_year
+        
+        return None
+        
+    except Exception as e:
+        st.error(f"ไม่สามารถแปลงชื่อไฟล์เป็น month_year: {str(e)}")
+        return None
+
 def get_fiscal_year(date_value):
     """คำนวณปีงบประมาณ (ตุลาคม-กันยายน)"""
     if pd.isna(date_value):
@@ -182,24 +239,92 @@ def calculate_length_of_stay(admit_date, discharge_date):
     days = (discharge - admit).days
     return max(days, 0)
 
-def validate_and_prepare_data(df):
+def map_columns(df):
+    """แปลงชื่อคอลัมน์จากไฟล์ Excel ให้ตรงกับ schema ของ database"""
+    
+    # Mapping dictionary สำหรับแปลงชื่อคอลัมน์
+    column_mapping = {
+        'No': None,  # ไม่ใช้
+        'an': 'an',
+        'hn': 'hn',
+        'vn': 'vn',
+        'birthday': 'birth_date',
+        'Age': 'age',
+        'sex': 'sex',
+        'AdmitDate': 'admit_date',
+        'D/C Date': 'discharge_date',
+        'wardname': 'ward_name',
+        'pttypename': 'pttype_name',
+        'pdx': 'pdx',
+        'dx0': 'dx0',
+        'dx1': 'dx1',
+        'dx2': 'dx2',
+        'dx3': 'dx3',
+        'dx4': 'dx4',
+        'dx5': 'dx5',
+        'dx6': 'dx6',
+        'dx7': 'dx7',
+        'dx8': 'dx8',
+        'dx9': 'dx9',
+        'dx10': 'dx10',
+        'op0': 'op0',
+        'op1': 'op1',
+        'op2': 'op2',
+        'op3': 'op3',
+        'op4': 'op4',
+        'op5': 'op5',
+        'op6': 'op6',
+        'op7': 'op7',
+        'op8': 'op8',
+        'op9': 'op9',
+        'op10': 'op10',
+        'op11': 'op11',
+        'จำนวนวันนอน': 'length_of_stay',
+        'adjrw': 'adjrw',
+        'discharge_status': 'discharge_status',
+        'type_description': 'discharge_type',
+        'clinic': 'clinic_name'
+    }
+    
+    # สร้าง DataFrame ใหม่ด้วยชื่อคอลัมน์ที่แปลงแล้ว
+    df_mapped = pd.DataFrame()
+    
+    for old_col, new_col in column_mapping.items():
+        if old_col in df.columns and new_col is not None:
+            df_mapped[new_col] = df[old_col]
+    
+    return df_mapped
+
+def validate_and_prepare_data(df, filename):
     """ตรวจสอบและเตรียมข้อมูลก่อนนำเข้า"""
     errors = []
     warnings = []
     
+    # แปลง month_year จากชื่อไฟล์
+    month_year = parse_month_year_from_filename(filename)
+    if month_year is None:
+        errors.append("ไม่สามารถอ่าน month_year จากชื่อไฟล์ได้ กรุณาตั้งชื่อไฟล์ในรูปแบบ: 'ipd-ธ.ค.68.xlsx'")
+        return None, errors, warnings
+    
+    # แปลงชื่อคอลัมน์ให้ตรงกับ schema
+    df_mapped = map_columns(df)
+    
     # คอลัมน์ที่จำเป็น
-    required_columns = ['an', 'hn', 'month_year']
-    missing_cols = [col for col in required_columns if col not in df.columns]
+    required_columns = ['an', 'hn']
+    missing_cols = [col for col in required_columns if col not in df_mapped.columns]
     
     if missing_cols:
         errors.append(f"ขาดคอลัมน์ที่จำเป็น: {', '.join(missing_cols)}")
         return None, errors, warnings
     
     # ทำสำเนาข้อมูล
-    df_clean = df.copy()
+    df_clean = df_mapped.copy()
+    
+    # เพิ่ม month_year ทุกแถว
+    df_clean['month_year'] = month_year
     
     # แปลงวันที่
-    date_columns = ['month_year', 'birth_date', 'admit_date', 'discharge_date']
+    date_columns = ['birth_date', 'admit_date', 'discharge_date']
     for col in date_columns:
         if col in df_clean.columns:
             try:
@@ -209,19 +334,20 @@ def validate_and_prepare_data(df):
             except:
                 warnings.append(f"ไม่สามารถแปลงวันที่ในคอลัมน์ {col} บางรายการ")
     
-    # คำนวณปีงบประมาณ
-    if 'month_year' in df_clean.columns:
-        df_clean['fiscal_year'] = df.apply(
-            lambda row: get_fiscal_year(row['month_year']) if 'month_year' in row else None,
-            axis=1
-        )
+    # แปลง month_year เป็น datetime แล้วแปลงกลับเป็น string
+    df_clean['month_year'] = pd.to_datetime(df_clean['month_year']).dt.strftime('%Y-%m-%d')
     
-    # คำนวณจำนวนวันนอน
-    if 'admit_date' in df.columns and 'discharge_date' in df.columns:
-        df_clean['length_of_stay'] = df.apply(
-            lambda row: calculate_length_of_stay(row.get('admit_date'), row.get('discharge_date')),
-            axis=1
-        )
+    # คำนวณปีงบประมาณ
+    df_clean['fiscal_year'] = pd.to_datetime(df_clean['month_year']).apply(get_fiscal_year)
+    
+    # ถ้าไม่มี length_of_stay หรือเป็น null ให้คำนวณใหม่
+    if 'length_of_stay' not in df_clean.columns or df_clean['length_of_stay'].isna().any():
+        if 'admit_date' in df_clean.columns and 'discharge_date' in df_clean.columns:
+            # แปลงกลับเป็น datetime เพื่อคำนวณ
+            admit_dates = pd.to_datetime(df_clean['admit_date'], errors='coerce')
+            discharge_dates = pd.to_datetime(df_clean['discharge_date'], errors='coerce')
+            df_clean['length_of_stay'] = (discharge_dates - admit_dates).dt.days
+            df_clean['length_of_stay'] = df_clean['length_of_stay'].apply(lambda x: max(x, 0) if pd.notna(x) else None)
     
     # แปลงตัวเลข
     if 'age' in df_clean.columns:
@@ -229,6 +355,25 @@ def validate_and_prepare_data(df):
     
     if 'adjrw' in df_clean.columns:
         df_clean['adjrw'] = pd.to_numeric(df_clean['adjrw'], errors='coerce')
+    
+    if 'length_of_stay' in df_clean.columns:
+        df_clean['length_of_stay'] = pd.to_numeric(df_clean['length_of_stay'], errors='coerce')
+    
+    # แปลง AN และ HN เป็น string
+    df_clean['an'] = df_clean['an'].astype(str)
+    df_clean['hn'] = df_clean['hn'].astype(str)
+    if 'vn' in df_clean.columns:
+        df_clean['vn'] = df_clean['vn'].astype(str)
+    
+    # แปลง sex เป็น string (1 ตัวอักษร)
+    if 'sex' in df_clean.columns:
+        df_clean['sex'] = df_clean['sex'].astype(str).str[:1]
+    
+    # แปลง op ทั้งหมดเป็น string
+    op_columns = [f'op{i}' for i in range(12)]
+    for col in op_columns:
+        if col in df_clean.columns:
+            df_clean[col] = df_clean[col].apply(lambda x: str(x) if pd.notna(x) and str(x) != 'nan' else None)
     
     # เพิ่มข้อมูลการนำเข้า
     df_clean['imported_by'] = st.session_state.get('username', 'system')
@@ -238,7 +383,7 @@ def validate_and_prepare_data(df):
     # ตรวจสอบข้อมูลซ้ำ (AN + month_year)
     duplicates = df_clean[df_clean.duplicated(subset=['an', 'month_year'], keep=False)]
     if not duplicates.empty:
-        warnings.append(f"พบข้อมูลซ้ำ {len(duplicates)} รายการ (AN + month_year ซ้ำ)")
+        warnings.append(f"พบข้อมูลซ้ำในไฟล์ {len(duplicates)} รายการ (AN + month_year ซ้ำ)")
     
     # แทนที่ NaN ด้วย None
     df_clean = df_clean.where(pd.notna(df_clean), None)
@@ -413,24 +558,32 @@ def show_import():
         - Excel (.xlsx, .xls)
         - CSV (.csv)
         
-        ### คอลัมน์ที่จำเป็นต้องมี:
-        - **an** (Admission Number) - รหัสผู้ป่วยใน
-        - **hn** (Hospital Number) - รหัสผู้ป่วย
-        - **month_year** - เดือน/ปี ที่รายงาน
+        ### 🔴 สำคัญ: รูปแบบชื่อไฟล์
+        ชื่อไฟล์ต้องมีรูปแบบ: **`ipd-[เดือน].[ปี].xlsx`**
         
-        ### คอลัมน์เสริม (ถ้ามี):
-        - vn, birth_date, age, sex
-        - admit_date, discharge_date, length_of_stay
-        - ward_code, ward_name, clinic_code, clinic_name
-        - pttype_code, pttype_name
+        ตัวอย่าง:
+        - `3_ipd-ธ.ค.68.xlsx` → ธันวาคม 2568 (2025-12-01)
+        - `ipd-ม.ค.69.xlsx` → มกราคม 2569 (2026-01-01)
+        - `ipd-ก.พ.68.xlsx` → กุมภาพันธ์ 2568 (2025-02-01)
+        
+        เดือนที่รองรับ: ม.ค., ก.พ., มี.ค., เม.ย., พ.ค., มิ.ย., ก.ค., ส.ค., ก.ย., ต.ค., พ.ย., ธ.ค.
+        
+        ### คอลัมน์ที่จำเป็นต้องมีในไฟล์:
+        - **an** - รหัสผู้ป่วยใน (Admission Number)
+        - **hn** - รหัสผู้ป่วย (Hospital Number)
+        
+        ### คอลัมน์ที่รองรับ:
+        - vn, birthday, Age, sex
+        - AdmitDate, D/C Date, จำนวนวันนอน
+        - wardname, pttypename, clinic
         - pdx, dx0-dx10 (รหัสโรค ICD-10)
         - op0-op11 (รหัสหัตถการ)
-        - adjrw, drg_code
-        - discharge_status, discharge_type
+        - adjrw, discharge_status, type_description
         
         ### หมายเหตุ:
-        - ระบบจะคำนวณ fiscal_year และ length_of_stay ให้อัตโนมัติ
-        - ข้อมูลที่มี AN และ month_year ซ้ำจะไม่สามารถนำเข้าได้
+        - ระบบจะอ่าน **month_year** จากชื่อไฟล์โดยอัตโนมัติ
+        - ระบบจะคำนวณ **fiscal_year** ให้อัตโนมัติ
+        - ข้อมูลที่มี AN ซ้ำในเดือนเดียวกันจะไม่สามารถนำเข้าได้
         """)
     
     st.markdown("---")
@@ -439,21 +592,32 @@ def show_import():
     uploaded_file = st.file_uploader(
         "เลือกไฟล์ข้อมูล",
         type=['xlsx', 'xls', 'csv'],
-        help="อัพโหลดไฟล์ Excel หรือ CSV"
+        help="อัพโหลดไฟล์ Excel หรือ CSV ที่ตั้งชื่อตามรูปแบบ: ipd-ธ.ค.68.xlsx"
     )
     
     if uploaded_file is not None:
         try:
+            # แสดงชื่อไฟล์และ month_year ที่แปลงได้
+            st.info(f"📁 **ชื่อไฟล์:** {uploaded_file.name}")
+            
+            month_year = parse_month_year_from_filename(uploaded_file.name)
+            if month_year:
+                month_year_display = pd.to_datetime(month_year).strftime('%B %Y')
+                st.success(f"📅 **เดือน-ปีที่จะนำเข้า:** {month_year_display} ({month_year})")
+            else:
+                st.error("❌ ไม่สามารถอ่าน month_year จากชื่อไฟล์ได้ กรุณาตั้งชื่อไฟล์ให้ถูกต้อง")
+                st.stop()
+            
             # อ่านไฟล์
             if uploaded_file.name.endswith('.csv'):
                 df = pd.read_csv(uploaded_file)
             else:
                 df = pd.read_excel(uploaded_file)
             
-            st.success(f"✅ อ่านไฟล์สำเร็จ: **{uploaded_file.name}**")
+            st.success(f"✅ อ่านไฟล์สำเร็จ!")
             
             # แสดงข้อมูลตัวอย่าง
-            st.markdown("### 👀 ตัวอย่างข้อมูล")
+            st.markdown("### 👀 ตัวอย่างข้อมูลจากไฟล์")
             st.dataframe(df.head(10), use_container_width=True)
             
             # แสดงสถิติ
@@ -468,10 +632,10 @@ def show_import():
             st.markdown("---")
             
             # ตรวจสอบและเตรียมข้อมูล
-            st.markdown("### 🔍 ตรวจสอบข้อมูล")
+            st.markdown("### 🔍 ตรวจสอบและแปลงข้อมูล")
             
-            with st.spinner("กำลังตรวจสอบข้อมูล..."):
-                df_clean, errors, warnings = validate_and_prepare_data(df)
+            with st.spinner("กำลังตรวจสอบและแปลงข้อมูล..."):
+                df_clean, errors, warnings = validate_and_prepare_data(df, uploaded_file.name)
             
             # แสดงข้อผิดพลาด
             if errors:
@@ -488,8 +652,9 @@ def show_import():
                 st.success("✅ ข้อมูลผ่านการตรวจสอบเรียบร้อย")
                 
                 # แสดงข้อมูลที่จะนำเข้า
-                with st.expander("📋 ดูข้อมูลที่เตรียมนำเข้า"):
+                with st.expander("📋 ดูข้อมูลที่เตรียมนำเข้า (แปลงเป็น schema database แล้ว)"):
                     st.dataframe(df_clean.head(20), use_container_width=True)
+                    st.info(f"💡 ข้อมูลมีคอลัมน์: {', '.join(df_clean.columns.tolist())}")
                 
                 st.markdown("---")
                 
