@@ -117,7 +117,7 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 
 
 class SupabaseClient:
-    """Simple Supabase client using REST API"""
+    """Simple Supabase client using REST API with improved error handling"""
     
     def __init__(self, url, key):
         self.url = url
@@ -128,14 +128,45 @@ class SupabaseClient:
             "Prefer": "return=representation"
         }
     
+    def test_connection(self):
+        """ทดสอบการเชื่อมต่อ Supabase"""
+        try:
+            url = f"{self.url}/rest/v1/"
+            response = requests.get(url, headers=self.headers, timeout=10)
+            
+            if response.status_code == 200:
+                return {"success": True, "message": "✅ เชื่อมต่อ Supabase สำเร็จ"}
+            else:
+                return {
+                    "success": False, 
+                    "message": f"❌ HTTP {response.status_code}",
+                    "detail": response.text[:200]
+                }
+        except requests.exceptions.Timeout:
+            return {"success": False, "message": "⏱️ Timeout - เซิร์ฟเวอร์ตอบสนองช้า"}
+        except requests.exceptions.ConnectionError:
+            return {"success": False, "message": "🔌 ไม่สามารถเชื่อมต่อได้"}
+        except Exception as e:
+            return {"success": False, "message": f"❌ {str(e)}"}
+    
     def insert(self, table, data):
         """Insert data into table"""
         url = f"{self.url}/rest/v1/{table}"
-        response = requests.post(url, headers=self.headers, json=data)
-        if response.status_code in [200, 201]:
-            return {"data": response.json(), "error": None}
-        else:
-            return {"data": None, "error": response.text}
+        try:
+            response = requests.post(url, headers=self.headers, json=data, timeout=30)
+            
+            if response.status_code in [200, 201]:
+                return {"data": response.json(), "error": None}
+            else:
+                error_detail = response.text
+                try:
+                    error_json = response.json()
+                    error_detail = error_json.get('message', error_detail)
+                except:
+                    pass
+                return {"data": None, "error": f"HTTP {response.status_code}: {error_detail}"}
+        except Exception as e:
+            return {"data": None, "error": f"Error: {str(e)}"}
     
     def select(self, table, columns="*", filters=None, limit=None):
         """
@@ -163,42 +194,89 @@ class SupabaseClient:
             headers = self.headers.copy()
             headers["Prefer"] = "count=exact"
             
-            response = requests.get(url, headers=headers)
-            
-            if response.status_code != 200:
-                return {"data": None, "count": 0, "error": response.text}
-            
-            data = response.json()
-            
-            # ถ้าไม่มีข้อมูลแล้ว หยุด
-            if not data:
-                break
-            
-            all_data.extend(data)
-            
-            # ถ้าได้ข้อมูลน้อยกว่า page_size แสดงว่าหมดแล้ว
-            if len(data) < page_size:
-                break
-            
-            # ถ้ามี limit และได้ครบแล้ว
-            if limit and len(all_data) >= limit:
-                all_data = all_data[:limit]
-                break
-            
-            offset += page_size
+            try:
+                response = requests.get(url, headers=headers, timeout=30)
+                
+                if response.status_code != 200:
+                    error_detail = response.text
+                    try:
+                        error_json = response.json()
+                        error_detail = error_json.get('message', error_detail)
+                    except:
+                        pass
+                    
+                    return {
+                        "data": None, 
+                        "count": 0, 
+                        "error": f"HTTP {response.status_code}: {error_detail[:300]}"
+                    }
+                
+                data = response.json()
+                
+                # ถ้าไม่มีข้อมูลแล้ว หยุด
+                if not data:
+                    break
+                
+                all_data.extend(data)
+                
+                # ถ้าได้ข้อมูลน้อยกว่า page_size แสดงว่าหมดแล้ว
+                if len(data) < page_size:
+                    break
+                
+                # ถ้ามี limit และได้ครบแล้ว
+                if limit and len(all_data) >= limit:
+                    all_data = all_data[:limit]
+                    break
+                
+                offset += page_size
+                
+            except requests.exceptions.Timeout:
+                return {"data": None, "count": 0, "error": "Timeout: เซิร์ฟเวอร์ตอบสนองช้า"}
+            except requests.exceptions.ConnectionError:
+                return {"data": None, "count": 0, "error": "Connection Error: ไม่สามารถเชื่อมต่อได้"}
+            except Exception as e:
+                return {"data": None, "count": 0, "error": f"Error: {str(e)}"}
         
         return {"data": all_data, "count": len(all_data), "error": None}
     
     def count(self, table):
-        """Count records in table"""
+        """Count records in table - ปรับปรุงให้ทำงานได้ดีขึ้น"""
         url = f"{self.url}/rest/v1/{table}?select=count"
         headers = self.headers.copy()
         headers["Prefer"] = "count=exact"
-        response = requests.head(url, headers=headers)
-        if response.status_code == 200:
-            count = response.headers.get("Content-Range", "0-0/0").split("/")[-1]
-            return int(count)
-        return 0
+        
+        try:
+            # ลอง HEAD request ก่อน
+            response = requests.head(url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                content_range = response.headers.get("Content-Range", "")
+                if content_range:
+                    # Format: "0-999/1234" or "*/1234"
+                    parts = content_range.split("/")
+                    if len(parts) == 2:
+                        try:
+                            return int(parts[1])
+                        except:
+                            pass
+            
+            # ถ้า HEAD ไม่ได้ ลอง GET
+            response = requests.get(url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                # ถ้า response เป็น list ให้นับ
+                if isinstance(data, list):
+                    return len(data)
+                # ถ้า response มี count
+                if isinstance(data, dict) and 'count' in data:
+                    return data['count']
+                    
+            return 0
+            
+        except Exception as e:
+            st.warning(f"⚠️ ไม่สามารถนับจำนวนได้: {str(e)}")
+            return 0
   
 @st.cache_resource
 def init_supabase():
@@ -496,13 +574,13 @@ def main():
         st.markdown("### 📋 เมนูหลัก")
         menu = st.radio(
             "เลือกเมนู",
-            ["🏠 หน้าแรก", "📊 รายงาน", "📥 นำเข้าข้อมูล"],
+            ["🏠 หน้าแรก", "📊 รายงาน", "📥 นำเข้าข้อมูล", "🔧 ทดสอบการเชื่อมต่อ"],
             label_visibility="collapsed"
         )
         
         st.markdown("---")
         st.markdown("### ℹ️ ข้อมูลระบบ")
-        st.info(f"**วันที่:** {datetime.now().strftime('%d/%m/%Y')}\n\n**เวอร์ชัน:** 1.0.0")
+        st.info(f"**วันที่:** {datetime.now().strftime('%d/%m/%Y')}\n\n**เวอร์ชัน:** 1.0.1 (Fixed)")
     
     # หน้าแรก
     if menu == "🏠 หน้าแรก":
@@ -515,6 +593,67 @@ def main():
     # นำเข้าข้อมูล
     elif menu == "📥 นำเข้าข้อมูล":
         show_import()
+    
+    # ทดสอบการเชื่อมต่อ
+    elif menu == "🔧 ทดสอบการเชื่อมต่อ":
+        show_connection_test()
+
+def show_connection_test():
+    """หน้าทดสอบการเชื่อมต่อ Supabase"""
+    st.markdown("## 🔧 ทดสอบการเชื่อมต่อ Supabase")
+    
+    client = init_supabase()
+    
+    # ── Test 1: Connection ──
+    st.markdown("### 1️⃣ ทดสอบการเชื่อมต่อ")
+    if st.button("🔌 ทดสอบเชื่อมต่อ", key="test_conn"):
+        with st.spinner("กำลังทดสอบ..."):
+            result = client.test_connection()
+            
+            if result['success']:
+                st.success(result['message'])
+            else:
+                st.error(result['message'])
+                if 'detail' in result:
+                    with st.expander("📄 รายละเอียดข้อผิดพลาด"):
+                        st.code(result['detail'])
+    
+    st.markdown("---")
+    
+    # ── Test 2: Count ──
+    st.markdown("### 2️⃣ นับจำนวนรายการในตาราง")
+    if st.button("🔢 นับจำนวนข้อมูล", key="test_count"):
+        with st.spinner("กำลังนับ..."):
+            count = client.count('ipd_monthly')
+            st.metric("📊 จำนวนรายการทั้งหมด", f"{count:,} ราย")
+    
+    st.markdown("---")
+    
+    # ── Test 3: Select ──
+    st.markdown("### 3️⃣ ดึงข้อมูลตัวอย่าง (5 รายการแรก)")
+    if st.button("📥 ดึงข้อมูลตัวอย่าง", key="test_select"):
+        with st.spinner("กำลังดึงข้อมูล..."):
+            result = client.select('ipd_monthly', limit=5)
+            
+            if result['error']:
+                st.error(f"❌ เกิดข้อผิดพลาด: {result['error']}")
+            elif result['data']:
+                st.success(f"✅ ดึงข้อมูลสำเร็จ {len(result['data'])} รายการ")
+                df = pd.DataFrame(result['data'])
+                st.dataframe(df, use_container_width=True)
+            else:
+                st.info("📭 ไม่มีข้อมูลในตาราง")
+    
+    st.markdown("---")
+    
+    # ── Test 4: API Info ──
+    st.markdown("### 4️⃣ ข้อมูล API")
+    with st.expander("🔑 ข้อมูล Supabase API", expanded=False):
+        st.code(f"""
+URL: {SUPABASE_URL}
+API Key (ย่อ): {SUPABASE_KEY[:30]}...{SUPABASE_KEY[-15:]}
+Table: ipd_monthly
+        """)
 
 def show_home():
     """หน้าแรก"""
@@ -576,404 +715,6 @@ def show_home():
     st.info("💡 **คำแนะนำ:** เลือกเมนูจากแถบด้านซ้ายเพื่อเริ่มใช้งานระบบ")
 
 def show_reports():
-    """หน้ารายงาน"""
-    st.markdown("## 📊 รายงานข้อมูล")
-    st.info("🚧 ส่วนนี้อยู่ระหว่างการพัฒนา")
-    
-    st.markdown("""
-        ### รายงานที่จะพัฒนา:
-        - 📈 สถิติผู้ป่วยใน (IPD) รายเดือน
-        - 📊 สถิติ Case Mix Index (CMI)
-        - 🏥 สถิติแยกตามหอผู้ป่วย
-        - 💊 สถิติแยกตามโรค (ICD-10)
-        - 📉 แนวโน้มและกราฟ
-    """)
-
-
-def show_import():
-    """หน้านำเข้าข้อมูล"""
-    st.markdown("## 📥 นำเข้าข้อมูล IPD Monthly")
-    
-    # ตรวจสอบ libraries ที่มีอยู่
-    available_engines = {
-        'openpyxl': False,
-        'xlrd': False,
-        'html': True
-    }
-    
-
- 
-    try:
-        import openpyxl
-        available_engines['openpyxl'] = True
-    except ImportError:
-        pass
-    
-    try:
-        import xlrd
-        available_engines['xlrd'] = True
-    except ImportError:
-        pass
-    
-    excel_available = available_engines['openpyxl'] or available_engines['xlrd']
-    
-    # คำแนะนำ
-    with st.expander("📖 คำแนะนำการนำเข้าข้อมูล", expanded=True):
-        st.markdown(f"""
-        ### รูปแบบไฟล์ที่รองรับ:
-        - **Excel (.xlsx)** {'✅' if available_engines['openpyxl'] else '⚠️ จำกัด'}
-        - **Excel เก่า (.xls)** {'✅' if available_engines['xlrd'] else '⚠️ จำกัด'}
-        - **CSV (.csv)** ✅ (แนะนำ)
-        - **HTML Table (.html)** ✅
-        
-        {"⚠️ **หมายเหตุ:** ระบบอาจอ่านไฟล์ Excel ได้ไม่สมบูรณ์ แนะนำให้แปลงเป็น CSV ก่อน" if not excel_available else ""}
-        
-        ### 🔴 สำคัญ: รูปแบบชื่อไฟล์
-        ชื่อไฟล์ต้องมีรูปแบบ: **`ipd-[เดือน].[ปี].[นามสกุล]`**
-        
-        ตัวอย่าง:
-        - `3_ipd-ธ.ค.68.xlsx` → ธันวาคม 2568 (2025-12-01)
-        - `ipd-ม.ค.69.csv` → มกราคม 2569 (2026-01-01)
-        - `ipd-ก.พ.68.xls` → กุมภาพันธ์ 2568 (2025-02-01)
-        
-        เดือนที่รองรับ: ม.ค., ก.พ., มี.ค., เม.ย., พ.ค., มิ.ย., ก.ค., ส.ค., ก.ย., ต.ค., พ.ย., ธ.ค.
-         
-        """)
-        
-        if not excel_available:
-            st.warning("""
-            ### ⚠️ ระบบอ่านไฟล์ Excel ได้จำกัด
-            
-            **วิธีแปลงไฟล์ Excel เป็น CSV (แนะนำ):**
-            1. เปิดไฟล์ Excel
-            2. คลิก **File** → **Save As**
-            3. เลือก **Save as type:** → **CSV UTF-8 (Comma delimited) (*.csv)**
-            4. กด **Save**
-            5. อัปโหลดไฟล์ CSV ที่นี่
-            
-            **ทางเลือกอื่น:**
-            - ใช้ Google Sheets: File → Download → Comma Separated Values (.csv)
-            - ใช้ LibreOffice Calc: File → Save As → Text CSV (.csv)
-            """)
-    
-    st.markdown("---")
-    
-    # ============================================
-    # แสดงข้อมูลที่มีในระบบ
-    # ============================================
-    st.markdown("### 📊 ข้อมูลที่มีในระบบ")
-    
-    try:
-        client = init_supabase()
-        # ============================================
-        # เพิ่มส่วนนี้เพื่อ debug - เริ่มที่นี่
-        # ============================================
-        with st.expander("🔍 Debug Info (แสดงเมื่อมีปัญหา)", expanded=False):
-            st.write(f"**Supabase URL:** `{SUPABASE_URL}`")
-            st.write(f"**API Key (ย่อ):** `{SUPABASE_KEY[:30]}...{SUPABASE_KEY[-15:]}`")
-            st.write("**กำลังทดสอบการเชื่อมต่อ...**")
-        # ============================================
-        # จบส่วน debug
-        # ============================================ 
-        # ดึงข้อมูล month_year ที่ไม่ซ้ำพร้อมสถิติ
-        with st.spinner("กำลังโหลดข้อมูลในระบบ..."):
-            result = client.select('ipd_monthly', columns='month_year,fiscal_year,an,created_at')
-        
-        if result['data'] and len(result['data']) > 0:
-            df_existing = pd.DataFrame(result['data'])
-            df_existing['month_year'] = pd.to_datetime(df_existing['month_year'], errors='coerce')
-            df_existing['created_at'] = pd.to_datetime(df_existing['created_at'], errors='coerce')
-            
-            # สรุปข้อมูลรายเดือน
-            summary = df_existing.groupby('month_year').agg({
-                'an': 'count',
-                'created_at': 'max'
-            }).reset_index()
-            
-            summary.columns = ['เดือน-ปี', 'จำนวนรายการ', 'นำเข้าล่าสุด']
-            summary['เดือน-ปี_sort'] = summary['เดือน-ปี']  # เก็บไว้สำหรับ sort
-            summary['เดือน-ปี'] = summary['เดือน-ปี'].dt.strftime('%B %Y')
-            summary['นำเข้าล่าสุด'] = summary['นำเข้าล่าสุด'].dt.strftime('%d/%m/%Y %H:%M')
-            summary = summary.sort_values('เดือน-ปี_sort', ascending=False)
-            summary = summary.drop('เดือน-ปี_sort', axis=1)
-            summary.index = range(1, len(summary) + 1)
-            
-            # แสดงข้อมูลสถิติและตาราง
-            col_stat1, col_stat2, col_stat3 = st.columns(3)
-            
-            with col_stat1:
-                st.metric("📅 จำนวนเดือนที่มีข้อมูล", f"{len(summary)} เดือน")
-            
-            with col_stat2:
-                st.metric("📋 รายการทั้งหมด", f"{len(df_existing):,} ราย")
-            
-            with col_stat3:
-                latest_month = df_existing['month_year'].max()
-                if pd.notna(latest_month):
-                    st.metric("🗓️ เดือนล่าสุด", latest_month.strftime('%B %Y'))
-            
-            # แสดงตาราง
-            with st.expander("📋 รายละเอียดข้อมูลแต่ละเดือน", expanded=True):
-                st.dataframe(
-                    summary,
-                    use_container_width=True,
-                    column_config={
-                        "เดือน-ปี": st.column_config.TextColumn("เดือน-ปี", width="medium"),
-                        "จำนวนรายการ": st.column_config.NumberColumn(
-                            "จำนวนรายการ", 
-                            format="%d ราย",
-                            help="จำนวนรายการทั้งหมดในเดือนนี้"
-                        ),
-                        "นำเข้าล่าสุด": st.column_config.TextColumn(
-                            "นำเข้าล่าสุด", 
-                            width="medium",
-                            help="วันเวลาที่นำเข้าข้อมูลล่าสุด"
-                        ),
-                    }
-                )
-                
-                # แสดงรายการเดือนที่มี (สำหรับเช็คซ้ำ)
-                existing_months = df_existing['month_year'].dt.strftime('%Y-%m-01').unique().tolist()
-                st.info(f"💡 **เดือนที่มีข้อมูลแล้ว:** {len(existing_months)} เดือน")
-                
-                # เก็บไว้ใน session state เพื่อใช้ตรวจสอบข้อมูลซ้ำ
-                st.session_state['existing_months'] = existing_months
-        
-        else:
-            st.info("📭 ยังไม่มีข้อมูลในระบบ - เริ่มนำเข้าข้อมูลได้เลย")
-            st.session_state['existing_months'] = []
-    
-    except Exception as e:
-        st.warning(f"⚠️ ไม่สามารถโหลดข้อมูลในระบบได้: {str(e)}")
-        st.session_state['existing_months'] = []
-    
-    st.markdown("---")
-    
-    # ============================================
-    # File Uploader
-    # ============================================
-    
-    uploaded_file = st.file_uploader(
-        "เลือกไฟล์ข้อมูล",
-        type=['xlsx', 'xls', 'csv', 'html'],
-        help="อัพโหลดไฟล์ Excel, CSV, หรือ HTML ที่ตั้งชื่อตามรูปแบบ: ipd-ธ.ค.68.xlsx"
-    )
-    
-    if uploaded_file is not None:
-        try:
-            st.info(f"📁 **ชื่อไฟล์:** {uploaded_file.name}")
-            
-            month_year = parse_month_year_from_filename(uploaded_file.name)
-            if month_year:
-                month_year_display = pd.to_datetime(month_year).strftime('%B %Y')
-                st.success(f"📅 **เดือน-ปีที่จะนำเข้า:** {month_year_display} ({month_year})")
-                
-                # ============================================
-                # เตือนถ้าข้อมูลเดือนนี้มีแล้ว
-                # ============================================
-                existing_months = st.session_state.get('existing_months', [])
-                if month_year in existing_months:
-                    st.warning(f"""
-                    ⚠️ **พบข้อมูลเดือนนี้ในระบบแล้ว!**
-                    
-                    เดือน **{month_year_display}** มีข้อมูลในระบบแล้ว  
-                    การนำเข้าใหม่อาจทำให้เกิดข้อมูลซ้ำ (ขึ้นอยู่กับ AN)
-                    
-                    **ตัวเลือก:**
-                    - ถ้า AN ซ้ำ → ระบบจะ **ไม่นำเข้า** (ป้องกันโดย unique constraint)
-                    - ถ้า AN ใหม่ → ระบบจะ **เพิ่มเข้าไป**
-                    """)
-                else:
-                    st.success(f"✅ เดือนนี้ยังไม่มีข้อมูลในระบบ - พร้อมนำเข้า")
-                
-            else:
-                st.error("❌ ไม่สามารถอ่าน month_year จากชื่อไฟล์ได้ กรุณาตั้งชื่อไฟล์ให้ถูกต้อง")
-                st.stop()
-            
-            df = None
-            file_ext = uploaded_file.name.split('.')[-1].lower()
-            
-            with st.spinner(f"กำลังอ่านไฟล์ .{file_ext}..."):
-                try:
-                    # === CSV File ===
-                    if file_ext == 'csv':
-                        try:
-                            df = pd.read_csv(uploaded_file, encoding='utf-8')
-                        except UnicodeDecodeError:
-                            uploaded_file.seek(0)
-                            df = pd.read_csv(uploaded_file, encoding='cp874')
-                        st.success("✅ อ่านไฟล์ CSV สำเร็จ")
-                    
-                    # === HTML File ===
-                    elif file_ext == 'html':
-                        uploaded_file.seek(0)
-                        html_content = uploaded_file.read().decode('utf-8', errors='replace')
-                        tables = pd.read_html(html_content)
-                        
-                        if not tables:
-                            st.error("❌ ไม่พบตารางในไฟล์ HTML")
-                            st.stop()
-                        
-                        if len(tables) > 1:
-                            table_index = st.selectbox(
-                                f"พบ {len(tables)} ตาราง กรุณาเลือกตารางที่ต้องการ:",
-                                range(len(tables)),
-                                format_func=lambda x: f"ตารางที่ {x+1} ({len(tables[x])} แถว, {len(tables[x].columns)} คอลัมน์)"
-                            )
-                            df = tables[table_index]
-                        else:
-                            df = tables[0]
-                        
-                        st.success(f"✅ อ่านไฟล์ HTML สำเร็จ (ตารางที่ 1/{len(tables)})")
-                    
-                    # === Excel Files (.xlsx, .xls) ===
-                    elif file_ext in ['xlsx', 'xls']:
-                        if file_ext == 'xlsx':
-                            engines_to_try = ['openpyxl', 'xlrd']
-                        else:
-                            engines_to_try = ['xlrd', 'openpyxl']
-                        
-                        success = False
-                        errors = []
-                        
-                        for engine in engines_to_try:
-                            try:
-                                uploaded_file.seek(0)
-                                df = pd.read_excel(uploaded_file, engine=engine)
-                                st.success(f"✅ อ่านไฟล์ Excel สำเร็จด้วย engine: {engine}")
-                                success = True
-                                break
-                            except ImportError as e:
-                                errors.append(f"- {engine} (ไม่ได้ติดตั้ง): {str(e)[:80]}")
-                                continue
-                            except Exception as e:
-                                errors.append(f"- {engine}: {str(e)[:80]}")
-                                continue
-                        
-                        # Fallback: ลองอ่านเป็น HTML (บาง .xls เป็น HTML จริงๆ)
-                        if not success:
-                            try:
-                                uploaded_file.seek(0)
-                                raw_content = uploaded_file.read(4096)
-                                uploaded_file.seek(0)
-                                
-                                if b"<table" in raw_content.lower() or b"<html" in raw_content.lower():
-                                    html_text = uploaded_file.read().decode('utf-8', errors='replace')
-                                    tables = pd.read_html(html_text)
-                                    if tables:
-                                        df = tables[0]
-                                        st.info("✅ อ่านไฟล์สำเร็จในรูปแบบ HTML Table")
-                                        success = True
-                            except Exception as e:
-                                errors.append(f"- HTML fallback: {str(e)[:80]}")
-                        
-                        # ถ้ายังไม่สำเร็จ — หยุดและแนะนำ
-                        if not success:
-                            st.error(f"""
-❌ **ไม่สามารถอ่านไฟล์ Excel ได้**
-
-**ข้อผิดพลาดที่พบ:**
-{chr(10).join(errors)}
-
-**วิธีแก้ — แปลงไฟล์เป็น CSV:**
-1. เปิดไฟล์ด้วย Excel
-2. กด File → Save As
-3. เลือก CSV UTF-8 (Comma delimited) (*.csv)
-4. อัปโหลดไฟล์ .csv แทน
-                            """)
-                            st.stop()
-                    
-                    else:
-                        st.error(f"❌ ไฟล์นามสกุล .{file_ext} ไม่รองรับ")
-                        st.stop()
-                
-                except Exception as e:
-                    st.error(f"❌ เกิดข้อผิดพลาดในการอ่านไฟล์: {str(e)}")
-                    st.info("""
-                    💡 **แนะนำวิธีแก้:**
-                    1. แปลงไฟล์เป็น **CSV** (แนะนำที่สุด)
-                       - Excel: File → Save As → CSV UTF-8
-                       - Google Sheets: File → Download → CSV
-                    2. ตรวจสอบว่าไฟล์ไม่เสียหาย
-                    3. ลองเปิดไฟล์ด้วย Excel/LibreOffice แล้วบันทึกใหม่
-                    """)
-                    st.exception(e)
-                    st.stop()
-            
-            if df is None or df.empty:
-                st.error("❌ ไม่สามารถอ่านข้อมูลจากไฟล์ได้ หรือไฟล์ว่างเปล่า")
-                st.stop()
-            
-            # แสดงข้อมูลตัวอย่าง
-            st.markdown("### 👀 ตัวอย่างข้อมูลจากไฟล์")
-            st.dataframe(df.head(10), use_container_width=True)
-            
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("📊 จำนวนแถว", f"{len(df):,}")
-            with col2:
-                st.metric("📋 จำนวนคอลัมน์", f"{len(df.columns):,}")
-            with col3:
-                st.metric("🔍 ขนาดไฟล์", f"{uploaded_file.size/1024:.2f} KB")
-            
-            st.markdown("---")
-            
-            # ตรวจสอบและเตรียมข้อมูล
-            st.markdown("### 🔍 ตรวจสอบและแปลงข้อมูล")
-            
-            with st.spinner("กำลังตรวจสอบและแปลงข้อมูล..."):
-                df_clean, errors, warnings = validate_and_prepare_data(df, uploaded_file.name)
-            
-            if errors:
-                for error in errors:
-                    st.error(f"❌ {error}")
-                st.stop()
-            
-            if warnings:
-                for warning in warnings:
-                    st.warning(f"⚠️ {warning}")
-            
-            if df_clean is not None:
-                st.success("✅ ข้อมูลผ่านการตรวจสอบเรียบร้อย")
-                
-                with st.expander("📋 ดูข้อมูลที่เตรียมนำเข้า (แปลงเป็น schema database แล้ว)"):
-                    st.dataframe(df_clean.head(20), use_container_width=True)
-                    st.info(f"💡 ข้อมูลมีคอลัมน์: {', '.join(df_clean.columns.tolist())}")
-                
-                st.markdown("---")
-                
-                col1, col2 = st.columns([1, 3])
-                with col1:
-                    if st.button("🚀 เริ่มนำเข้าข้อมูล", type="primary", use_container_width=True):
-                        st.session_state.confirm_import = True
-                
-                if st.session_state.get('confirm_import', False):
-                    st.markdown("### 📤 กำลังนำเข้าข้อมูล")
-                    
-                    with st.spinner("กรุณารอสักครู่..."):
-                        success_count, error_count, error_details = import_to_supabase(df_clean)
-                    
-                    if error_count == 0:
-                        st.balloons()
-                        st.success(f"🎉 นำเข้าข้อมูลสำเร็จ **{success_count:,}** รายการ!")
-                    else:
-                        st.warning(f"⚠️ นำเข้าสำเร็จ **{success_count:,}** รายการ, ล้มเหลว **{error_count:,}** รายการ")
-                        
-                        if error_details:
-                            with st.expander("🔍 รายละเอียดข้อผิดพลาด"):
-                                for detail in error_details:
-                                    st.error(detail)
-                    
-                    st.session_state.confirm_import = False
-                    
-                    if st.button("📥 นำเข้าข้อมูลชุดใหม่"):
-                        st.rerun()
-        
-        except Exception as e:
-            st.error(f"❌ เกิดข้อผิดพลาดที่ไม่คาดคิด: {str(e)}")
-            st.exception(e) 
-
-def show_reports():
     """หน้ารายงาน — 4 tabs"""
 
     # ── รหัสโรค ──────────────────────────────────────────
@@ -988,7 +729,12 @@ def show_reports():
     with st.spinner("กำลังโหลดข้อมูล..."):
         result = client.select('ipd_monthly')
 
-    if result['error'] or not result['data']:
+    if result['error']:
+        st.error(f"❌ เกิดข้อผิดพลาดในการดึงข้อมูล: {result['error']}")
+        st.info("💡 ลองไปที่เมนู '🔧 ทดสอบการเชื่อมต่อ' เพื่อตรวจสอบปัญหา")
+        return
+    
+    if not result['data']:
         st.warning("⚠️ ไม่พบข้อมูลในระบบ กรุณานำเข้าข้อมูลก่อน")
         return
 
@@ -1561,6 +1307,385 @@ def show_reports():
     st.markdown("---")
     st.caption(f"🕐 อัปเดตล่าสุด: {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}")
 
+
+def show_import():
+    """หน้านำเข้าข้อมูล"""
+    st.markdown("## 📥 นำเข้าข้อมูล IPD Monthly")
+    
+    # ตรวจสอบ libraries ที่มีอยู่
+    available_engines = {
+        'openpyxl': False,
+        'xlrd': False,
+        'html': True
+    }
+    
+
+ 
+    try:
+        import openpyxl
+        available_engines['openpyxl'] = True
+    except ImportError:
+        pass
+    
+    try:
+        import xlrd
+        available_engines['xlrd'] = True
+    except ImportError:
+        pass
+    
+    excel_available = available_engines['openpyxl'] or available_engines['xlrd']
+    
+    # คำแนะนำ
+    with st.expander("📖 คำแนะนำการนำเข้าข้อมูล", expanded=True):
+        st.markdown(f"""
+        ### รูปแบบไฟล์ที่รองรับ:
+        - **Excel (.xlsx)** {'✅' if available_engines['openpyxl'] else '⚠️ จำกัด'}
+        - **Excel เก่า (.xls)** {'✅' if available_engines['xlrd'] else '⚠️ จำกัด'}
+        - **CSV (.csv)** ✅ (แนะนำ)
+        - **HTML Table (.html)** ✅
+        
+        {"⚠️ **หมายเหตุ:** ระบบอาจอ่านไฟล์ Excel ได้ไม่สมบูรณ์ แนะนำให้แปลงเป็น CSV ก่อน" if not excel_available else ""}
+        
+        ### 🔴 สำคัญ: รูปแบบชื่อไฟล์
+        ชื่อไฟล์ต้องมีรูปแบบ: **`ipd-[เดือน].[ปี].[นามสกุล]`**
+        
+        ตัวอย่าง:
+        - `3_ipd-ธ.ค.68.xlsx` → ธันวาคม 2568 (2025-12-01)
+        - `ipd-ม.ค.69.csv` → มกราคม 2569 (2026-01-01)
+        - `ipd-ก.พ.68.xls` → กุมภาพันธ์ 2568 (2025-02-01)
+        
+        เดือนที่รองรับ: ม.ค., ก.พ., มี.ค., เม.ย., พ.ค., มิ.ย., ก.ค., ส.ค., ก.ย., ต.ค., พ.ย., ธ.ค.
+         
+        """)
+        
+        if not excel_available:
+            st.warning("""
+            ### ⚠️ ระบบอ่านไฟล์ Excel ได้จำกัด
+            
+            **วิธีแปลงไฟล์ Excel เป็น CSV (แนะนำ):**
+            1. เปิดไฟล์ Excel
+            2. คลิก **File** → **Save As**
+            3. เลือก **Save as type:** → **CSV UTF-8 (Comma delimited) (*.csv)**
+            4. กด **Save**
+            5. อัปโหลดไฟล์ CSV ที่นี่
+            
+            **ทางเลือกอื่น:**
+            - ใช้ Google Sheets: File → Download → Comma Separated Values (.csv)
+            - ใช้ LibreOffice Calc: File → Save As → Text CSV (.csv)
+            """)
+    
+    st.markdown("---")
+    
+    # ============================================
+    # แสดงข้อมูลที่มีในระบบ
+    # ============================================
+    st.markdown("### 📊 ข้อมูลที่มีในระบบ")
+    
+    try:
+        client = init_supabase()
+        
+        # ดึงข้อมูล month_year ที่ไม่ซ้ำพร้อมสถิติ
+        with st.spinner("กำลังโหลดข้อมูลในระบบ..."):
+            result = client.select('ipd_monthly', columns='month_year,fiscal_year,an,created_at')
+        
+        if result['error']:
+            st.error(f"❌ เกิดข้อผิดพลาด: {result['error']}")
+            st.info("💡 ลองไปที่เมนู '🔧 ทดสอบการเชื่อมต่อ' เพื่อตรวจสอบปัญหา")
+            st.session_state['existing_months'] = []
+        
+        elif result['data'] and len(result['data']) > 0:
+            df_existing = pd.DataFrame(result['data'])
+            df_existing['month_year'] = pd.to_datetime(df_existing['month_year'], errors='coerce')
+            df_existing['created_at'] = pd.to_datetime(df_existing['created_at'], errors='coerce')
+            
+            # สรุปข้อมูลรายเดือน
+            summary = df_existing.groupby('month_year').agg({
+                'an': 'count',
+                'created_at': 'max'
+            }).reset_index()
+            
+            summary.columns = ['เดือน-ปี', 'จำนวนรายการ', 'นำเข้าล่าสุด']
+            summary['เดือน-ปี_sort'] = summary['เดือน-ปี']  # เก็บไว้สำหรับ sort
+            summary['เดือน-ปี'] = summary['เดือน-ปี'].dt.strftime('%B %Y')
+            summary['นำเข้าล่าสุด'] = summary['นำเข้าล่าสุด'].dt.strftime('%d/%m/%Y %H:%M')
+            summary = summary.sort_values('เดือน-ปี_sort', ascending=False)
+            summary = summary.drop('เดือน-ปี_sort', axis=1)
+            summary.index = range(1, len(summary) + 1)
+            
+            # แสดงข้อมูลสถิติและตาราง
+            col_stat1, col_stat2, col_stat3 = st.columns(3)
+            
+            with col_stat1:
+                st.metric("📅 จำนวนเดือนที่มีข้อมูล", f"{len(summary)} เดือน")
+            
+            with col_stat2:
+                st.metric("📋 รายการทั้งหมด", f"{len(df_existing):,} ราย")
+            
+            with col_stat3:
+                latest_month = df_existing['month_year'].max()
+                if pd.notna(latest_month):
+                    st.metric("🗓️ เดือนล่าสุด", latest_month.strftime('%B %Y'))
+            
+            # แสดงตาราง
+            with st.expander("📋 รายละเอียดข้อมูลแต่ละเดือน", expanded=True):
+                st.dataframe(
+                    summary,
+                    use_container_width=True,
+                    column_config={
+                        "เดือน-ปี": st.column_config.TextColumn("เดือน-ปี", width="medium"),
+                        "จำนวนรายการ": st.column_config.NumberColumn(
+                            "จำนวนรายการ", 
+                            format="%d ราย",
+                            help="จำนวนรายการทั้งหมดในเดือนนี้"
+                        ),
+                        "นำเข้าล่าสุด": st.column_config.TextColumn(
+                            "นำเข้าล่าสุด", 
+                            width="medium",
+                            help="วันเวลาที่นำเข้าข้อมูลล่าสุด"
+                        ),
+                    }
+                )
+                
+                # แสดงรายการเดือนที่มี (สำหรับเช็คซ้ำ)
+                existing_months = df_existing['month_year'].dt.strftime('%Y-%m-01').unique().tolist()
+                st.info(f"💡 **เดือนที่มีข้อมูลแล้ว:** {len(existing_months)} เดือน")
+                
+                # เก็บไว้ใน session state เพื่อใช้ตรวจสอบข้อมูลซ้ำ
+                st.session_state['existing_months'] = existing_months
+        
+        else:
+            st.info("📭 ยังไม่มีข้อมูลในระบบ - เริ่มนำเข้าข้อมูลได้เลย")
+            st.session_state['existing_months'] = []
+    
+    except Exception as e:
+        st.warning(f"⚠️ ไม่สามารถโหลดข้อมูลในระบบได้: {str(e)}")
+        st.session_state['existing_months'] = []
+    
+    st.markdown("---")
+    
+    # ============================================
+    # File Uploader
+    # ============================================
+    
+    uploaded_file = st.file_uploader(
+        "เลือกไฟล์ข้อมูล",
+        type=['xlsx', 'xls', 'csv', 'html'],
+        help="อัพโหลดไฟล์ Excel, CSV, หรือ HTML ที่ตั้งชื่อตามรูปแบบ: ipd-ธ.ค.68.xlsx"
+    )
+    
+    if uploaded_file is not None:
+        try:
+            st.info(f"📁 **ชื่อไฟล์:** {uploaded_file.name}")
+            
+            month_year = parse_month_year_from_filename(uploaded_file.name)
+            if month_year:
+                month_year_display = pd.to_datetime(month_year).strftime('%B %Y')
+                st.success(f"📅 **เดือน-ปีที่จะนำเข้า:** {month_year_display} ({month_year})")
+                
+                # ============================================
+                # เตือนถ้าข้อมูลเดือนนี้มีแล้ว
+                # ============================================
+                existing_months = st.session_state.get('existing_months', [])
+                if month_year in existing_months:
+                    st.warning(f"""
+                    ⚠️ **พบข้อมูลเดือนนี้ในระบบแล้ว!**
+                    
+                    เดือน **{month_year_display}** มีข้อมูลในระบบแล้ว  
+                    การนำเข้าใหม่อาจทำให้เกิดข้อมูลซ้ำ (ขึ้นอยู่กับ AN)
+                    
+                    **ตัวเลือก:**
+                    - ถ้า AN ซ้ำ → ระบบจะ **ไม่นำเข้า** (ป้องกันโดย unique constraint)
+                    - ถ้า AN ใหม่ → ระบบจะ **เพิ่มเข้าไป**
+                    """)
+                else:
+                    st.success(f"✅ เดือนนี้ยังไม่มีข้อมูลในระบบ - พร้อมนำเข้า")
+                
+            else:
+                st.error("❌ ไม่สามารถอ่าน month_year จากชื่อไฟล์ได้ กรุณาตั้งชื่อไฟล์ให้ถูกต้อง")
+                st.stop()
+            
+            df = None
+            file_ext = uploaded_file.name.split('.')[-1].lower()
+            
+            with st.spinner(f"กำลังอ่านไฟล์ .{file_ext}..."):
+                try:
+                    # === CSV File ===
+                    if file_ext == 'csv':
+                        try:
+                            df = pd.read_csv(uploaded_file, encoding='utf-8')
+                        except UnicodeDecodeError:
+                            uploaded_file.seek(0)
+                            df = pd.read_csv(uploaded_file, encoding='cp874')
+                        st.success("✅ อ่านไฟล์ CSV สำเร็จ")
+                    
+                    # === HTML File ===
+                    elif file_ext == 'html':
+                        uploaded_file.seek(0)
+                        html_content = uploaded_file.read().decode('utf-8', errors='replace')
+                        tables = pd.read_html(html_content)
+                        
+                        if not tables:
+                            st.error("❌ ไม่พบตารางในไฟล์ HTML")
+                            st.stop()
+                        
+                        if len(tables) > 1:
+                            table_index = st.selectbox(
+                                f"พบ {len(tables)} ตาราง กรุณาเลือกตารางที่ต้องการ:",
+                                range(len(tables)),
+                                format_func=lambda x: f"ตารางที่ {x+1} ({len(tables[x])} แถว, {len(tables[x].columns)} คอลัมน์)"
+                            )
+                            df = tables[table_index]
+                        else:
+                            df = tables[0]
+                        
+                        st.success(f"✅ อ่านไฟล์ HTML สำเร็จ (ตารางที่ 1/{len(tables)})")
+                    
+                    # === Excel Files (.xlsx, .xls) ===
+                    elif file_ext in ['xlsx', 'xls']:
+                        if file_ext == 'xlsx':
+                            engines_to_try = ['openpyxl', 'xlrd']
+                        else:
+                            engines_to_try = ['xlrd', 'openpyxl']
+                        
+                        success = False
+                        errors = []
+                        
+                        for engine in engines_to_try:
+                            try:
+                                uploaded_file.seek(0)
+                                df = pd.read_excel(uploaded_file, engine=engine)
+                                st.success(f"✅ อ่านไฟล์ Excel สำเร็จด้วย engine: {engine}")
+                                success = True
+                                break
+                            except ImportError as e:
+                                errors.append(f"- {engine} (ไม่ได้ติดตั้ง): {str(e)[:80]}")
+                                continue
+                            except Exception as e:
+                                errors.append(f"- {engine}: {str(e)[:80]}")
+                                continue
+                        
+                        # Fallback: ลองอ่านเป็น HTML (บาง .xls เป็น HTML จริงๆ)
+                        if not success:
+                            try:
+                                uploaded_file.seek(0)
+                                raw_content = uploaded_file.read(4096)
+                                uploaded_file.seek(0)
+                                
+                                if b"<table" in raw_content.lower() or b"<html" in raw_content.lower():
+                                    html_text = uploaded_file.read().decode('utf-8', errors='replace')
+                                    tables = pd.read_html(html_text)
+                                    if tables:
+                                        df = tables[0]
+                                        st.info("✅ อ่านไฟล์สำเร็จในรูปแบบ HTML Table")
+                                        success = True
+                            except Exception as e:
+                                errors.append(f"- HTML fallback: {str(e)[:80]}")
+                        
+                        # ถ้ายังไม่สำเร็จ — หยุดและแนะนำ
+                        if not success:
+                            st.error(f"""
+❌ **ไม่สามารถอ่านไฟล์ Excel ได้**
+
+**ข้อผิดพลาดที่พบ:**
+{chr(10).join(errors)}
+
+**วิธีแก้ — แปลงไฟล์เป็น CSV:**
+1. เปิดไฟล์ด้วย Excel
+2. กด File → Save As
+3. เลือก CSV UTF-8 (Comma delimited) (*.csv)
+4. อัปโหลดไฟล์ .csv แทน
+                            """)
+                            st.stop()
+                    
+                    else:
+                        st.error(f"❌ ไฟล์นามสกุล .{file_ext} ไม่รองรับ")
+                        st.stop()
+                
+                except Exception as e:
+                    st.error(f"❌ เกิดข้อผิดพลาดในการอ่านไฟล์: {str(e)}")
+                    st.info("""
+                    💡 **แนะนำวิธีแก้:**
+                    1. แปลงไฟล์เป็น **CSV** (แนะนำที่สุด)
+                       - Excel: File → Save As → CSV UTF-8
+                       - Google Sheets: File → Download → CSV
+                    2. ตรวจสอบว่าไฟล์ไม่เสียหาย
+                    3. ลองเปิดไฟล์ด้วย Excel/LibreOffice แล้วบันทึกใหม่
+                    """)
+                    st.exception(e)
+                    st.stop()
+            
+            if df is None or df.empty:
+                st.error("❌ ไม่สามารถอ่านข้อมูลจากไฟล์ได้ หรือไฟล์ว่างเปล่า")
+                st.stop()
+            
+            # แสดงข้อมูลตัวอย่าง
+            st.markdown("### 👀 ตัวอย่างข้อมูลจากไฟล์")
+            st.dataframe(df.head(10), use_container_width=True)
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("📊 จำนวนแถว", f"{len(df):,}")
+            with col2:
+                st.metric("📋 จำนวนคอลัมน์", f"{len(df.columns):,}")
+            with col3:
+                st.metric("🔍 ขนาดไฟล์", f"{uploaded_file.size/1024:.2f} KB")
+            
+            st.markdown("---")
+            
+            # ตรวจสอบและเตรียมข้อมูล
+            st.markdown("### 🔍 ตรวจสอบและแปลงข้อมูล")
+            
+            with st.spinner("กำลังตรวจสอบและแปลงข้อมูล..."):
+                df_clean, errors, warnings = validate_and_prepare_data(df, uploaded_file.name)
+            
+            if errors:
+                for error in errors:
+                    st.error(f"❌ {error}")
+                st.stop()
+            
+            if warnings:
+                for warning in warnings:
+                    st.warning(f"⚠️ {warning}")
+            
+            if df_clean is not None:
+                st.success("✅ ข้อมูลผ่านการตรวจสอบเรียบร้อย")
+                
+                with st.expander("📋 ดูข้อมูลที่เตรียมนำเข้า (แปลงเป็น schema database แล้ว)"):
+                    st.dataframe(df_clean.head(20), use_container_width=True)
+                    st.info(f"💡 ข้อมูลมีคอลัมน์: {', '.join(df_clean.columns.tolist())}")
+                
+                st.markdown("---")
+                
+                col1, col2 = st.columns([1, 3])
+                with col1:
+                    if st.button("🚀 เริ่มนำเข้าข้อมูล", type="primary", use_container_width=True):
+                        st.session_state.confirm_import = True
+                
+                if st.session_state.get('confirm_import', False):
+                    st.markdown("### 📤 กำลังนำเข้าข้อมูล")
+                    
+                    with st.spinner("กรุณารอสักครู่..."):
+                        success_count, error_count, error_details = import_to_supabase(df_clean)
+                    
+                    if error_count == 0:
+                        st.balloons()
+                        st.success(f"🎉 นำเข้าข้อมูลสำเร็จ **{success_count:,}** รายการ!")
+                    else:
+                        st.warning(f"⚠️ นำเข้าสำเร็จ **{success_count:,}** รายการ, ล้มเหลว **{error_count:,}** รายการ")
+                        
+                        if error_details:
+                            with st.expander("🔍 รายละเอียดข้อผิดพลาด"):
+                                for detail in error_details:
+                                    st.error(detail)
+                    
+                    st.session_state.confirm_import = False
+                    
+                    if st.button("📥 นำเข้าข้อมูลชุดใหม่"):
+                        st.rerun()
+        
+        except Exception as e:
+            st.error(f"❌ เกิดข้อผิดพลาดที่ไม่คาดคิด: {str(e)}")
+            st.exception(e) 
 
 # เรียกใช้งาน
 if __name__ == "__main__":
