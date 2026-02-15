@@ -702,38 +702,31 @@ def show_import():
                         st.success(f"✅ อ่านไฟล์ HTML สำเร็จ (ตารางที่ 1/{len(tables)})")
                     
                     # === Excel Files (.xlsx, .xls) ===
-                    elif file_ext in ['xlsx', 'xls']:
-                        engines_to_try = []
-                        
-                       
+                    
 
-                        # ✅ แก้ไข: ลอง import engine โดยตรง ไม่พึ่ง available_engines flag
-                        # เพราะ flag อาจ False แม้ติดตั้งแล้ว ถ้า import ล้มเหลวตอนตรวจสอบ
-                        
-                        # กำหนดลำดับ engine ตามนามสกุลไฟล์
-                        if file_ext == 'xlsx':
-                            engines_to_try = ['openpyxl', 'xlrd']
-                        else:  # xls
-                            engines_to_try = ['xlrd', 'openpyxl']
-                        
-                        # ลอง engine ทีละตัว (ลอง import จริงๆ ไม่ใช้ flag)
-                        success = False
-                        errors = []
-                        
-                        for engine in engines_to_try:
-                            try:
-                                uploaded_file.seek(0)
-                                df = pd.read_excel(uploaded_file, engine=engine)
-                                st.success(f"✅ อ่านไฟล์ Excel สำเร็จด้วย engine: {engine}")
-                                success = True
-                                break
-                            except ImportError as e:
-                                # engine library ไม่ได้ติดตั้ง → ข้ามไป engine ถัดไป
-                                errors.append(f"- {engine} (ไม่ได้ติดตั้ง): {str(e)[:80]}")
-                                continue
-                            except Exception as e:
-                                errors.append(f"- {engine}: {str(e)[:80]}")
-                                continue
+                    elif file_ext in ['xlsx', 'xls']:
+                    # ✅ ไม่พึ่ง available_engines flag — ลอง import โดยตรง
+                    if file_ext == 'xlsx':
+                        engines_to_try = ['openpyxl', 'xlrd']
+                    else:
+                        engines_to_try = ['xlrd', 'openpyxl']
+                    
+                    success = False
+                    errors = []
+                    
+                    for engine in engines_to_try:
+                        try:
+                            uploaded_file.seek(0)
+                            df = pd.read_excel(uploaded_file, engine=engine)
+                            st.success(f"✅ อ่านไฟล์ Excel สำเร็จด้วย engine: {engine}")
+                            success = True
+                            break
+                        except ImportError as e:
+                            errors.append(f"- {engine} (ไม่ได้ติดตั้ง): {str(e)[:80]}")
+                            continue
+                        except Exception as e:
+                            errors.append(f"- {engine}: {str(e)[:80]}")
+                            continue
                         
                         # ถ้าทุก engine ล้มเหลว ลอง fallback methods
                         if not success:
@@ -757,14 +750,22 @@ def show_import():
                                 errors.append(f"- HTML fallback: {str(e)[:80]}")
                             
                             # Fallback 2: ลองอ่านเป็น CSV
+                           
                             if not success:
-                                try:
-                                    uploaded_file.seek(0)
-                                    df = pd.read_csv(uploaded_file, on_bad_lines='skip', encoding='utf-8')
-                                    st.info("✅ อ่านไฟล์สำเร็จในรูปแบบ CSV")
-                                    success = True
-                                except Exception as e:
-                                    errors.append(f"- CSV fallback: {str(e)[:80]}")
+                                for enc in ['utf-8', 'cp874', 'tis-620', 'latin-1']:
+                                    try:
+                                        uploaded_file.seek(0)
+                                        df = pd.read_csv(
+                                            uploaded_file,
+                                            on_bad_lines='skip',
+                                            encoding=enc
+                                        )
+                                        st.info(f"✅ อ่านไฟล์สำเร็จในรูปแบบ CSV (encoding: {enc})")
+                                        success = True
+                                        break
+                                    except Exception as e:
+                                        errors.append(f"- CSV fallback ({enc}): {str(e)[:80]}")
+                                        continue
                         
                         # ถ้ายังไม่สำเร็จ แสดง error
                         if not success:
