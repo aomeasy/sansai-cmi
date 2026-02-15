@@ -15,101 +15,159 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS สำหรับปรับแต่งสีตามเว็บไซต์โรงพยาบาลสันทราย (โทนสีน้ำเงิน-เขียว)
+
+# เพิ่มใน CSS section (หลังบรรทัด 100)
 st.markdown("""
     <style>
-    /* สีหลักของระบบ */
-    :root {
-        --primary-color: #2E7D32;
-        --secondary-color: #1976D2;
-        --accent-color: #66BB6A;
-    }
+    /* ... CSS เดิม ... */
     
-    /* Header */
-    .main-header {
-        background: linear-gradient(135deg, #1976D2 0%, #2E7D32 100%);
-        padding: 2rem;
-        border-radius: 10px;
-        margin-bottom: 2rem;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
+    /* ========================================
+       ENTERPRISE DESIGN SYSTEM
+       ======================================== */
     
-    .main-header h1 {
-        color: white;
-        margin: 0;
-        font-size: 2.5rem;
-        font-weight: bold;
-    }
-    
-    .main-header p {
-        color: #E3F2FD;
-        margin: 0.5rem 0 0 0;
-        font-size: 1.1rem;
-    }
-    
-    /* Sidebar */
-    [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #1976D2 0%, #2E7D32 100%);
-    }
-    
-    [data-testid="stSidebar"] .sidebar-content {
-        color: white;
-    }
-    
-    /* ปุ่ม */
-    .stButton>button {
-        background: linear-gradient(135deg, #2E7D32 0%, #66BB6A 100%);
-        color: white;
-        border: none;
-        padding: 0.75rem 2rem;
-        border-radius: 8px;
-        font-weight: bold;
-        transition: all 0.3s;
-    }
-    
-    .stButton>button:hover {
-        background: linear-gradient(135deg, #1B5E20 0%, #4CAF50 100%);
-        box-shadow: 0 4px 12px rgba(46, 125, 50, 0.4);
-        transform: translateY(-2px);
-    }
-    
-    /* Cards */
-    .info-card {
+    /* Professional Card Shadows */
+    .stMetric {
         background: white;
-        padding: 1.5rem;
-        border-radius: 10px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        border-left: 4px solid #2E7D32;
-        margin-bottom: 1rem;
+        padding: 1.2rem;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        border: 1px solid #E0E0E0;
+        transition: all 0.3s ease;
     }
     
-    /* Success/Error Messages */
-    .stSuccess {
-        background-color: #E8F5E9;
-        border-left: 4px solid #4CAF50;
+    .stMetric:hover {
+        box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+        transform: translateY(-4px);
     }
     
-    .stError {
-        background-color: #FFEBEE;
-        border-left: 4px solid #F44336;
-    }
-    
-    /* File Uploader */
-    [data-testid="stFileUploader"] {
-        background-color: #F5F5F5;
-        border: 2px dashed #2E7D32;
-        border-radius: 10px;
-        padding: 2rem;
-    }
-    
-    /* Metrics */
+    /* Executive Metric Values */
     [data-testid="stMetricValue"] {
-        color: #1976D2;
-        font-size: 2rem;
-        font-weight: bold;
+        font-size: 2.2rem !important;
+        font-weight: 700 !important;
+        color: #1565C0 !important;
+        font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    
+    [data-testid="stMetricDelta"] {
+        font-size: 0.95rem !important;
+        font-weight: 600 !important;
+    }
+    
+    /* Professional Data Tables */
+    .stDataFrame {
+        border: 1px solid #E0E0E0 !important;
+        border-radius: 8px !important;
+        overflow: hidden !important;
+    }
+    
+    .stDataFrame thead tr th {
+        background: linear-gradient(135deg, #1565C0, #1976D2) !important;
+        color: white !important;
+        font-weight: 600 !important;
+        font-size: 0.9rem !important;
+        padding: 1rem 0.8rem !important;
+    }
+    
+    .stDataFrame tbody tr:nth-child(even) {
+        background-color: #F5F9FC !important;
+    }
+    
+    .stDataFrame tbody tr:hover {
+        background-color: #E3F2FD !important;
+        transition: background-color 0.2s;
+    }
+    
+    /* Alert Boxes */
+    .alert-success {
+        background: linear-gradient(135deg, #E8F5E9, #C8E6C9);
+        border-left: 4px solid #4CAF50;
+        padding: 1rem;
+        border-radius: 8px;
+        margin: 1rem 0;
+    }
+    
+    .alert-warning {
+        background: linear-gradient(135deg, #FFF3E0, #FFE0B2);
+        border-left: 4px solid #FF9800;
+        padding: 1rem;
+        border-radius: 8px;
+        margin: 1rem 0;
+    }
+    
+    .alert-danger {
+        background: linear-gradient(135deg, #FFEBEE, #FFCDD2);
+        border-left: 4px solid #F44336;
+        padding: 1rem;
+        border-radius: 8px;
+        margin: 1rem 0;
+    }
+    
+    /* Professional Charts */
+    .vega-embed {
+        border-radius: 12px !important;
+        overflow: hidden !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+    }
+    
+    /* Tab Navigation */
+    .stTabs [data-baseweb="tab-list"] {
+        background: white;
+        padding: 0.5rem;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        padding: 0.8rem 1.5rem;
+        font-weight: 600;
+        font-size: 1rem;
+        border-radius: 8px;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #1565C0, #1976D2);
+        color: white !important;
+    }
+    
+    /* Sidebar Enhancement */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #0D47A1 0%, #1565C0 30%, #1B5E20 100%) !important;
+    }
+    
+    [data-testid="stSidebar"] .stRadio label {
+        color: white !important;
+        font-weight: 500 !important;
+        padding: 0.8rem 1rem !important;
+        border-radius: 8px !important;
+        transition: all 0.3s !important;
+    }
+    
+    [data-testid="stSidebar"] .stRadio label:hover {
+        background: rgba(255,255,255,0.1) !important;
+        transform: translateX(4px) !important;
+    }
+    
+    /* Loading Spinner */
+    .stSpinner > div {
+        border-color: #1565C0 transparent transparent transparent !important;
+    }
+    
+    /* Expander Enhancement */
+    .streamlit-expanderHeader {
+        background: linear-gradient(135deg, #E3F2FD, #BBDEFB) !important;
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+        padding: 1rem !important;
+    }
+    
+    .streamlit-expanderContent {
+        border: 1px solid #BBDEFB !important;
+        border-radius: 0 0 8px 8px !important;
+        padding: 1.5rem !important;
     }
     </style>
 """, unsafe_allow_html=True)
+ 
 
 # ตั้งค่า Supabase
 SUPABASE_URL = "https://qwxnsusfydrhtfqdcsqn.supabase.co"
@@ -759,86 +817,288 @@ def show_troubleshooting():
     st.markdown("---")
     st.info("💡 **หากยังมีปัญหา** ลองไปที่เมนู '🔧 ทดสอบการเชื่อมต่อ' เพื่อตรวจสอบขั้นตอนการทำงาน")
 
+
+
+# ========================================
+# PROFESSIONAL CHART UTILITIES
+# ========================================
+
+def create_professional_chart(data, chart_type, **kwargs):
+    """
+    สร้าง Chart แบบ Professional สำหรับ Hospital BI
+    
+    Args:
+        data: DataFrame
+        chart_type: 'line', 'bar', 'area', 'combo'
+        **kwargs: configuration options
+    """
+    import altair as alt
+    
+    # Color Scheme สำหรับ Hospital
+    HOSPITAL_COLORS = {
+        'primary': '#1565C0',
+        'secondary': '#2E7D32',
+        'accent': '#F57C00',
+        'danger': '#D32F2F',
+        'warning': '#FFA000',
+        'success': '#388E3C',
+        'neutral': '#546E7A'
+    }
+    
+    # Base configuration
+    base_config = {
+        'view': {'strokeWidth': 0},
+        'axis': {
+            'labelFontSize': 11,
+            'titleFontSize': 12,
+            'labelFont': '"SF Pro Display", -apple-system, sans-serif',
+            'titleFont': '"SF Pro Display", -apple-system, sans-serif',
+            'titleFontWeight': 600,
+            'titleColor': '#37474F',
+            'labelColor': '#546E7A',
+            'gridColor': '#ECEFF1',
+            'domainColor': '#CFD8DC'
+        },
+        'legend': {
+            'labelFontSize': 11,
+            'titleFontSize': 12,
+            'labelFont': '"SF Pro Display", sans-serif',
+            'titleFont': '"SF Pro Display", sans-serif',
+            'titleFontWeight': 600,
+            'orient': 'top',
+            'padding': 10
+        },
+        'title': {
+            'fontSize': 16,
+            'fontWeight': 700,
+            'font': '"SF Pro Display", sans-serif',
+            'color': '#1565C0',
+            'anchor': 'start',
+            'offset': 20
+        }
+    }
+    
+    if chart_type == 'line':
+        chart = alt.Chart(data).mark_line(
+            strokeWidth=3,
+            point=alt.OverlayMarkDef(
+                filled=True,
+                size=80,
+                color=kwargs.get('color', HOSPITAL_COLORS['primary'])
+            )
+        ).encode(
+            x=alt.X(kwargs['x'], title=kwargs.get('x_title', '')),
+            y=alt.Y(kwargs['y'], title=kwargs.get('y_title', ''), 
+                   scale=alt.Scale(zero=False)),
+            tooltip=kwargs.get('tooltip', []),
+            color=alt.value(kwargs.get('color', HOSPITAL_COLORS['primary']))
+        ).properties(
+            height=kwargs.get('height', 300),
+            title=kwargs.get('title', '')
+        ).configure(**base_config)
+        
+    elif chart_type == 'area':
+        chart = alt.Chart(data).mark_area(
+            line={'color': kwargs.get('color', HOSPITAL_COLORS['primary']), 
+                  'strokeWidth': 3},
+            color=alt.Gradient(
+                gradient='linear',
+                stops=[
+                    alt.GradientStop(color='white', offset=0),
+                    alt.GradientStop(color=kwargs.get('color', HOSPITAL_COLORS['primary']), 
+                                   offset=1)
+                ],
+                x1=1, x2=1, y1=1, y2=0
+            )
+        ).encode(
+            x=alt.X(kwargs['x'], title=kwargs.get('x_title', '')),
+            y=alt.Y(kwargs['y'], title=kwargs.get('y_title', '')),
+            tooltip=kwargs.get('tooltip', [])
+        ).properties(
+            height=kwargs.get('height', 300),
+            title=kwargs.get('title', '')
+        ).configure(**base_config)
+        
+    elif chart_type == 'bar':
+        chart = alt.Chart(data).mark_bar(
+            cornerRadiusTopLeft=4,
+            cornerRadiusTopRight=4
+        ).encode(
+            x=alt.X(kwargs['x'], title=kwargs.get('x_title', '')),
+            y=alt.Y(kwargs['y'], title=kwargs.get('y_title', '')),
+            color=alt.value(kwargs.get('color', HOSPITAL_COLORS['primary'])),
+            tooltip=kwargs.get('tooltip', [])
+        ).properties(
+            height=kwargs.get('height', 300),
+            title=kwargs.get('title', '')
+        ).configure(**base_config)
+    
+    return chart
+
+
+def create_kpi_card(title, value, delta=None, icon="📊", color="#1565C0"):
+    """
+    สร้าง KPI Card แบบ Professional
+    """
+    delta_html = ""
+    if delta is not None:
+        delta_color = "#4CAF50" if delta >= 0 else "#F44336"
+        delta_icon = "▲" if delta >= 0 else "▼"
+        delta_html = f"""
+            <div style="color:{delta_color};font-size:0.9rem;font-weight:600;margin-top:0.5rem;">
+                {delta_icon} {abs(delta):+.2f}%
+            </div>
+        """
+    
+    return f"""
+        <div style="background:white;padding:1.5rem;border-radius:12px;
+                    box-shadow:0 4px 12px rgba(0,0,0,0.08);
+                    border-left:4px solid {color};min-height:140px;">
+            <div style="font-size:2rem;margin-bottom:0.5rem;">{icon}</div>
+            <div style="color:#546E7A;font-size:0.85rem;font-weight:500;
+                        text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;">
+                {title}
+            </div>
+            <div style="color:{color};font-size:2rem;font-weight:700;">
+                {value}
+            </div>
+            {delta_html}
+        </div>
+    """
+ 
 # ============================================
 # MAIN APP
 # ============================================
 
+
+
+
 def main():
-    # Header
+    # Header (เดิม)
     st.markdown("""
         <div class="main-header">
             <h1>🏥 ระบบรายงานข้อมูล Sansai-CMI</h1>
             <p>โรงพยาบาลสันทราย | Case Mix Information System</p>
         </div>
     """, unsafe_allow_html=True)
-   
-# Sidebar Menu
-    with st.sidebar:
-        st.markdown("### 📋 เมนูหลัก")
-        
-        # ตรวจสอบว่า user เป็น admin หรือไม่
-        is_admin = st.session_state.get('is_admin', False)
-        
-        # ถ้ายังไม่ได้ login เป็น admin
-        if not is_admin:
-            # แสดงเมนูปกติ (ไม่มีเมนูแอดมิน)
-            menu = st.radio(
-                "เลือกเมนู",
-                ["🏠 หน้าแรก", "📊 รายงาน", "📥 นำเข้าข้อมูล"],
-                label_visibility="collapsed"
-            )
-            
-            # ปุ่มสำหรับเข้าสู่โหมด Admin
-            st.markdown("---")
-            with st.expander("🔐 Admin Tools", expanded=False):
-                admin_password = st.text_input("รหัสผ่าน Admin", type="password", key="admin_pw")
-                if st.button("เข้าสู่ระบบ Admin"):
-                    # เปลี่ยนรหัสผ่านนี้เป็นของคุณเอง
-                    if admin_password == "aom":  # ⚠️ เปลี่ยนรหัสผ่านนี้!
-                        st.session_state.is_admin = True
-                        st.success("✅ เข้าสู่โหมด Admin สำเร็จ")
-                        st.rerun()
-                    else:
-                        st.error("❌ รหัสผ่านไม่ถูกต้อง")
-        else:
-            # ถ้า login เป็น admin แล้ว - แสดงเมนูเต็ม
-            menu = st.radio(
-                "เลือกเมนู",
-                ["🏠 หน้าแรก", "📊 รายงาน", "📥 นำเข้าข้อมูล", "🔧 ทดสอบการเชื่อมต่อ", "🩹 แก้ไขปัญหา"],
-                label_visibility="collapsed"
-            )
-            
-            # ปุ่มออกจากระบบ Admin
-            st.markdown("---")
-            st.success("🔓 โหมด Admin")
-            if st.button("🚪 ออกจากโหมด Admin"):
-                st.session_state.is_admin = False
-                st.rerun()
-     
-        st.markdown("---")
-        st.markdown("### ℹ️ ข้อมูลระบบ")
-        st.info(f"**วันที่:** {datetime.now().strftime('%d/%m/%Y')}\n\n**เวอร์ชัน:** 1.0.1 (Fixed)")
     
-    # หน้าแรก
+    # ========================================
+    # ENHANCED SIDEBAR NAVIGATION
+    # ========================================
+    with st.sidebar:
+        # Logo & Title
+        st.markdown("""
+            <div style="text-align:center;padding:1.5rem 0;border-bottom:2px solid rgba(255,255,255,0.2);">
+                <div style="font-size:3rem;margin-bottom:0.5rem;">🏥</div>
+                <h2 style="color:white;margin:0;font-size:1.3rem;font-weight:700;">
+                    Sansai Hospital
+                </h2>
+                <p style="color:#B3E5FC;font-size:0.85rem;margin:0.3rem 0 0;">
+                    Case Mix Intelligence
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # Navigation Menu
+        st.markdown("""
+            <div style="color:white;font-weight:600;font-size:0.9rem;
+                        margin:1rem 0 0.5rem 0.5rem;letter-spacing:0.5px;">
+                📋 NAVIGATION
+            </div>
+        """, unsafe_allow_html=True)
+        
+        menu_options = {
+            "🏠 หน้าแรก": "Executive Dashboard & Real-time KPIs",
+            "📊 รายงาน": "Comprehensive Analytics & Reports",
+            "📥 นำเข้าข้อมูล": "Data Import & Validation",
+            "🔧 ทดสอบการเชื่อมต่อ": "System Health Check",
+            "🩹 แก้ไขปัญหา": "Troubleshooting Guide"
+        }
+        
+        # Custom Radio with descriptions
+        selected_menu = None
+        for menu_key, menu_desc in menu_options.items():
+            is_selected = st.session_state.get('selected_menu', '🏠 หน้าแรก') == menu_key
+            
+            button_style = """
+                background: rgba(255,255,255,0.15);
+                border-left: 4px solid #4CAF50;
+            """ if is_selected else ""
+            
+            if st.button(
+                menu_key,
+                key=f"nav_{menu_key}",
+                use_container_width=True,
+                help=menu_desc
+            ):
+                st.session_state['selected_menu'] = menu_key
+                selected_menu = menu_key
+        
+        menu = selected_menu or st.session_state.get('selected_menu', '🏠 หน้าแรก')
+        
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        
+        # System Info Section
+        st.markdown("""
+            <div style="border-top:2px solid rgba(255,255,255,0.2);
+                        padding-top:1.5rem;margin-top:2rem;">
+                <div style="color:#B3E5FC;font-weight:600;font-size:0.9rem;
+                            margin-bottom:1rem;letter-spacing:0.5px;">
+                    ℹ️ SYSTEM INFO
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        # Info cards
+        current_date = datetime.now()
+        st.markdown(f"""
+            <div style="background:rgba(255,255,255,0.1);padding:0.8rem;
+                        border-radius:8px;margin-bottom:0.5rem;">
+                <div style="color:#B3E5FC;font-size:0.75rem;margin-bottom:0.2rem;">
+                    📅 CURRENT DATE
+                </div>
+                <div style="color:white;font-weight:600;font-size:0.9rem;">
+                    {current_date.strftime('%d %B %Y')}
+                </div>
+            </div>
+            
+            <div style="background:rgba(255,255,255,0.1);padding:0.8rem;
+                        border-radius:8px;margin-bottom:0.5rem;">
+                <div style="color:#B3E5FC;font-size:0.75rem;margin-bottom:0.2rem;">
+                    🔄 VERSION
+                </div>
+                <div style="color:white;font-weight:600;font-size:0.9rem;">
+                    v2.0.0 (Enterprise)
+                </div>
+            </div>
+            
+            <div style="background:rgba(76,175,80,0.2);padding:0.8rem;
+                        border-radius:8px;border:1px solid rgba(76,175,80,0.4);">
+                <div style="color:#C8E6C9;font-size:0.75rem;margin-bottom:0.2rem;">
+                    ✅ STATUS
+                </div>
+                <div style="color:#4CAF50;font-weight:600;font-size:0.9rem;">
+                    System Online
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    # ========================================
+    # ROUTE TO PAGES
+    # ========================================
     if menu == "🏠 หน้าแรก":
         show_home()
-    
-    # รายงาน
     elif menu == "📊 รายงาน":
         show_reports()
-    
-    # นำเข้าข้อมูล
     elif menu == "📥 นำเข้าข้อมูล":
         show_import()
-    
-    # ทดสอบการเชื่อมต่อ
     elif menu == "🔧 ทดสอบการเชื่อมต่อ":
         show_connection_test()
-    
-    # แก้ไขปัญหา
     elif menu == "🩹 แก้ไขปัญหา":
         show_troubleshooting()
-
+     
 def show_connection_test():
     """หน้าทดสอบการเชื่อมต่อ Supabase"""
     st.markdown("## 🔧 ทดสอบการเชื่อมต่อ Supabase")
@@ -895,660 +1155,424 @@ URL: {SUPABASE_URL}
 API Key (ย่อ): {SUPABASE_KEY[:30]}...{SUPABASE_KEY[-15:]}
 Table: ipd_monthly
         """)
+ 
+
+
 
 def show_home():
-    """หน้าแรก"""
-    st.markdown("## ยินดีต้อนรับสู่ระบบรายงานข้อมูล Sansai-CMI")
+    """Executive Dashboard Homepage - Hospital Intelligence"""
     
-    col1, col2, col3 = st.columns(3)
+    # ========================================
+    # HERO SECTION - Executive Summary
+    # ========================================
+    st.markdown("""
+        <div style="background:linear-gradient(135deg,#1565C0 0%,#0D47A1 50%,#1B5E20 100%);
+                    padding:3rem 2rem;border-radius:16px;margin-bottom:2rem;
+                    box-shadow:0 8px 32px rgba(0,0,0,0.12);">
+            <h1 style="color:white;margin:0;font-size:2.8rem;font-weight:700;
+                       text-shadow:2px 2px 4px rgba(0,0,0,0.2);">
+                🏥 Sansai Hospital Intelligence Platform
+            </h1>
+            <p style="color:#E3F2FD;margin:1rem 0 0;font-size:1.2rem;font-weight:300;">
+                Case Mix Information System · Real-time Analytics
+            </p>
+        </div>
+    """, unsafe_allow_html=True)
     
-    with col1:
-        st.markdown("""
-            <div class="info-card">
-                <h3>📊 รายงานข้อมูล</h3>
-                <p>ดูรายงานและสถิติข้อมูล IPD Monthly</p>
-            </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("""
-            <div class="info-card">
-                <h3>📥 นำเข้าข้อมูล</h3>
-                <p>นำเข้าข้อมูลจากไฟล์ Excel/CSV</p>
-            </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown("""
-            <div class="info-card">
-                <h3>🔍 วิเคราะห์ข้อมูล</h3>
-                <p>วิเคราะห์และประมวลผลข้อมูล</p>
-            </div>
-        """, unsafe_allow_html=True)
-    
-    st.markdown("---")
-    
-    # แสดงสถิติเบื้องต้น
+    # ========================================
+    # EXECUTIVE KPI DASHBOARD
+    # ========================================
     try:
         client = init_supabase()
         
-        # นับจำนวนรายการทั้งหมด
-        total_records = client.count('ipd_monthly')
+        # โหลดข้อมูล
+        with st.spinner("⚡ Loading real-time data..."):
+            result = client.select('ipd_monthly')
         
-        col1, col2, col3, col4 = st.columns(4)
+        if result['error'] or not result['data']:
+            st.warning("⚠️ ไม่สามารถโหลดข้อมูลได้ กรุณาตรวจสอบการเชื่อมต่อ")
+            return
         
-        with col1:
-            st.metric("📋 จำนวนรายการทั้งหมด", f"{total_records:,}")
+        df_all = pd.DataFrame(result['data'])
         
-        with col2:
-            st.metric("📅 ข้อมูลล่าสุด", datetime.now().strftime('%m/%Y'))
+        # แปลงประเภทข้อมูล
+        df_all['month_year'] = pd.to_datetime(df_all['month_year'], errors='coerce')
+        df_all['admit_date'] = pd.to_datetime(df_all['admit_date'], errors='coerce')
+        df_all['discharge_date'] = pd.to_datetime(df_all['discharge_date'], errors='coerce')
+        df_all['age'] = pd.to_numeric(df_all.get('age', pd.Series()), errors='coerce')
+        df_all['adjrw'] = pd.to_numeric(df_all.get('adjrw', pd.Series()), errors='coerce')
+        df_all['length_of_stay'] = pd.to_numeric(df_all.get('length_of_stay', pd.Series()), errors='coerce')
         
-        with col3:
-            st.metric("✅ สถานะระบบ", "ปกติ")
+        # คำนวณเดือนปัจจุบันและเดือนก่อนหน้า
+        latest_month = df_all['month_year'].max()
+        prev_month = latest_month - pd.DateOffset(months=1)
         
-        with col4:
-            st.metric("🔄 อัพเดตล่าสุด", datetime.now().strftime('%d/%m/%Y'))
+        df_current = df_all[df_all['month_year'] == latest_month]
+        df_previous = df_all[df_all['month_year'] == prev_month]
+        
+        # ========================================
+        # SECTION 1: PRIMARY KPIs (ระดับ C-Level)
+        # ========================================
+        st.markdown("""
+            <div style="background:white;padding:1.5rem;border-radius:12px;
+                        box-shadow:0 4px 16px rgba(0,0,0,0.08);margin-bottom:2rem;">
+                <h3 style="color:#1565C0;margin:0 0 1rem 0;font-size:1.4rem;font-weight:600;">
+                    📊 Executive KPIs – Latest Month
+                </h3>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        # คำนวณ KPIs
+        total_current = len(df_current)
+        total_previous = len(df_previous)
+        cmi_current = df_current['adjrw'].mean()
+        cmi_previous = df_previous['adjrw'].mean()
+        total_rw_current = df_current['adjrw'].sum()
+        total_rw_previous = df_previous['adjrw'].sum()
+        los_current = df_current['length_of_stay'].mean()
+        los_previous = df_previous['length_of_stay'].mean()
+        death_current = df_current['discharge_status'].str.contains('ตาย', na=False).sum()
+        death_previous = df_previous['discharge_status'].str.contains('ตาย', na=False).sum()
+        death_rate_current = (death_current / total_current * 100) if total_current else 0
+        death_rate_previous = (death_previous / total_previous * 100) if total_previous else 0
+        
+        # แสดง KPI Cards แบบ Delta
+        k1, k2, k3, k4, k5, k6 = st.columns(6)
+        
+        with k1:
+            delta_discharge = total_current - total_previous
+            st.metric(
+                "👥 Total Discharges",
+                f"{total_current:,}",
+                f"{delta_discharge:+,} vs prev month",
+                delta_color="normal"
+            )
+        
+        with k2:
+            delta_cmi = cmi_current - cmi_previous
+            st.metric(
+                "📈 CMI (Case Mix Index)",
+                f"{cmi_current:.3f}",
+                f"{delta_cmi:+.3f}",
+                delta_color="normal"
+            )
+        
+        with k3:
+            delta_rw = total_rw_current - total_rw_previous
+            st.metric(
+                "💰 Total Adjusted RW",
+                f"{total_rw_current:,.1f}",
+                f"{delta_rw:+,.1f}",
+                delta_color="normal"
+            )
+        
+        with k4:
+            delta_los = los_current - los_previous
+            st.metric(
+                "🛏️ Average LOS",
+                f"{los_current:.1f} days",
+                f"{delta_los:+.1f}",
+                delta_color="inverse"  # LOS ต่ำกว่าดีกว่า
+            )
+        
+        with k5:
+            delta_death_rate = death_rate_current - death_rate_previous
+            st.metric(
+                "💀 Mortality Rate",
+                f"{death_rate_current:.2f}%",
+                f"{delta_death_rate:+.2f}%",
+                delta_color="inverse"
+            )
+        
+        with k6:
+            # คำนวณ Bed Turnover Rate (ประมาณการ)
+            turnover_current = total_current / 30  # สมมติ 30 เตียง
+            st.metric(
+                "🔄 Bed Turnover",
+                f"{turnover_current:.1f}/day",
+                help="Average discharges per day"
+            )
+        
+        st.markdown("---")
+        
+        # ========================================
+        # SECTION 2: TREND ANALYSIS (6 Months)
+        # ========================================
+        st.markdown("""
+            <div style="background:white;padding:1.5rem;border-radius:12px;
+                        box-shadow:0 4px 16px rgba(0,0,0,0.08);margin-bottom:1.5rem;">
+                <h3 style="color:#1565C0;margin:0 0 1rem 0;font-size:1.4rem;font-weight:600;">
+                    📈 6-Month Trend Analysis
+                </h3>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        # เตรียมข้อมูล 6 เดือนล่าสุด
+        last_6_months = df_all['month_year'].nlargest(6).unique()
+        df_trend = df_all[df_all['month_year'].isin(last_6_months)].copy()
+        df_trend['month_label'] = df_trend['month_year'].dt.strftime('%b %Y')
+        
+        # สร้าง summary รายเดือน
+        monthly_summary = df_trend.groupby('month_label').agg({
+            'an': 'count',
+            'adjrw': ['mean', 'sum'],
+            'length_of_stay': 'mean'
+        }).reset_index()
+        
+        monthly_summary.columns = ['Month', 'Discharges', 'CMI', 'Total_RW', 'Avg_LOS']
+        monthly_summary = monthly_summary.round(3)
+        
+        # แสดงกราฟ Trend
+        import altair as alt
+        
+        col_t1, col_t2 = st.columns(2)
+        
+        with col_t1:
+            # CMI Trend with Area Chart
+            chart_cmi = alt.Chart(monthly_summary).mark_area(
+                line={'color': '#1565C0', 'strokeWidth': 3},
+                color=alt.Gradient(
+                    gradient='linear',
+                    stops=[
+                        alt.GradientStop(color='#E3F2FD', offset=0),
+                        alt.GradientStop(color='#1565C0', offset=1)
+                    ],
+                    x1=1, x2=1, y1=1, y2=0
+                )
+            ).encode(
+                x=alt.X('Month:N', title='Month', sort=None),
+                y=alt.Y('CMI:Q', title='Case Mix Index', scale=alt.Scale(zero=False)),
+                tooltip=[
+                    alt.Tooltip('Month:N', title='Month'),
+                    alt.Tooltip('CMI:Q', title='CMI', format='.3f'),
+                    alt.Tooltip('Discharges:Q', title='Discharges', format=',')
+                ]
+            ).properties(
+                height=280,
+                title=alt.TitleParams(
+                    text='📊 CMI Trend (6 Months)',
+                    fontSize=16,
+                    fontWeight='bold',
+                    color='#1565C0'
+                )
+            ).configure_view(
+                strokeWidth=0
+            ).configure_axis(
+                labelFontSize=11,
+                titleFontSize=12
+            )
+            
+            st.altair_chart(chart_cmi, use_container_width=True)
+        
+        with col_t2:
+            # Discharge Volume + Average LOS
+            base = alt.Chart(monthly_summary).encode(
+                x=alt.X('Month:N', title='Month', sort=None)
+            )
+            
+            # Bar chart for discharges
+            bar = base.mark_bar(color='#2E7D32', opacity=0.7).encode(
+                y=alt.Y('Discharges:Q', title='Discharges'),
+                tooltip=[
+                    alt.Tooltip('Month:N', title='Month'),
+                    alt.Tooltip('Discharges:Q', title='Discharges', format=',')
+                ]
+            )
+            
+            # Line chart for LOS
+            line = base.mark_line(
+                color='#F57C00',
+                strokeWidth=3,
+                point=alt.OverlayMarkDef(filled=True, size=80, color='#F57C00')
+            ).encode(
+                y=alt.Y('Avg_LOS:Q', title='Average LOS (days)', scale=alt.Scale(zero=False)),
+                tooltip=[
+                    alt.Tooltip('Month:N', title='Month'),
+                    alt.Tooltip('Avg_LOS:Q', title='Avg LOS', format='.1f')
+                ]
+            )
+            
+            chart_combo = alt.layer(bar, line).resolve_scale(
+                y='independent'
+            ).properties(
+                height=280,
+                title=alt.TitleParams(
+                    text='👥 Volume & LOS Trend',
+                    fontSize=16,
+                    fontWeight='bold',
+                    color='#2E7D32'
+                )
+            ).configure_view(
+                strokeWidth=0
+            ).configure_axis(
+                labelFontSize=11,
+                titleFontSize=12
+            )
+            
+            st.altair_chart(chart_combo, use_container_width=True)
+        
+        st.markdown("---")
+        
+        # ========================================
+        # SECTION 3: OPERATIONAL INSIGHTS
+        # ========================================
+        st.markdown("""
+            <div style="background:white;padding:1.5rem;border-radius:12px;
+                        box-shadow:0 4px 16px rgba(0,0,0,0.08);margin-bottom:1.5rem;">
+                <h3 style="color:#1565C0;margin:0 0 1rem 0;font-size:1.4rem;font-weight:600;">
+                    🎯 Operational Insights
+                </h3>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        col_i1, col_i2, col_i3 = st.columns(3)
+        
+        with col_i1:
+            # Top 5 High-RW Cases
+            st.markdown("#### 🏆 Top 5 High-Value Cases")
+            top_rw = df_current.nlargest(5, 'adjrw')[['pdx', 'adjrw', 'ward_name']]
+            if not top_rw.empty:
+                for idx, row in enumerate(top_rw.itertuples(), 1):
+                    st.markdown(f"""
+                        <div style="background:#F5F5F5;padding:0.8rem;border-radius:8px;
+                                    margin-bottom:0.5rem;border-left:4px solid #1976D2;">
+                            <b>#{idx}</b> {row.pdx} <span style="float:right;color:#1976D2;font-weight:600;">RW: {row.adjrw:.2f}</span><br>
+                            <small style="color:#666;">{row.ward_name}</small>
+                        </div>
+                    """, unsafe_allow_html=True)
+        
+        with col_i2:
+            # Alert: Long Stay Cases
+            st.markdown("#### ⚠️ Long Stay Alert (>30 days)")
+            long_stay = df_current[df_current['length_of_stay'] > 30]
+            if len(long_stay) > 0:
+                st.error(f"🚨 **{len(long_stay)} cases** require attention")
+                for row in long_stay.head(5).itertuples():
+                    st.markdown(f"""
+                        <div style="background:#FFF3E0;padding:0.6rem;border-radius:6px;
+                                    margin-bottom:0.4rem;border-left:3px solid #FF6F00;">
+                            <b>AN:</b> {row.an} · <b>LOS:</b> {row.length_of_stay:.0f} days<br>
+                            <small>{row.pdx} · {row.ward_name}</small>
+                        </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.success("✅ No long-stay cases")
+        
+        with col_i3:
+            # Ward Performance
+            st.markdown("#### 🏥 Ward CMI Ranking")
+            ward_cmi = (df_current.groupby('ward_name')['adjrw']
+                        .mean()
+                        .sort_values(ascending=False)
+                        .head(5))
+            
+            if not ward_cmi.empty:
+                for ward, cmi in ward_cmi.items():
+                    bar_width = int((cmi / ward_cmi.max()) * 100)
+                    st.markdown(f"""
+                        <div style="margin-bottom:0.8rem;">
+                            <div style="display:flex;justify-content:space-between;margin-bottom:0.2rem;">
+                                <span style="font-size:0.9rem;font-weight:500;">{ward}</span>
+                                <span style="color:#2E7D32;font-weight:600;">{cmi:.3f}</span>
+                            </div>
+                            <div style="background:#E8F5E9;border-radius:4px;height:8px;">
+                                <div style="background:#2E7D32;height:8px;width:{bar_width}%;
+                                            border-radius:4px;transition:width 0.3s;"></div>
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        
+        # ========================================
+        # SECTION 4: QUICK ACTION CARDS
+        # ========================================
+        st.markdown("""
+            <div style="background:white;padding:1.5rem;border-radius:12px;
+                        box-shadow:0 4px 16px rgba(0,0,0,0.08);margin-bottom:1.5rem;">
+                <h3 style="color:#1565C0;margin:0 0 1rem 0;font-size:1.4rem;font-weight:600;">
+                    🚀 Quick Actions
+                </h3>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        qa1, qa2, qa3, qa4 = st.columns(4)
+        
+        with qa1:
+            st.markdown("""
+                <div style="background:linear-gradient(135deg,#1976D2,#1565C0);
+                            padding:1.5rem;border-radius:12px;text-align:center;
+                            box-shadow:0 4px 12px rgba(25,118,210,0.3);
+                            cursor:pointer;transition:transform 0.2s;min-height:140px;">
+                    <div style="font-size:2.5rem;margin-bottom:0.5rem;">📊</div>
+                    <div style="color:white;font-weight:600;font-size:1.1rem;">View Reports</div>
+                    <div style="color:#E3F2FD;font-size:0.85rem;margin-top:0.5rem;">
+                        Detailed analytics & dashboards
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        with qa2:
+            st.markdown("""
+                <div style="background:linear-gradient(135deg,#2E7D32,#1B5E20);
+                            padding:1.5rem;border-radius:12px;text-align:center;
+                            box-shadow:0 4px 12px rgba(46,125,50,0.3);
+                            cursor:pointer;transition:transform 0.2s;min-height:140px;">
+                    <div style="font-size:2.5rem;margin-bottom:0.5rem;">📥</div>
+                    <div style="color:white;font-weight:600;font-size:1.1rem;">Import Data</div>
+                    <div style="color:#E8F5E9;font-size:0.85rem;margin-top:0.5rem;">
+                        Upload monthly IPD files
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        with qa3:
+            st.markdown("""
+                <div style="background:linear-gradient(135deg,#F57C00,#E65100);
+                            padding:1.5rem;border-radius:12px;text-align:center;
+                            box-shadow:0 4px 12px rgba(245,124,0,0.3);
+                            cursor:pointer;transition:transform 0.2s;min-height:140px;">
+                    <div style="font-size:2.5rem;margin-bottom:0.5rem;">🔬</div>
+                    <div style="color:white;font-weight:600;font-size:1.1rem;">Deep Analysis</div>
+                    <div style="color:#FFF3E0;font-size:0.85rem;margin-top:0.5rem;">
+                        Advanced insights & trends
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        with qa4:
+            st.markdown("""
+                <div style="background:linear-gradient(135deg,#7B1FA2,#6A1B9A);
+                            padding:1.5rem;border-radius:12px;text-align:center;
+                            box-shadow:0 4px 12px rgba(123,31,162,0.3);
+                            cursor:pointer;transition:transform 0.2s;min-height:140px;">
+                    <div style="font-size:2.5rem;margin-bottom:0.5rem;">⚙️</div>
+                    <div style="color:white;font-weight:600;font-size:1.1rem;">Settings</div>
+                    <div style="color:#F3E5F5;font-size:0.85rem;margin-top:0.5rem;">
+                        Configure system & alerts
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        
+        # ========================================
+        # FOOTER: System Status
+        # ========================================
+        st.markdown(f"""
+            <div style="background:#F5F5F5;padding:1rem;border-radius:8px;
+                        text-align:center;color:#666;font-size:0.9rem;">
+                <span style="color:#2E7D32;font-weight:600;">✅ System Online</span> · 
+                Last updated: {pd.Timestamp.now().strftime('%d %b %Y, %H:%M')} · 
+                Data records: {len(df_all):,} · 
+                Latest month: {latest_month.strftime('%B %Y')}
+            </div>
+        """, unsafe_allow_html=True)
         
     except Exception as e:
-        st.warning(f"ไม่สามารถโหลดสถิติได้: {str(e)}")
-    
-    st.markdown("---")
-    st.info("💡 **คำแนะนำ:** เลือกเมนูจากแถบด้านซ้ายเพื่อเริ่มใช้งานระบบ")
-
-def show_reports():
-    """หน้ารายงาน — 4 tabs"""
-
-    # ── รหัสโรค ──────────────────────────────────────────
-    PNEUMONIA_CODES = [
-        'J10', 'J11', 'J12', 'J13', 'J14',
-        'J15', 'J16', 'J17', 'J18', 'J85.0', 'J85.1'
-    ]
-    OP_VENT = ['96.7']  # ventilator op codes
-
-    # ── โหลดข้อมูล ────────────────────────────────────────
-    client = init_supabase()
-    with st.spinner("กำลังโหลดข้อมูล..."):
-        result = client.select('ipd_monthly')
-
-    if result['error']:
-        st.error(f"❌ เกิดข้อผิดพลาดในการดึงข้อมูล: {result['error']}")
+        st.error(f"❌ เกิดข้อผิดพลาดในการโหลด Dashboard: {str(e)}")
         st.info("💡 ลองไปที่เมนู '🔧 ทดสอบการเชื่อมต่อ' เพื่อตรวจสอบปัญหา")
-        return
-    
-    if not result['data']:
-        st.warning("⚠️ ไม่พบข้อมูลในระบบ กรุณานำเข้าข้อมูลก่อน")
-        return
-
-    df_all = pd.DataFrame(result['data'])
-    if df_all.empty:
-        st.warning("⚠️ ไม่พบข้อมูล")
-        return
-
-    # ── แปลงประเภทข้อมูล ─────────────────────────────────
-    df_all['month_year']      = pd.to_datetime(df_all['month_year'],      errors='coerce')
-    df_all['admit_date']      = pd.to_datetime(df_all['admit_date'],      errors='coerce')
-    df_all['discharge_date']  = pd.to_datetime(df_all['discharge_date'],  errors='coerce')
-    df_all['age']             = pd.to_numeric(df_all.get('age',            pd.Series()), errors='coerce')
-    df_all['adjrw']           = pd.to_numeric(df_all.get('adjrw',          pd.Series()), errors='coerce')
-    df_all['length_of_stay']  = pd.to_numeric(df_all.get('length_of_stay', pd.Series()), errors='coerce')
-    df_all['month_label']     = df_all['month_year'].dt.strftime('%b %Y')
-    df_all['month_sort']      = df_all['month_year'].dt.to_period('M')
-
-    # ── helper ───────────────────────────────────────────
-    def is_pneumonia(code):
-        if pd.isna(code): return False
-        s = str(code).strip()
-        return any(s.startswith(c) for c in PNEUMONIA_CODES)
-
-    def has_ventilator(row):
-        op_cols = [f'op{i}' for i in range(12)]
-        return any(
-            str(row[c]).startswith(tuple(OP_VENT))
-            for c in op_cols if c in row and pd.notna(row[c])
-        )
-
-    def get_vent_codes(row):
-        op_cols = [f'op{i}' for i in range(12)]
-        return ', '.join(
-            f'{c}={row[c]}' for c in op_cols
-            if c in row and pd.notna(row[c]) and str(row[c]).startswith(tuple(OP_VENT))
-        )
-
-    df_pneumonia = df_all[df_all['pdx'].apply(is_pneumonia)].copy()
-    df_pneumonia['on_vent']   = df_pneumonia.apply(has_ventilator, axis=1)
-    df_pneumonia['vent_codes'] = df_pneumonia.apply(get_vent_codes, axis=1)
-
-    # ════════════════════════════════════════════════════
-    # TABS
-    # ════════════════════════════════════════════════════
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "🏥 Dashboard ภาพรวม",
-        "🫁 ปอดบวม (Pneumonia)",
-        "💨 VAP Analysis",
-        "🔬 เชิงลึก"
-    ])
-
-    # ════════════════════════════════════════════════════
-    # TAB 1 : DASHBOARD ภาพรวม
-    # ════════════════════════════════════════════════════
-    with tab1:
-        st.markdown("""
-        <div style="background:linear-gradient(135deg,#1565C0,#2E7D32);
-                    padding:1.2rem 2rem;border-radius:12px;margin-bottom:1.2rem;">
-            <h2 style="color:white;margin:0;font-size:1.5rem;">
-                🏥 Dashboard ภาพรวมโรงพยาบาลสันทราย
-            </h2>
-            <p style="color:#E3F2FD;margin:.3rem 0 0;font-size:.9rem;">
-                IPD Monthly — ข้อมูลผู้ป่วยใน
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # ── KPI cards ──
-        total     = len(df_all)
-        cmi       = df_all['adjrw'].mean()
-        total_rw  = df_all['adjrw'].sum()
-        los_mean  = df_all['length_of_stay'].mean()
-        death_n   = df_all['discharge_status'].str.contains('ตาย', na=False).sum()
-        death_pct = death_n / total * 100 if total else 0
-        readmit_n = 0
-        readmit_hn = set()
-        for _, row in df_all.iterrows():
-            if pd.isna(row['discharge_date']) or pd.isna(row['hn']): continue
-            same = df_all[
-                (df_all['hn'] == row['hn']) &
-                (df_all['admit_date'] > row['discharge_date']) &
-                (df_all['admit_date'] <= row['discharge_date'] + pd.Timedelta(days=28))
-            ]
-            if len(same) > 0:
-                readmit_hn.add(row['hn'])
-        readmit_n   = len(readmit_hn)
-        readmit_pct = readmit_n / total * 100 if total else 0
-
-        c1, c2, c3, c4, c5, c6 = st.columns(6)
-        c1.metric("👥 จำหน่ายทั้งหมด",   f"{total:,} ราย")
-        c2.metric("📊 CMI",               f"{cmi:.3f}")
-        c3.metric("💰 Total adjRW",        f"{total_rw:,.1f}")
-        c4.metric("🛏 LOS เฉลี่ย",        f"{los_mean:.1f} วัน")
-        c5.metric("💀 เสียชีวิต",         f"{death_n} ราย",   f"{death_pct:.1f}%")
-        c6.metric("🔄 Readmit ≤28 วัน",   f"{readmit_n} ราย", f"{readmit_pct:.1f}%")
-
-        st.markdown("---")
-        import altair as alt
-
-        # ── กราฟ 1: จำหน่ายรายเดือน ──
-        col_a, col_b = st.columns(2)
-        with col_a:
-            st.markdown("#### 📅 จำนวนจำหน่ายรายเดือน")
-            m_count = (df_all.groupby('month_label')
-                       .size().reset_index(name='จำนวน'))
-            ch = alt.Chart(m_count).mark_bar(color='#1976D2').encode(
-                x=alt.X('month_label:N', title='เดือน'),
-                y=alt.Y('จำนวน:Q', title='ราย'),
-                tooltip=['month_label', 'จำนวน']
-            ).properties(height=280)
-            st.altair_chart(ch, use_container_width=True)
-
-        with col_b:
-            st.markdown("#### 📊 CMI รายเดือน")
-            m_cmi = (df_all.groupby('month_label')['adjrw']
-                     .mean().reset_index(name='CMI').round(3))
-            ch2 = alt.Chart(m_cmi).mark_line(
-                point=True, strokeWidth=2, color='#2E7D32'
-            ).encode(
-                x=alt.X('month_label:N', title='เดือน'),
-                y=alt.Y('CMI:Q', title='CMI', scale=alt.Scale(zero=False)),
-                tooltip=['month_label', 'CMI']
-            ).properties(height=280)
-            st.altair_chart(ch2, use_container_width=True)
-
-        # ── กราฟ 2: Top 10 โรค + clinic ──
-        col_c, col_d = st.columns(2)
-        with col_c:
-            st.markdown("#### 🏆 Top 10 โรค (จำนวนราย)")
-            top10 = (df_all['pdx'].value_counts().head(10)
-                     .reset_index().rename(columns={'pdx':'รหัส','count':'จำนวน'}))
-            ch3 = alt.Chart(top10).mark_bar(color='#1565C0').encode(
-                x=alt.X('จำนวน:Q', title='จำนวนราย'),
-                y=alt.Y('รหัส:N', sort='-x', title='ICD-10'),
-                tooltip=['รหัส', 'จำนวน']
-            ).properties(height=300)
-            st.altair_chart(ch3, use_container_width=True)
-
-        with col_d:
-            st.markdown("#### 🏥 สัดส่วน Clinic")
-            clinic_df = (df_all['clinic_name'].value_counts().head(8)
-                         .reset_index().rename(columns={'clinic_name':'clinic','count':'จำนวน'}))
-            ch4 = alt.Chart(clinic_df).mark_arc(innerRadius=50).encode(
-                theta=alt.Theta('จำนวน:Q'),
-                color=alt.Color('clinic:N', legend=alt.Legend(title='Clinic')),
-                tooltip=['clinic', 'จำนวน']
-            ).properties(height=300)
-            st.altair_chart(ch4, use_container_width=True)
-
-        # ── กราฟ 3: discharge status + กลุ่มอายุ ──
-        col_e, col_f = st.columns(2)
-        with col_e:
-            st.markdown("#### 📋 สถานะการจำหน่าย")
-            status_df = (df_all['discharge_status'].value_counts()
-                         .reset_index().rename(columns={'discharge_status':'สถานะ','count':'จำนวน'}))
-            ch5 = alt.Chart(status_df).mark_bar(color='#43A047').encode(
-                x=alt.X('จำนวน:Q'),
-                y=alt.Y('สถานะ:N', sort='-x'),
-                tooltip=['สถานะ', 'จำนวน']
-            ).properties(height=250)
-            st.altair_chart(ch5, use_container_width=True)
-
-        with col_f:
-            st.markdown("#### 👥 กลุ่มอายุ")
-            bins   = [0, 5, 15, 30, 45, 60, 75, 200]
-            labels = ['0-5','6-15','16-30','31-45','46-60','61-75','75+']
-            df_all['age_grp'] = pd.cut(df_all['age'], bins=bins, labels=labels)
-            age_df = (df_all['age_grp'].value_counts().sort_index()
-                      .reset_index().rename(columns={'age_grp':'กลุ่มอายุ','count':'จำนวน'}))
-            age_df['กลุ่มอายุ'] = age_df['กลุ่มอายุ'].astype(str)
-            ch6 = alt.Chart(age_df).mark_bar(color='#F57C00').encode(
-                x=alt.X('กลุ่มอายุ:N', sort=labels),
-                y=alt.Y('จำนวน:Q'),
-                tooltip=['กลุ่มอายุ', 'จำนวน']
-            ).properties(height=250)
-            st.altair_chart(ch6, use_container_width=True)
-
-        # ── LOS outlier table ──
-        st.markdown("---")
-        st.markdown("#### ⚠️ ผู้ป่วยนอนนาน (LOS > 30 วัน)")
-        long_stay = df_all[df_all['length_of_stay'] > 30].copy()
-        if not long_stay.empty:
-            cols_show = ['hn','an','age','pdx','ward_name',
-                         'length_of_stay','discharge_status']
-            avail = [c for c in cols_show if c in long_stay.columns]
-            st.dataframe(
-                long_stay[avail].sort_values('length_of_stay', ascending=False),
-                use_container_width=True, hide_index=True
-            )
-        else:
-            st.info("ไม่พบผู้ป่วย LOS > 30 วัน")
-
-    # ════════════════════════════════════════════════════
-    # TAB 2 : ปอดบวม
-    # ════════════════════════════════════════════════════
-    with tab2:
-        st.markdown("""
-        <div style="background:linear-gradient(135deg,#1976D2,#2E7D32);
-                    padding:1.2rem 2rem;border-radius:12px;margin-bottom:1.2rem;">
-            <h2 style="color:white;margin:0;font-size:1.5rem;">
-                🫁 ตัวชี้วัดผู้ป่วยปอดบวม (Pneumonia)
-            </h2>
-            <p style="color:#E3F2FD;margin:.3rem 0 0;font-size:.9rem;">
-                ICD-10: J10–J18, J85.0, J85.1 | วิเคราะห์จาก pdx
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-
-        if df_pneumonia.empty:
-            st.warning("⚠️ ไม่พบข้อมูลผู้ป่วยปอดบวม")
-        else:
-            # filter เดือน
-            months_avail  = sorted(df_pneumonia['month_sort'].dropna().unique())
-            months_labels = [str(m) for m in months_avail]
-            if len(months_labels) > 1:
-                cf1, cf2 = st.columns(2)
-                with cf1:
-                    s_m = st.selectbox("เดือนเริ่มต้น", months_labels, index=0, key='pn_s')
-                with cf2:
-                    e_m = st.selectbox("เดือนสิ้นสุด",  months_labels, index=len(months_labels)-1, key='pn_e')
-                df_pn = df_pneumonia[
-                    (df_pneumonia['month_sort'] >= s_m) &
-                    (df_pneumonia['month_sort'] <= e_m)
-                ].copy()
-            else:
-                df_pn = df_pneumonia.copy()
-
-            # KPI
-            tot_pn    = len(df_pn)
-            death_pn  = df_pn['discharge_status'].str.contains('ตาย',na=False).sum()
-            improve_pn = df_pn['discharge_status'].str.contains('ดีขึ้น',na=False).sum()
-            vent_pn   = df_pn['on_vent'].sum()
-            readmit_pn = 0
-            for _, row in df_pn.iterrows():
-                if pd.isna(row['discharge_date']) or pd.isna(row['hn']): continue
-                same = df_all[
-                    (df_all['hn'] == row['hn']) &
-                    (df_all['admit_date'] > row['discharge_date']) &
-                    (df_all['admit_date'] <= row['discharge_date'] + pd.Timedelta(days=28))
-                ]
-                if len(same) > 0:
-                    readmit_pn += 1
-
-            k1,k2,k3,k4,k5 = st.columns(5)
-            k1.metric("🏥 จำหน่ายทั้งหมด", f"{tot_pn:,} ราย")
-            k2.metric("💀 เสียชีวิต",       f"{death_pn} ราย", f"{death_pn/tot_pn*100:.1f}%")
-            k3.metric("✅ Improve",          f"{improve_pn} ราย")
-            k4.metric("🔄 Readmit ≤28 วัน", f"{readmit_pn} ราย", f"{readmit_pn/tot_pn*100:.1f}%")
-            k5.metric("💨 On Ventilator",   f"{int(vent_pn)} ราย")
-
-            st.markdown("---")
-
-            # ── ตารางรายเดือน ──
-            st.markdown("#### 📋 ตารางสรุปรายเดือน")
-            rows = []
-            for period, grp in df_pn.groupby('month_sort'):
-                ml   = grp['month_label'].iloc[0]
-                tot  = len(grp)
-                dead = grp['discharge_status'].str.contains('ตาย',na=False).sum()
-                imp  = grp['discharge_status'].str.contains('ดีขึ้น',na=False).sum()
-                vn   = grp['on_vent'].sum()
-                ra   = 0
-                for _, row in grp.iterrows():
-                    if pd.isna(row['discharge_date']) or pd.isna(row['hn']): continue
-                    same = df_all[
-                        (df_all['hn'] == row['hn']) &
-                        (df_all['admit_date'] > row['discharge_date']) &
-                        (df_all['admit_date'] <= row['discharge_date'] + pd.Timedelta(days=28))
-                    ]
-                    if len(same) > 0: ra += 1
-                rows.append({
-                    'เดือน': ml,
-                    'จำหน่ายทั้งหมด': tot,
-                    'เสียชีวิต': int(dead),
-                    'อัตราเสียชีวิต (%)': round(dead/tot*100, 1) if tot else 0,
-                    'Improve': int(imp),
-                    'Readmit ≤28 วัน': ra,
-                    'อัตรา Readmit (%)': round(ra/tot*100, 1) if tot else 0,
-                    'On Ventilator': int(vn),
-                })
-            df_stat = pd.DataFrame(rows)
-            df_stat.index = range(1, len(df_stat)+1)
-            st.dataframe(df_stat, use_container_width=True)
-            csv = df_stat.to_csv(encoding='utf-8-sig').encode('utf-8-sig')
-            st.download_button("📥 ดาวน์โหลด CSV", csv,
-                               f"pneumonia_{pd.Timestamp.now().strftime('%Y%m%d')}.csv",
-                               "text/csv", key='dl_pn')
-
-            st.markdown("---")
-            # ── charts ──
-            import altair as alt
-            months_order = df_stat['เดือน'].tolist()
-
-            col_p1, col_p2 = st.columns(2)
-            with col_p1:
-                st.markdown("#### จำนวนจำหน่าย vs เสียชีวิต")
-                melt1 = df_stat[['เดือน','จำหน่ายทั้งหมด','เสียชีวิต']].melt(
-                    id_vars='เดือน', var_name='ประเภท', value_name='จำนวน')
-                ch_p1 = alt.Chart(melt1).mark_bar().encode(
-                    x=alt.X('เดือน:N', sort=months_order),
-                    y='จำนวน:Q',
-                    color=alt.Color('ประเภท:N', scale=alt.Scale(
-                        domain=['จำหน่ายทั้งหมด','เสียชีวิต'],
-                        range=['#1976D2','#E53935'])),
-                    xOffset='ประเภท:N',
-                    tooltip=['เดือน','ประเภท','จำนวน']
-                ).properties(height=280)
-                st.altair_chart(ch_p1, use_container_width=True)
-
-            with col_p2:
-                st.markdown("#### อัตราเสียชีวิต & Readmit (%)")
-                melt2 = df_stat[['เดือน','อัตราเสียชีวิต (%)','อัตรา Readmit (%)']].melt(
-                    id_vars='เดือน', var_name='ตัวชี้วัด', value_name='%')
-                ch_p2 = alt.Chart(melt2).mark_line(point=True, strokeWidth=2).encode(
-                    x=alt.X('เดือน:N', sort=months_order),
-                    y=alt.Y('%:Q', title='%'),
-                    color=alt.Color('ตัวชี้วัด:N'),
-                    tooltip=['เดือน','ตัวชี้วัด','%']
-                ).properties(height=280)
-                st.altair_chart(ch_p2, use_container_width=True)
-
-            # ── รายละเอียดผู้ป่วย ──
-            st.markdown("---")
-            with st.expander("📋 รายการผู้ป่วยปอดบวมทั้งหมด", expanded=False):
-                det_cols = ['hn','an','age','sex','pdx','admit_date','discharge_date',
-                            'discharge_status','ward_name','length_of_stay','adjrw','month_year']
-                av = [c for c in det_cols if c in df_pn.columns]
-                st.dataframe(df_pn[av], use_container_width=True, hide_index=True)
-
-    # ════════════════════════════════════════════════════
-    # TAB 3 : VAP
-    # ════════════════════════════════════════════════════
-    with tab3:
-        st.markdown("""
-        <div style="background:linear-gradient(135deg,#37474F,#546E7A);
-                    padding:1.2rem 2rem;border-radius:12px;margin-bottom:1.2rem;">
-            <h2 style="color:white;margin:0;font-size:1.5rem;">
-                💨 VAP Analysis
-            </h2>
-            <p style="color:#CFD8DC;margin:.3rem 0 0;font-size:.9rem;">
-                Ventilator-Associated Pneumonia | J95.851 / ปอดบวม + op 96.71/96.72
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # หา VAP โดยตรง (J95.851)
-        all_dx = ['pdx'] + [f'dx{i}' for i in range(11)]
-        vap_code_mask = pd.Series([False]*len(df_all), index=df_all.index)
-        for col in all_dx:
-            if col in df_all.columns:
-                vap_code_mask |= df_all[col].astype(str).str.startswith('J95.85')
-        df_vap_coded = df_all[vap_code_mask].copy()
-
-        # ปอดบวม + ventilator
-        df_pn_vent = df_pneumonia[df_pneumonia['on_vent']].copy()
-
-        # all ventilator cases
-        df_all['on_vent'] = df_all.apply(has_ventilator, axis=1)
-        df_vent_all = df_all[df_all['on_vent']].copy()
-
-        k1, k2, k3, k4 = st.columns(4)
-        k1.metric("🔴 J95.851 (VAP code)",    f"{len(df_vap_coded)} ราย",
-                  "⚠️ ควรตรวจสอบ" if len(df_vap_coded)==0 else "")
-        k2.metric("💨 ใช้ Ventilator ทั้งหมด", f"{len(df_vent_all)} ราย")
-        k3.metric("🫁 ปอดบวม + Ventilator",    f"{len(df_pn_vent)} ราย")
-        k4.metric("💀 เสียชีวิตใน ปอดบวม+Vent",
-                  str(df_pn_vent['discharge_status'].str.contains('ตาย',na=False).sum()) + " ราย")
-
-        st.markdown("---")
-
-        # ── VAP coded ──
-        st.markdown("#### 🔴 ผู้ป่วยที่ code J95.851 (VAP โดยตรง)")
-        if df_vap_coded.empty:
-            st.info("""
-            ℹ️ **ไม่พบรหัส J95.851** ในข้อมูล
-
-            **ความเป็นไปได้:**
-            - ยังไม่มีผู้ป่วย VAP ในช่วงนี้ ✅
-            - มีผู้ป่วย VAP แต่ยังไม่ได้ลง code → ควรแจ้ง **ทีม Coder** และ **IC**
-
-            **เกณฑ์การวินิจฉัย VAP:**
-            ใส่ท่อช่วยหายใจ > 48 ชั่วโมง แล้วเกิดปอดบวมใหม่
-            """)
-        else:
-            vc = [c for c in ['hn','an','age','pdx','ward_name',
-                               'length_of_stay','discharge_status'] if c in df_vap_coded.columns]
-            st.dataframe(df_vap_coded[vc], use_container_width=True, hide_index=True)
-
-        st.markdown("---")
-
-        # ── ปอดบวม + ventilator ──
-        st.markdown("#### 🫁 ผู้ป่วยปอดบวม + ใช้ Ventilator (Possible VAP)")
-        st.caption("⚠️ ไม่ใช่ VAP ทุกราย — ต้องประเมินทางคลินิกเพิ่มเติม (ลำดับเวลา admit vs ventilator)")
-
-        if df_pn_vent.empty:
-            st.info("ไม่พบผู้ป่วยในกลุ่มนี้")
-        else:
-            vc2 = [c for c in ['hn','an','age','sex','pdx','admit_date','discharge_date',
-                                'ward_name','length_of_stay','discharge_status','vent_codes']
-                   if c in df_pn_vent.columns]
-            df_pn_vent_show = df_pn_vent[vc2].copy()
-            df_pn_vent_show.index = range(1, len(df_pn_vent_show)+1)
-            st.dataframe(df_pn_vent_show, use_container_width=True)
-
-        st.markdown("---")
-
-        # ── Ventilator ทุก ward ──
-        st.markdown("#### 💨 การกระจาย Ventilator ตาม Ward")
-        if not df_vent_all.empty and 'ward_name' in df_vent_all.columns:
-            import altair as alt
-            ward_vent = (df_vent_all['ward_name'].value_counts()
-                         .reset_index().rename(columns={'ward_name':'Ward','count':'จำนวน'}))
-            ch_v = alt.Chart(ward_vent).mark_bar(color='#546E7A').encode(
-                x=alt.X('จำนวน:Q'),
-                y=alt.Y('Ward:N', sort='-x'),
-                tooltip=['Ward','จำนวน']
-            ).properties(height=300)
-            st.altair_chart(ch_v, use_container_width=True)
-
-        # ── คำแนะนำ ──
-        st.markdown("---")
-        st.markdown("""
-        #### 📌 คำแนะนำ
-        | ขั้นตอน | ผู้รับผิดชอบ |
-        |---------|------------|
-        | ตรวจสอบผู้ป่วย ICU ที่ใส่ ventilator > 48 ชม. | ทีม IC + แพทย์เจ้าของไข้ |
-        | Cross-check กับสมุดบันทึก VAP ของ IC | ทีม IC |
-        | ลง code J95.851 ถ้าวินิจฉัย VAP | ทีม Coder |
-        | ติดตาม VAP rate รายเดือน | งานพัฒนาคุณภาพ |
-        """)
-
-    # ════════════════════════════════════════════════════
-    # TAB 4 : เชิงลึก
-    # ════════════════════════════════════════════════════
-    with tab4:
-        st.markdown("""
-        <div style="background:linear-gradient(135deg,#4A148C,#6A1B9A);
-                    padding:1.2rem 2rem;border-radius:12px;margin-bottom:1.2rem;">
-            <h2 style="color:white;margin:0;font-size:1.5rem;">
-                🔬 วิเคราะห์เชิงลึก
-            </h2>
-            <p style="color:#E1BEE7;margin:.3rem 0 0;font-size:.9rem;">
-                CMI · LOS Outlier · สิทธิ์ · แรงงานต่างด้าว · Top RW
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-
-        import altair as alt
-
-        sub1, sub2, sub3, sub4 = st.tabs([
-            "💰 adjRW / CMI", "🛏 LOS Outlier",
-            "🪪 สิทธิ์การรักษา", "🌏 แรงงานต่างด้าว"
-        ])
-
-        # ── sub1: adjRW / CMI ──
-        with sub1:
-            st.markdown("#### 🏆 Top 10 โรค by Total adjRW")
-            rw_grp = (df_all.groupby('pdx')['adjrw']
-                      .agg(['sum','mean','count']).round(3)
-                      .rename(columns={'sum':'Total RW','mean':'Mean RW','count':'จำนวนราย'})
-                      .sort_values('Total RW', ascending=False).head(10).reset_index())
-            st.dataframe(rw_grp, use_container_width=True, hide_index=True)
-
-            ch_rw = alt.Chart(rw_grp).mark_bar(color='#7B1FA2').encode(
-                x=alt.X('Total RW:Q'),
-                y=alt.Y('pdx:N', sort='-x', title='ICD-10'),
-                tooltip=['pdx','Total RW','Mean RW','จำนวนราย']
-            ).properties(height=320)
-            st.altair_chart(ch_rw, use_container_width=True)
-
-            st.markdown("---")
-            st.markdown("#### 📈 CMI รายเดือน")
-            cmi_m = (df_all.groupby('month_label')['adjrw']
-                     .mean().reset_index(name='CMI').round(3))
-            ch_cmi = alt.Chart(cmi_m).mark_area(
-                line={'color':'#7B1FA2'}, color=alt.Gradient(
-                    gradient='linear',
-                    stops=[alt.GradientStop(color='#CE93D8', offset=0),
-                           alt.GradientStop(color='white', offset=1)],
-                    x1=1, x2=1, y1=1, y2=0)
-            ).encode(
-                x=alt.X('month_label:N', title='เดือน'),
-                y=alt.Y('CMI:Q', scale=alt.Scale(zero=False)),
-                tooltip=['month_label','CMI']
-            ).properties(height=250)
-            st.altair_chart(ch_cmi, use_container_width=True)
-
-        # ── sub2: LOS Outlier ──
-        with sub2:
-            threshold = st.slider("กำหนด LOS threshold (วัน)", 7, 60, 30)
-            df_long = df_all[df_all['length_of_stay'] > threshold].copy()
-            st.metric(f"ผู้ป่วย LOS > {threshold} วัน",
-                      f"{len(df_long)} ราย",
-                      f"{len(df_long)/len(df_all)*100:.1f}% ของทั้งหมด")
-
-            if not df_long.empty:
-                lc = [c for c in ['hn','an','age','pdx','ward_name',
-                                   'length_of_stay','discharge_status','adjrw']
-                      if c in df_long.columns]
-                st.dataframe(
-                    df_long[lc].sort_values('length_of_stay', ascending=False),
-                    use_container_width=True, hide_index=True
-                )
-
-                # histogram
-                hist_df = df_all[['length_of_stay']].dropna()
-                ch_h = alt.Chart(hist_df).mark_bar(color='#E65100').encode(
-                    x=alt.X('length_of_stay:Q', bin=alt.Bin(maxbins=30), title='LOS (วัน)'),
-                    y=alt.Y('count()', title='จำนวนราย'),
-                    tooltip=['count()']
-                ).properties(height=250, title='Distribution ของ LOS ทั้งหมด')
-                st.altair_chart(ch_h, use_container_width=True)
-
-        # ── sub3: สิทธิ์ ──
-        with sub3:
-            st.markdown("#### 🪪 สิทธิ์การรักษา")
-            pt_col = 'pttype_name' if 'pttype_name' in df_all.columns else None
-            if pt_col:
-                pt_df = (df_all[pt_col].value_counts()
-                         .reset_index().rename(columns={pt_col:'สิทธิ์','count':'จำนวน'}))
-                st.dataframe(pt_df, use_container_width=True, hide_index=True)
-
-                ch_pt = alt.Chart(pt_df.head(12)).mark_bar(color='#0277BD').encode(
-                    x=alt.X('จำนวน:Q'),
-                    y=alt.Y('สิทธิ์:N', sort='-x'),
-                    tooltip=['สิทธิ์','จำนวน']
-                ).properties(height=380)
-                st.altair_chart(ch_pt, use_container_width=True)
-            else:
-                st.info("ไม่พบคอลัมน์ pttype_name ในข้อมูล")
-
-        # ── sub4: แรงงานต่างด้าว ──
-        with sub4:
-            st.markdown("#### 🌏 แรงงานต่างด้าว")
-            pt_col = 'pttype_name' if 'pttype_name' in df_all.columns else None
-            if pt_col:
-                df_foreign = df_all[df_all[pt_col].str.contains('ต่างด้าว', na=False)].copy()
-                f1, f2, f3 = st.columns(3)
-                f1.metric("👥 จำนวน",    f"{len(df_foreign):,} ราย")
-                f2.metric("💰 adjRW รวม", f"{df_foreign['adjrw'].sum():.1f}")
-                f3.metric("🛏 LOS เฉลี่ย", f"{df_foreign['length_of_stay'].mean():.1f} วัน")
-
-                st.markdown("---")
-                col_f1, col_f2 = st.columns(2)
-                with col_f1:
-                    st.markdown("**Top 10 โรค**")
-                    fdx = (df_foreign['pdx'].value_counts().head(10)
-                           .reset_index().rename(columns={'pdx':'รหัส','count':'จำนวน'}))
-                    ch_fd = alt.Chart(fdx).mark_bar(color='#00838F').encode(
-                        x=alt.X('จำนวน:Q'),
-                        y=alt.Y('รหัส:N', sort='-x'),
-                        tooltip=['รหัส','จำนวน']
-                    ).properties(height=300)
-                    st.altair_chart(ch_fd, use_container_width=True)
-
-                with col_f2:
-                    st.markdown("**สถานะการจำหน่าย**")
-                    fst = (df_foreign['discharge_status'].value_counts()
-                           .reset_index().rename(columns={'discharge_status':'สถานะ','count':'จำนวน'}))
-                    ch_fs = alt.Chart(fst).mark_arc(innerRadius=45).encode(
-                        theta='จำนวน:Q',
-                        color=alt.Color('สถานะ:N'),
-                        tooltip=['สถานะ','จำนวน']
-                    ).properties(height=300)
-                    st.altair_chart(ch_fs, use_container_width=True)
-            else:
-                st.info("ไม่พบคอลัมน์ pttype_name ในข้อมูล")
-
-    st.markdown("---")
-    st.caption(f"🕐 อัปเดตล่าสุด: {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}")
-
-
+     
 def show_import():
     """หน้านำเข้าข้อมูล"""
     st.markdown("## 📥 นำเข้าข้อมูล IPD Monthly")
