@@ -113,7 +113,7 @@ st.markdown("""
 
 # ตั้งค่า Supabase
 SUPABASE_URL = "https://qwxnsusfydrhtfqdcsqn.supabase.co"
-SUPABASE_KEY = "sb_publishable_Q2bzMBe3jSlQWlGAZhyJig_ILZ8heFz"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3eG5zdXNmeWRyaHRmcWRjc3FuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEwOTczNDcsImV4cCI6MjA4NjY3MzM0N30.1KiMRlJJ1jUpS7xfzocahJl3fH78m6CgM3Nm-UhhcRk"
 
 
 class SupabaseClient:
