@@ -1983,6 +1983,24 @@ def show_reports():
                 7, 60, 30,
                 help="🛏️ **กำหนดจำนวนวันขั้นต่ำที่ถือว่า 'นอนนาน'**\n\n🔹 **7-14 วัน:** Long stay\n🔹 **15-29 วัน:** Very long stay\n🔹 **30+ วัน:** Outlier (ควรตรวจสอบ)\n\n💡 **LOS นานมาก** อาจเกิดจาก:\n   • Chronic care\n   • Complication\n   • Social admission\n   • Waiting for transfer"
             )
+
+  
+            if threshold <= 10:
+                level, color, msg = "🟡 Low", "#F9A825", "เห็นผู้ป่วยจำนวนมาก — เหมาะสำหรับ IC Surveillance"
+            elif threshold <= 20:
+                level, color, msg = "🟠 Medium", "#F57C00", "เหมาะสำหรับ Sub-acute / Chronic care review"
+            elif threshold <= 35:
+                level, color, msg = "🔵 Standard", "#1976D2", "เกณฑ์มาตรฐานทั่วไป — เหมาะสำหรับรายงานผู้บริหาร"
+            else:
+                level, color, msg = "🔴 Strict", "#C62828", "เฉพาะรายที่นอนนานมากผิดปกติ"
+            
+            st.markdown(f"""
+            <div style="background:#F5F5F5;padding:0.6rem 1rem;border-radius:8px;
+                        border-left:4px solid {color};margin-bottom:1rem;">
+                <span style="color:{color};font-weight:700;">{level}</span>
+                <span style="color:#546E7A;font-size:0.9rem;margin-left:0.5rem;">{msg}</span>
+            </div>
+            """, unsafe_allow_html=True)           
             if 'length_of_stay' in df_all.columns:
                 df_long = df_all[df_all['length_of_stay'] > threshold].copy()
                 st.metric(f"ผู้ป่วย LOS > {threshold} วัน",
