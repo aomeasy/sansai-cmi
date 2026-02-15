@@ -1192,7 +1192,14 @@ def show_reports():
         df_all['on_vent'] = df_all.apply(has_ventilator, axis=1)
         df_vent_all = df_all[df_all['on_vent']].copy()
 
- 
+         # ✅ แก้ Bug: คำนวณ death_pn_vent ก่อนใช้งาน
+        if not df_pn_vent.empty and 'discharge_status' in df_pn_vent.columns:
+            death_pn_vent = int(
+                df_pn_vent['discharge_status'].str.contains('ตาย', na=False).sum()
+            )
+        else:
+            death_pn_vent = 0
+            
         k1, k2, k3, k4 = st.columns(4)
         
         k1.metric(
@@ -1285,7 +1292,7 @@ def show_reports():
     # ════════════════════════════════════════════════════
     # TAB 4 : Stroke & ACS 
     # ════════════════════════════════════════════════════
-    with tab5:
+    with tab4:
         st.markdown("""
         <div style="background:linear-gradient(135deg,#B71C1C,#880E4F);
                     padding:1.2rem 2rem;border-radius:12px;margin-bottom:1.2rem;">
