@@ -2551,9 +2551,6 @@ def create_kpi_card(title, value, delta=None, icon="📊", color="#1565C0"):
 # MAIN APP
 # ============================================
 
-
-
-
 def main():
     # Header (เดิม)
     st.markdown("""
@@ -2564,133 +2561,92 @@ def main():
     """, unsafe_allow_html=True)
     
     # ========================================
-    # ENHANCED SIDEBAR NAVIGATION
+    # SIDEBAR NAVIGATION
     # ========================================
-  
-
-    # ── Logo ──────────────────────────────────
-    st.markdown("""
-        <div style="text-align:center;padding:1rem 0 1.5rem;">
-            <div style="font-size:2.5rem;">🏥</div>
-            <div style="color:white;font-size:1.2rem;
-                        font-weight:700;margin-top:0.3rem;">
-                Sansai Hospital
+    with st.sidebar:
+        # Logo
+        st.markdown("""
+            <div style="text-align:center;padding:1rem 0 1.5rem;">
+                <div style="font-size:2.5rem;">🏥</div>
+                <div style="color:white;font-size:1.2rem;
+                            font-weight:700;margin-top:0.3rem;">
+                    Sansai Hospital
+                </div>
+                <div style="color:#B3E5FC;font-size:0.75rem;
+                            letter-spacing:2px;margin-top:0.2rem;">
+                    CASE MIX INTELLIGENCE
+                </div>
             </div>
-            <div style="color:#B3E5FC;font-size:0.75rem;
-                        letter-spacing:2px;margin-top:0.2rem;">
-                CASE MIX INTELLIGENCE
+            <hr style="border-color:rgba(255,255,255,0.15);margin:0 0 1rem;">
+        """, unsafe_allow_html=True)
+
+        # Navigation
+        current = st.session_state.get('selected_menu', '🏠 หน้าแรก')
+
+        # หน้าแรก
+        if current == '🏠 หน้าแรก':
+            st.success("🏠  หน้าแรก")
+        else:
+            if st.button("🏠  หน้าแรก",
+                         use_container_width=True,
+                         key="nav_home"):
+                st.session_state['selected_menu'] = '🏠 หน้าแรก'
+                st.rerun()
+
+        # รายงาน
+        if current == '📊 รายงาน':
+            st.success("📊  รายงาน")
+        else:
+            if st.button("📊  รายงาน",
+                         use_container_width=True,
+                         key="nav_report"):
+                st.session_state['selected_menu'] = '📊 รายงาน'
+                st.rerun()
+
+        # นำเข้าข้อมูล
+        if current == '📥 นำเข้าข้อมูล':
+            st.success("📥  นำเข้าข้อมูล")
+        else:
+            if st.button("📥  นำเข้าข้อมูล",
+                         use_container_width=True,
+                         key="nav_import"):
+                st.session_state['selected_menu'] = '📥 นำเข้าข้อมูล'
+                st.rerun()
+
+        # Divider + System Info
+        st.markdown("""
+            <hr style="border-color:rgba(255,255,255,0.15);margin:1rem 0;">
+            <div style="color:rgba(255,255,255,0.5);font-size:0.7rem;
+                        letter-spacing:2px;font-weight:700;
+                        padding:0 0.2rem;margin-bottom:0.8rem;">
+                ▸ SYSTEM INFO
             </div>
-        </div>
-        <hr style="border-color:rgba(255,255,255,0.15);margin:0 0 1rem;">
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
-    # ── Navigation ────────────────────────────
-    current = st.session_state.get('selected_menu', '🏠 หน้าแรก')
+        # System info
+        current_date = datetime.now()
+        fiscal_year  = current_date.year + 1 \
+                       if current_date.month >= 10 \
+                       else current_date.year
 
-    # หน้าแรก
-    if current == '🏠 หน้าแรก':
-        st.success("🏠  หน้าแรก")
-    else:
-        if st.button("🏠  หน้าแรก",
-                     use_container_width=True,
-                     key="nav_home"):
-            st.session_state['selected_menu'] = '🏠 หน้าแรก'
-            st.rerun()
-
-    # รายงาน
-    if current == '📊 รายงาน':
-        st.success("📊  รายงาน")
-    else:
-        if st.button("📊  รายงาน",
-                     use_container_width=True,
-                     key="nav_report"):
-            st.session_state['selected_menu'] = '📊 รายงาน'
-            st.rerun()
-
-    # นำเข้าข้อมูล
-    if current == '📥 นำเข้าข้อมูล':
-        st.success("📥  นำเข้าข้อมูล")
-    else:
-        if st.button("📥  นำเข้าข้อมูล",
-                     use_container_width=True,
-                     key="nav_import"):
-            st.session_state['selected_menu'] = '📥 นำเข้าข้อมูล'
-            st.rerun()
-
-    # ── Divider + System Info ─────────────────
-    st.markdown("""
-        <hr style="border-color:rgba(255,255,255,0.15);margin:1rem 0;">
-        <div style="color:rgba(255,255,255,0.5);font-size:0.7rem;
-                    letter-spacing:2px;font-weight:700;
-                    padding:0 0.2rem;margin-bottom:0.8rem;">
-            ▸ SYSTEM INFO
-        </div>
-    """, unsafe_allow_html=True)
-
-    # System info — ใช้ st.caption แทน HTML
-    current_date = datetime.now()
-    fiscal_year  = current_date.year + 1 \
-                   if current_date.month >= 10 \
-                   else current_date.year
-
-    st.caption(f"📅 {current_date.strftime('%d %b %Y')}")
-    st.caption(f"📆 ปีงบประมาณ {fiscal_year}")
-    st.caption("🔄 Version  v2.1.0")
-    st.caption("⚡ Status  🟢 Online")
-
+        st.caption(f"📅 {current_date.strftime('%d %b %Y')}")
+        st.caption(f"📆 ปีงบประมาณ {fiscal_year}")
+        st.caption("🔄 Version  v2.1.0")
+        st.caption("⚡ Status  🟢 Online")
 
     # ========================================
     # ROUTE TO PAGES
     # ========================================
     menu = st.session_state.get('selected_menu', '🏠 หน้าแรก')
     
-    # Info cards (แสดงข้อมูลระบบด้านล่าง Sidebar)
-    current_date = datetime.now()
-    fiscal_year = current_date.year + 1 if current_date.month >= 10 else current_date.year
-    
-    st.markdown(f"""
-        <div style="background:rgba(255,255,255,0.1);padding:0.8rem;
-                    border-radius:8px;margin-bottom:0.5rem;">
-            <div style="color:#B3E5FC;font-size:0.75rem;margin-bottom:0.2rem;">
-                📅 CURRENT DATE
-            </div>
-            <div style="color:white;font-weight:600;font-size:0.9rem;">
-                {current_date.strftime('%d %B %Y')}
-            </div>
-        </div>
-        
-        <div style="background:rgba(255,255,255,0.1);padding:0.8rem;
-                    border-radius:8px;margin-bottom:0.5rem;">
-            <div style="color:#B3E5FC;font-size:0.75rem;margin-bottom:0.2rem;">
-                🔄 VERSION
-            </div>
-            <div style="color:white;font-weight:600;font-size:0.9rem;">
-                v2.0.0 (Enterprise)
-            </div>
-        </div>
-        
-        <div style="background:rgba(76,175,80,0.2);padding:0.8rem;
-                    border-radius:8px;border:1px solid rgba(76,175,80,0.4);">
-            <div style="color:#C8E6C9;font-size:0.75rem;margin-bottom:0.2rem;">
-                ✅ STATUS
-            </div>
-            <div style="color:#4CAF50;font-weight:600;font-size:0.9rem;">
-                System Online
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    # ========================================
-    # ROUTE TO PAGES
-    # ========================================
     if menu == "🏠 หน้าแรก":
         show_home()
     elif menu == "📊 รายงาน":
         show_reports()
     elif menu == "📥 นำเข้าข้อมูล":
         show_import()
-    
-   
+
+ 
 
 def show_home():
     """Executive Dashboard Homepage - Hospital Intelligence"""
