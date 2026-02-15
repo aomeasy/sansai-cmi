@@ -693,19 +693,18 @@ def show_import():
                     elif file_ext in ['xlsx', 'xls']:
                         engines_to_try = []
                         
-                        # กำหนด engine ตามนามสกุล
-                        if file_ext == 'xlsx' and available_engines['openpyxl']:
-                            engines_to_try.append('openpyxl')
-                        if file_ext == 'xls' and available_engines['xlrd']:
-                            engines_to_try.append('xlrd')
+                       
+
+                        # ✅ แก้ไข: ลอง import engine โดยตรง ไม่พึ่ง available_engines flag
+                        # เพราะ flag อาจ False แม้ติดตั้งแล้ว ถ้า import ล้มเหลวตอนตรวจสอบ
                         
-                        # ลองทุก engine ที่มี
-                        if available_engines['openpyxl'] and 'openpyxl' not in engines_to_try:
-                            engines_to_try.append('openpyxl')
-                        if available_engines['xlrd'] and 'xlrd' not in engines_to_try:
-                            engines_to_try.append('xlrd')
+                        # กำหนดลำดับ engine ตามนามสกุลไฟล์
+                        if file_ext == 'xlsx':
+                            engines_to_try = ['openpyxl', 'xlrd']
+                        else:  # xls
+                            engines_to_try = ['xlrd', 'openpyxl']
                         
-                        # ลอง engine ทีละตัว
+                        # ลอง engine ทีละตัว (ลอง import จริงๆ ไม่ใช้ flag)
                         success = False
                         errors = []
                         
@@ -716,6 +715,10 @@ def show_import():
                                 st.success(f"✅ อ่านไฟล์ Excel สำเร็จด้วย engine: {engine}")
                                 success = True
                                 break
+                            except ImportError as e:
+                                # engine library ไม่ได้ติดตั้ง → ข้ามไป engine ถัดไป
+                                errors.append(f"- {engine} (ไม่ได้ติดตั้ง): {str(e)[:80]}")
+                                continue
                             except Exception as e:
                                 errors.append(f"- {engine}: {str(e)[:80]}")
                                 continue
