@@ -1516,9 +1516,7 @@ def main():
         menu_options = {
             "🏠 หน้าแรก": "Executive Dashboard & Real-time KPIs",
             "📊 รายงาน": "Comprehensive Analytics & Reports",
-            "📥 นำเข้าข้อมูล": "Data Import & Validation",
-            "🔧 ทดสอบการเชื่อมต่อ": "System Health Check",
-            "🩹 แก้ไขปัญหา": "Troubleshooting Guide"
+            "📥 นำเข้าข้อมูล": "Data Import & Validation"
         }
         
         # Custom Radio with descriptions
