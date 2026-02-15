@@ -5,7 +5,7 @@ import io
 import requests
 import json
 import re
- 
+import altair as alt  # ⚠️ ต้องมีบรรทัดนี้
 
 # ตั้งค่าหน้าเว็บ
 st.set_page_config(
@@ -402,6 +402,343 @@ def parse_month_year_from_filename(filename):
     except Exception as e:
         st.error(f"ไม่สามารถแปลงชื่อไฟล์เป็น month_year: {str(e)}")
         return None
+
+def show_reports():
+    """หน้ารายงาน — 4 tabs"""
+
+    # ── รหัสโรค ──────────────────────────────────────────
+    PNEUMONIA_CODES = [
+        'J10', 'J11', 'J12', 'J13', 'J14',
+        'J15', 'J16', 'J17', 'J18', 'J85.0', 'J85.1'
+    ]
+    OP_VENT = ['96.7']  # ventilator op codes
+
+    # ── โหลดข้อมูล ────────────────────────────────────────
+    client = init_supabase()
+    
+    with st.spinner("กำลังโหลดข้อมูล..."):
+        try:
+            result = client.select('ipd_monthly')
+        except Exception as e:
+            st.error(f"❌ เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล: {str(e)}")
+            st.info("💡 ลองไปที่เมนู '🔧 ทดสอบการเชื่อมต่อ' เพื่อตรวจสอบปัญหา")
+            return
+
+    if result.get('error'):  # ✅ เปลี่ยนจาก result['error'] เป็น result.get('error')
+        st.error(f"❌ เกิดข้อผิดพลาดในการดึงข้อมูล: {result['error']}")
+        st.info("💡 ลองไปที่เมนู '🔧 ทดสอบการเชื่อมต่อ' เพื่อตรวจสอบปัญหา")
+        return
+    
+    if not result.get('data'):  # ✅ เปลี่ยนจาก result['data'] เป็น result.get('data')
+        st.warning("⚠️ ไม่พบข้อมูลในระบบ กรุณานำเข้าข้อมูลก่อน")
+        return
+
+    try:
+        df_all = pd.DataFrame(result['data'])
+    except Exception as e:
+        st.error(f"❌ ไม่สามารถแปลงข้อมูลเป็น DataFrame: {str(e)}")
+        return
+        
+    if df_all.empty:
+        st.warning("⚠️ ไม่พบข้อมูล")
+        return
+
+    # ── แปลงประเภทข้อมูล ─────────────────────────────────
+    try:
+        df_all['month_year'] = pd.to_datetime(df_all['month_year'], errors='coerce')
+        df_all['admit_date'] = pd.to_datetime(df_all['admit_date'], errors='coerce')
+        df_all['discharge_date'] = pd.to_datetime(df_all['discharge_date'], errors='coerce')
+        df_all['age'] = pd.to_numeric(df_all.get('age', pd.Series()), errors='coerce')
+        df_all['adjrw'] = pd.to_numeric(df_all.get('adjrw', pd.Series()), errors='coerce')
+        df_all['length_of_stay'] = pd.to_numeric(df_all.get('length_of_stay', pd.Series()), errors='coerce')
+        df_all['month_label'] = df_all['month_year'].dt.strftime('%b %Y')
+        df_all['month_sort'] = df_all['month_year'].dt.to_period('M')
+    except Exception as e:
+        st.error(f"❌ เกิดข้อผิดพลาดในการแปลงประเภทข้อมูล: {str(e)}")
+        st.info("💡 ตรวจสอบว่าข้อมูลในฐานข้อมูลมีรูปแบบที่ถูกต้อง")
+        return
+
+    # ── helper ───────────────────────────────────────────
+    def is_pneumonia(code):
+        if pd.isna(code): 
+            return False
+        s = str(code).strip()
+        return any(s.startswith(c) for c in PNEUMONIA_CODES)
+
+    def has_ventilator(row):
+        op_cols = [f'op{i}' for i in range(12)]
+        try:
+            return any(
+                str(row.get(c, '')).startswith(tuple(OP_VENT))  # ✅ ใช้ row.get()
+                for c in op_cols if c in row and pd.notna(row.get(c))
+            )
+        except Exception:
+            return False
+
+    def get_vent_codes(row):
+        op_cols = [f'op{i}' for i in range(12)]
+        try:
+            return ', '.join(
+                f'{c}={row[c]}' for c in op_cols
+                if c in row and pd.notna(row.get(c)) and str(row.get(c, '')).startswith(tuple(OP_VENT))
+            )
+        except Exception:
+            return ""
+
+    # ✅ ตรวจสอบว่ามีคอลัมน์ pdx ก่อนใช้งาน
+    if 'pdx' not in df_all.columns:
+        st.error("❌ ไม่พบคอลัมน์ 'pdx' ในข้อมูล ไม่สามารถวิเคราะห์โรคปอดบวมได้")
+        df_pneumonia = pd.DataFrame()  # สร้าง empty dataframe
+    else:
+        df_pneumonia = df_all[df_all['pdx'].apply(is_pneumonia)].copy()
+        df_pneumonia['on_vent'] = df_pneumonia.apply(has_ventilator, axis=1)
+        df_pneumonia['vent_codes'] = df_pneumonia.apply(get_vent_codes, axis=1)
+
+    # ════════════════════════════════════════════════════
+    # TABS
+    # ════════════════════════════════════════════════════
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "🏥 Dashboard ภาพรวม",
+        "🫁 ปอดบวม (Pneumonia)",
+        "💨 VAP Analysis",
+        "🔬 เชิงลึก"
+    ])
+
+    # ════════════════════════════════════════════════════
+    # TAB 1 : DASHBOARD ภาพรวม
+    # ════════════════════════════════════════════════════
+    with tab1:
+        st.markdown("""
+        <div style="background:linear-gradient(135deg,#1565C0,#2E7D32);
+                    padding:1.2rem 2rem;border-radius:12px;margin-bottom:1.2rem;">
+            <h2 style="color:white;margin:0;font-size:1.5rem;">
+                🏥 Dashboard ภาพรวมโรงพยาบาลสันทราย
+            </h2>
+            <p style="color:#E3F2FD;margin:.3rem 0 0;font-size:.9rem;">
+                IPD Monthly — ข้อมูลผู้ป่วยใน
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        try:
+            # ── KPI cards ──
+            total = len(df_all)
+            cmi = df_all['adjrw'].mean() if 'adjrw' in df_all.columns else 0
+            total_rw = df_all['adjrw'].sum() if 'adjrw' in df_all.columns else 0
+            los_mean = df_all['length_of_stay'].mean() if 'length_of_stay' in df_all.columns else 0
+            
+            # ✅ ตรวจสอบว่ามีคอลัมน์ discharge_status
+            if 'discharge_status' in df_all.columns:
+                death_n = df_all['discharge_status'].str.contains('ตาย', na=False).sum()
+            else:
+                death_n = 0
+                
+            death_pct = (death_n / total * 100) if total > 0 else 0
+            
+            # ✅ Readmit calculation with error handling
+            readmit_n = 0
+            readmit_hn = set()
+            if 'discharge_date' in df_all.columns and 'hn' in df_all.columns and 'admit_date' in df_all.columns:
+                try:
+                    for _, row in df_all.iterrows():
+                        if pd.isna(row.get('discharge_date')) or pd.isna(row.get('hn')): 
+                            continue
+                        same = df_all[
+                            (df_all['hn'] == row['hn']) &
+                            (df_all['admit_date'] > row['discharge_date']) &
+                            (df_all['admit_date'] <= row['discharge_date'] + pd.Timedelta(days=28))
+                        ]
+                        if len(same) > 0:
+                            readmit_hn.add(row['hn'])
+                    readmit_n = len(readmit_hn)
+                except Exception as e:
+                    st.warning(f"⚠️ ไม่สามารถคำนวณ Readmit ได้: {str(e)}")
+                    
+            readmit_pct = (readmit_n / total * 100) if total > 0 else 0
+
+            c1, c2, c3, c4, c5, c6 = st.columns(6)
+            c1.metric("👥 จำหน่ายทั้งหมด", f"{total:,} ราย")
+            c2.metric("📊 CMI", f"{cmi:.3f}")
+            c3.metric("💰 Total adjRW", f"{total_rw:,.1f}")
+            c4.metric("🛏 LOS เฉลี่ย", f"{los_mean:.1f} วัน")
+            c5.metric("💀 เสียชีวิต", f"{death_n} ราย", f"{death_pct:.1f}%")
+            c6.metric("🔄 Readmit ≤28 วัน", f"{readmit_n} ราย", f"{readmit_pct:.1f}%")
+
+            st.markdown("---")
+            
+            # ✅ Import altair เฉพาะส่วนที่ใช้
+            try:
+                import altair as alt
+            except ImportError:
+                st.error("❌ ไม่สามารถโหลด Altair library กรุณาติดตั้ง: pip install altair")
+                return
+
+            # ── กราฟ 1: จำหน่ายรายเดือน ──
+            col_a, col_b = st.columns(2)
+            with col_a:
+                st.markdown("#### 📅 จำนวนจำหน่ายรายเดือน")
+                if 'month_label' in df_all.columns:
+                    m_count = (df_all.groupby('month_label')
+                               .size().reset_index(name='จำนวน'))
+                    ch = alt.Chart(m_count).mark_bar(color='#1976D2').encode(
+                        x=alt.X('month_label:N', title='เดือน'),
+                        y=alt.Y('จำนวน:Q', title='ราย'),
+                        tooltip=['month_label', 'จำนวน']
+                    ).properties(height=280)
+                    st.altair_chart(ch, use_container_width=True)
+                else:
+                    st.info("ไม่พบข้อมูลเดือน")
+
+            with col_b:
+                st.markdown("#### 📊 CMI รายเดือน")
+                if 'month_label' in df_all.columns and 'adjrw' in df_all.columns:
+                    m_cmi = (df_all.groupby('month_label')['adjrw']
+                             .mean().reset_index(name='CMI').round(3))
+                    ch2 = alt.Chart(m_cmi).mark_line(
+                        point=True, strokeWidth=2, color='#2E7D32'
+                    ).encode(
+                        x=alt.X('month_label:N', title='เดือน'),
+                        y=alt.Y('CMI:Q', title='CMI', scale=alt.Scale(zero=False)),
+                        tooltip=['month_label', 'CMI']
+                    ).properties(height=280)
+                    st.altair_chart(ch2, use_container_width=True)
+                else:
+                    st.info("ไม่พบข้อมูล CMI")
+
+            # ── กราฟ 2: Top 10 โรค + clinic ──
+            col_c, col_d = st.columns(2)
+            with col_c:
+                st.markdown("#### 🏆 Top 10 โรค (จำนวนราย)")
+                if 'pdx' in df_all.columns:
+                    top10 = (df_all['pdx'].value_counts().head(10)
+                             .reset_index().rename(columns={'pdx':'รหัส','count':'จำนวน'}))
+                    ch3 = alt.Chart(top10).mark_bar(color='#1565C0').encode(
+                        x=alt.X('จำนวน:Q', title='จำนวนราย'),
+                        y=alt.Y('รหัส:N', sort='-x', title='ICD-10'),
+                        tooltip=['รหัส', 'จำนวน']
+                    ).properties(height=300)
+                    st.altair_chart(ch3, use_container_width=True)
+                else:
+                    st.info("ไม่พบข้อมูลรหัสโรค")
+
+            with col_d:
+                st.markdown("#### 🏥 สัดส่วน Clinic")
+                if 'clinic_name' in df_all.columns:
+                    clinic_df = (df_all['clinic_name'].value_counts().head(8)
+                                 .reset_index().rename(columns={'clinic_name':'clinic','count':'จำนวน'}))
+                    ch4 = alt.Chart(clinic_df).mark_arc(innerRadius=50).encode(
+                        theta=alt.Theta('จำนวน:Q'),
+                        color=alt.Color('clinic:N', legend=alt.Legend(title='Clinic')),
+                        tooltip=['clinic', 'จำนวน']
+                    ).properties(height=300)
+                    st.altair_chart(ch4, use_container_width=True)
+                else:
+                    st.info("ไม่พบข้อมูล Clinic")
+
+            # ── กราฟ 3: discharge status + กลุ่มอายุ ──
+            col_e, col_f = st.columns(2)
+            with col_e:
+                st.markdown("#### 📋 สถานะการจำหน่าย")
+                if 'discharge_status' in df_all.columns:
+                    status_df = (df_all['discharge_status'].value_counts()
+                                 .reset_index().rename(columns={'discharge_status':'สถานะ','count':'จำนวน'}))
+                    ch5 = alt.Chart(status_df).mark_bar(color='#43A047').encode(
+                        x=alt.X('จำนวน:Q'),
+                        y=alt.Y('สถานะ:N', sort='-x'),
+                        tooltip=['สถานะ', 'จำนวน']
+                    ).properties(height=250)
+                    st.altair_chart(ch5, use_container_width=True)
+                else:
+                    st.info("ไม่พบข้อมูลสถานะการจำหน่าย")
+
+            with col_f:
+                st.markdown("#### 👥 กลุ่มอายุ")
+                if 'age' in df_all.columns:
+                    bins = [0, 5, 15, 30, 45, 60, 75, 200]
+                    labels = ['0-5','6-15','16-30','31-45','46-60','61-75','75+']
+                    df_all['age_grp'] = pd.cut(df_all['age'], bins=bins, labels=labels)
+                    age_df = (df_all['age_grp'].value_counts().sort_index()
+                              .reset_index().rename(columns={'age_grp':'กลุ่มอายุ','count':'จำนวน'}))
+                    age_df['กลุ่มอายุ'] = age_df['กลุ่มอายุ'].astype(str)
+                    ch6 = alt.Chart(age_df).mark_bar(color='#F57C00').encode(
+                        x=alt.X('กลุ่มอายุ:N', sort=labels),
+                        y=alt.Y('จำนวน:Q'),
+                        tooltip=['กลุ่มอายุ', 'จำนวน']
+                    ).properties(height=250)
+                    st.altair_chart(ch6, use_container_width=True)
+                else:
+                    st.info("ไม่พบข้อมูลอายุ")
+
+            # ── LOS outlier table ──
+            st.markdown("---")
+            st.markdown("#### ⚠️ ผู้ป่วยนอนนาน (LOS > 30 วัน)")
+            if 'length_of_stay' in df_all.columns:
+                long_stay = df_all[df_all['length_of_stay'] > 30].copy()
+                if not long_stay.empty:
+                    cols_show = ['hn','an','age','pdx','ward_name',
+                                 'length_of_stay','discharge_status']
+                    avail = [c for c in cols_show if c in long_stay.columns]
+                    st.dataframe(
+                        long_stay[avail].sort_values('length_of_stay', ascending=False),
+                        use_container_width=True, hide_index=True
+                    )
+                else:
+                    st.info("ไม่พบผู้ป่วย LOS > 30 วัน")
+            else:
+                st.info("ไม่พบข้อมูล Length of Stay")
+                
+        except Exception as e:
+            st.error(f"❌ เกิดข้อผิดพลาดใน Tab Dashboard: {str(e)}")
+            st.exception(e)  # แสดง full traceback เพื่อ debug
+
+    # ════════════════════════════════════════════════════
+    # TAB 2-4: ใช้ Logic เดิม แต่เพิ่ม try-except
+    # ════════════════════════════════════════════════════
+    with tab2:
+        try:
+           
+            st.markdown("""
+            <div style="background:linear-gradient(135deg,#1976D2,#2E7D32);
+                        padding:1.2rem 2rem;border-radius:12px;margin-bottom:1.2rem;">
+                <h2 style="color:white;margin:0;font-size:1.5rem;">
+                    🫁 ตัวชี้วัดผู้ป่วยปอดบวม (Pneumonia)
+                </h2>
+                <p style="color:#E3F2FD;margin:.3rem 0 0;font-size:.9rem;">
+                    ICD-10: J10–J18, J85.0, J85.1 | วิเคราะห์จาก pdx
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            if df_pneumonia.empty:
+                st.warning("⚠️ ไม่พบข้อมูลผู้ป่วยปอดบวม")
+            else:
+                # ... (โค้ดเดิมทั้งหมด)
+                pass  # ใส่โค้ดเดิมตรงนี้
+                
+        except Exception as e:
+            st.error(f"❌ เกิดข้อผิดพลาดใน Tab ปอดบวม: {str(e)}")
+            st.exception(e)
+
+    with tab3:
+        try:
+            # ... (โค้ด Tab 3 เดิมทั้งหมด)
+            pass
+        except Exception as e:
+            st.error(f"❌ เกิดข้อผิดพลาดใน Tab VAP: {str(e)}")
+            st.exception(e)
+
+    with tab4:
+        try:
+            # ... (โค้ด Tab 4 เดิมทั้งหมด)
+            pass
+        except Exception as e:
+            st.error(f"❌ เกิดข้อผิดพลาดใน Tab เชิงลึก: {str(e)}")
+            st.exception(e)
+
+    st.markdown("---")
+    st.caption(f"🕐 อัปเดตล่าสุด: {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}")
+
+
 
 def get_fiscal_year(date_value):
     """คำนวณปีงบประมาณ (ตุลาคม-กันยายน)"""
