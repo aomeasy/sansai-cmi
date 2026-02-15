@@ -2257,74 +2257,13 @@ def show_home():
             **ตัวอย่าง:**
             - **หอผู้ป่วยหนัก ICU** → CMI สูง (2.5-4.0) ✅ ปกติ
             - **หอผู้ป่วยทั่วไป** → CMI ปานกลาง (1.0-1.5) ✅ ปกติ
-            - **หอผู้ป่วยทั่วไป แต่ CMI สูง (> 2.0)** → ⚠️ ควรย้ายไป ICU?
-            
-            ---
+            - **หอผู้ป่วยทั่วไป แต่ CMI สูง (> 2.0)** → ⚠️ ควรย้ายไป ICU?"""
              
         st.markdown("---")
 
 
 
-        
-        col_i1, col_i2, col_i3 = st.columns(3)
-        
-        with col_i1:
-            # Top 5 High-RW Cases
-            st.markdown("#### 🏆 Top 5 High-Value Cases")
-            top_rw = df_current.nlargest(5, 'adjrw')[['pdx', 'adjrw', 'ward_name']]
-            if not top_rw.empty:
-                for idx, row in enumerate(top_rw.itertuples(), 1):
-                    st.markdown(f"""
-                        <div style="background:#F5F5F5;padding:0.8rem;border-radius:8px;
-                                    margin-bottom:0.5rem;border-left:4px solid #1976D2;">
-                            <b>#{idx}</b> {row.pdx} <span style="float:right;color:#1976D2;font-weight:600;">RW: {row.adjrw:.2f}</span><br>
-                            <small style="color:#666;">{row.ward_name}</small>
-                        </div>
-                    """, unsafe_allow_html=True)
-        
-        with col_i2:
-            # Alert: Long Stay Cases
-            st.markdown("#### ⚠️ Long Stay Alert (>30 days)")
-            long_stay = df_current[df_current['length_of_stay'] > 30]
-            if len(long_stay) > 0:
-                st.error(f"🚨 **{len(long_stay)} cases** require attention")
-                for row in long_stay.head(5).itertuples():
-                    st.markdown(f"""
-                        <div style="background:#FFF3E0;padding:0.6rem;border-radius:6px;
-                                    margin-bottom:0.4rem;border-left:3px solid #FF6F00;">
-                            <b>AN:</b> {row.an} · <b>LOS:</b> {row.length_of_stay:.0f} days<br>
-                            <small>{row.pdx} · {row.ward_name}</small>
-                        </div>
-                    """, unsafe_allow_html=True)
-            else:
-                st.success("✅ No long-stay cases")
-        
-        with col_i3:
-            # Ward Performance
-            st.markdown("#### 🏥 Ward CMI Ranking")
-            ward_cmi = (df_current.groupby('ward_name')['adjrw']
-                        .mean()
-                        .sort_values(ascending=False)
-                        .head(5))
-            
-            if not ward_cmi.empty:
-                for ward, cmi in ward_cmi.items():
-                    bar_width = int((cmi / ward_cmi.max()) * 100)
-                    st.markdown(f"""
-                        <div style="margin-bottom:0.8rem;">
-                            <div style="display:flex;justify-content:space-between;margin-bottom:0.2rem;">
-                                <span style="font-size:0.9rem;font-weight:500;">{ward}</span>
-                                <span style="color:#2E7D32;font-weight:600;">{cmi:.3f}</span>
-                            </div>
-                            <div style="background:#E8F5E9;border-radius:4px;height:8px;">
-                                <div style="background:#2E7D32;height:8px;width:{bar_width}%;
-                                            border-radius:4px;transition:width 0.3s;"></div>
-                            </div>
-                        </div>
-                    """, unsafe_allow_html=True)
-        
-        st.markdown("---")
-        
+         
         # ========================================
         # SECTION 4: QUICK ACTION CARDS
         # ========================================
