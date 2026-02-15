@@ -547,16 +547,15 @@ def show_reports():
         - 💊 สถิติแยกตามโรค (ICD-10)
         - 📉 แนวโน้มและกราฟ
     """)
-
 def show_import():
     """หน้านำเข้าข้อมูล"""
     st.markdown("## 📥 นำเข้าข้อมูล IPD Monthly")
     
-    # ✅ เพิ่ม: ตรวจสอบ libraries ที่มีอยู่
+    # ตรวจสอบ libraries ที่มีอยู่
     available_engines = {
         'openpyxl': False,
         'xlrd': False,
-        'html': True  # pandas มี read_html built-in
+        'html': True
     }
     
     try:
@@ -571,7 +570,6 @@ def show_import():
     except ImportError:
         pass
     
-    # ✅ เพิ่ม: แสดงสถานะ engines ที่รองรับ
     excel_available = available_engines['openpyxl'] or available_engines['xlrd']
     
     # คำแนะนำ
@@ -613,7 +611,6 @@ def show_import():
         - ข้อมูลที่มี AN ซ้ำในเดือนเดียวกันจะไม่สามารถนำเข้าได้
         """)
         
-        # ✅ เพิ่ม: คำแนะนำแปลงไฟล์
         if not excel_available:
             st.warning("""
             ### ⚠️ ระบบอ่านไฟล์ Excel ได้จำกัด
@@ -632,16 +629,14 @@ def show_import():
     
     st.markdown("---")
     
-    # ✅ แก้ไข: รองรับหลายนามสกุล
     uploaded_file = st.file_uploader(
         "เลือกไฟล์ข้อมูล",
-        type=['xlsx', 'xls', 'csv', 'html'],  # ✅ รองรับทุกนามสกุล
+        type=['xlsx', 'xls', 'csv', 'html'],
         help="อัพโหลดไฟล์ Excel, CSV, หรือ HTML ที่ตั้งชื่อตามรูปแบบ: ipd-ธ.ค.68.xlsx"
     )
     
     if uploaded_file is not None:
         try:
-            # แสดงชื่อไฟล์และ month_year ที่แปลงได้
             st.info(f"📁 **ชื่อไฟล์:** {uploaded_file.name}")
             
             month_year = parse_month_year_from_filename(uploaded_file.name)
@@ -652,7 +647,6 @@ def show_import():
                 st.error("❌ ไม่สามารถอ่าน month_year จากชื่อไฟล์ได้ กรุณาตั้งชื่อไฟล์ให้ถูกต้อง")
                 st.stop()
             
-            # ✅ แก้ไข: อ่านไฟล์ด้วย Multi-Engine Support
             df = None
             file_ext = uploaded_file.name.split('.')[-1].lower()
             
@@ -664,7 +658,7 @@ def show_import():
                             df = pd.read_csv(uploaded_file, encoding='utf-8')
                         except UnicodeDecodeError:
                             uploaded_file.seek(0)
-                            df = pd.read_csv(uploaded_file, encoding='cp874')  # Thai encoding
+                            df = pd.read_csv(uploaded_file, encoding='cp874')
                         st.success("✅ อ่านไฟล์ CSV สำเร็จ")
                     
                     # === HTML File ===
@@ -677,7 +671,6 @@ def show_import():
                             st.error("❌ ไม่พบตารางในไฟล์ HTML")
                             st.stop()
                         
-                        # ถ้ามีหลายตาราง ให้ผู้ใช้เลือก
                         if len(tables) > 1:
                             table_index = st.selectbox(
                                 f"พบ {len(tables)} ตาราง กรุณาเลือกตารางที่ต้องการ:",
@@ -691,8 +684,7 @@ def show_import():
                         st.success(f"✅ อ่านไฟล์ HTML สำเร็จ (ตารางที่ 1/{len(tables)})")
                     
                     # === Excel Files (.xlsx, .xls) ===
-                     
-                     elif file_ext in ['xlsx', 'xls']:
+                    elif file_ext in ['xlsx', 'xls']:
                         if file_ext == 'xlsx':
                             engines_to_try = ['openpyxl', 'xlrd']
                         else:
@@ -715,7 +707,7 @@ def show_import():
                                 errors.append(f"- {engine}: {str(e)[:80]}")
                                 continue
                         
-                        # Fallback 1: HTML
+                        # Fallback: ลองอ่านเป็น HTML (บาง .xls เป็น HTML จริงๆ)
                         if not success:
                             try:
                                 uploaded_file.seek(0)
@@ -725,7 +717,6 @@ def show_import():
                                 if b"<table" in raw_content.lower() or b"<html" in raw_content.lower():
                                     html_text = uploaded_file.read().decode('utf-8', errors='replace')
                                     tables = pd.read_html(html_text)
-                                    
                                     if tables:
                                         df = tables[0]
                                         st.info("✅ อ่านไฟล์สำเร็จในรูปแบบ HTML Table")
@@ -733,34 +724,19 @@ def show_import():
                             except Exception as e:
                                 errors.append(f"- HTML fallback: {str(e)[:80]}")
                         
-                        # ❌ ถ้ายังไม่สำเร็จ — หยุดทันที ไม่ fallback CSV
+                        # ถ้ายังไม่สำเร็จ — หยุดและแนะนำ
                         if not success:
                             st.error(f"""
-                            ❌ **ไม่สามารถอ่านไฟล์ Excel ได้**
-                            
-                            **ข้อผิดพลาดที่พบ:**  
-                            {chr(10).join(errors)}
-                            
-                            **วิธีแก้ — แปลงไฟล์เป็น CSV:**  
-                            1. เปิดไฟล์ด้วย Excel  
-                            2. กด File → Save As  
-                            3. เลือก CSV UTF-8 (Comma delimited) (*.csv)  
-                            4. อัปโหลดไฟล์ .csv แทน
-                            """)
-                            st.stop()
-                        # ถ้ายังไม่สำเร็จ แสดง error
-                        if not success:
-                            st.error(f"""
-                            ❌ **ไม่สามารถอ่านไฟล์ Excel ได้**
-                            
-                            **ข้อผิดพลาดที่พบ:**
-                            {chr(10).join(errors)}
-                            
-                            **แนะนำวิธีแก้:**
-                            1. แปลงไฟล์เป็น **CSV** (วิธีที่ดีที่สุด)
-                               - เปิดไฟล์ → File → Save As → CSV UTF-8
-                            2. ลองบันทึกไฟล์ Excel ใหม่ด้วย Excel รุ่นใหม่
-                            3. ใช้ Google Sheets เปิดแล้ว Download เป็น CSV
+❌ **ไม่สามารถอ่านไฟล์ Excel ได้**
+
+**ข้อผิดพลาดที่พบ:**
+{chr(10).join(errors)}
+
+**วิธีแก้ — แปลงไฟล์เป็น CSV:**
+1. เปิดไฟล์ด้วย Excel
+2. กด File → Save As
+3. เลือก CSV UTF-8 (Comma delimited) (*.csv)
+4. อัปโหลดไฟล์ .csv แทน
                             """)
                             st.stop()
                     
@@ -781,7 +757,6 @@ def show_import():
                     st.exception(e)
                     st.stop()
             
-            # ✅ เพิ่ม: ตรวจสอบว่าอ่านไฟล์ได้หรือไม่
             if df is None or df.empty:
                 st.error("❌ ไม่สามารถอ่านข้อมูลจากไฟล์ได้ หรือไฟล์ว่างเปล่า")
                 st.stop()
@@ -790,7 +765,6 @@ def show_import():
             st.markdown("### 👀 ตัวอย่างข้อมูลจากไฟล์")
             st.dataframe(df.head(10), use_container_width=True)
             
-            # แสดงสถิติ
             col1, col2, col3 = st.columns(3)
             with col1:
                 st.metric("📊 จำนวนแถว", f"{len(df):,}")
@@ -807,13 +781,11 @@ def show_import():
             with st.spinner("กำลังตรวจสอบและแปลงข้อมูล..."):
                 df_clean, errors, warnings = validate_and_prepare_data(df, uploaded_file.name)
             
-            # แสดงข้อผิดพลาด
             if errors:
                 for error in errors:
                     st.error(f"❌ {error}")
                 st.stop()
             
-            # แสดงคำเตือน
             if warnings:
                 for warning in warnings:
                     st.warning(f"⚠️ {warning}")
@@ -821,27 +793,23 @@ def show_import():
             if df_clean is not None:
                 st.success("✅ ข้อมูลผ่านการตรวจสอบเรียบร้อย")
                 
-                # แสดงข้อมูลที่จะนำเข้า
                 with st.expander("📋 ดูข้อมูลที่เตรียมนำเข้า (แปลงเป็น schema database แล้ว)"):
                     st.dataframe(df_clean.head(20), use_container_width=True)
                     st.info(f"💡 ข้อมูลมีคอลัมน์: {', '.join(df_clean.columns.tolist())}")
                 
                 st.markdown("---")
                 
-                # ปุ่มนำเข้าข้อมูล
                 col1, col2 = st.columns([1, 3])
                 with col1:
                     if st.button("🚀 เริ่มนำเข้าข้อมูล", type="primary", use_container_width=True):
                         st.session_state.confirm_import = True
                 
-                # ยืนยันการนำเข้า
                 if st.session_state.get('confirm_import', False):
                     st.markdown("### 📤 กำลังนำเข้าข้อมูล")
                     
                     with st.spinner("กรุณารอสักครู่..."):
                         success_count, error_count, error_details = import_to_supabase(df_clean)
                     
-                    # แสดงผลลัพธ์
                     if error_count == 0:
                         st.balloons()
                         st.success(f"🎉 นำเข้าข้อมูลสำเร็จ **{success_count:,}** รายการ!")
@@ -853,18 +821,14 @@ def show_import():
                                 for detail in error_details:
                                     st.error(detail)
                     
-                    # รีเซ็ตสถานะ
                     st.session_state.confirm_import = False
                     
-                    # ปุ่มนำเข้าข้อมูลใหม่
                     if st.button("📥 นำเข้าข้อมูลชุดใหม่"):
                         st.rerun()
         
         except Exception as e:
             st.error(f"❌ เกิดข้อผิดพลาดที่ไม่คาดคิด: {str(e)}")
             st.exception(e)
- 
- 
 
 # เรียกใช้งาน
 if __name__ == "__main__":
