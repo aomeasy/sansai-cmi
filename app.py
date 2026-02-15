@@ -4,19 +4,7 @@ from datetime import datetime
 import io
 import requests
 import json
-import re
-import subprocess, sys
-
-# ✅ Force install ทันทีตอน startup — ไม่รอ requirements.txt
-for _pkg, _import_name in [('openpyxl', 'openpyxl'), ('xlrd', 'xlrd')]:
-    try:
-        __import__(_import_name)
-    except ImportError:
-        subprocess.check_call(
-            [sys.executable, "-m", "pip", "install", _pkg],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
+ 
 
 # ตั้งค่าหน้าเว็บ
 st.set_page_config(
