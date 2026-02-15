@@ -705,28 +705,28 @@ def show_import():
                     
 
                     elif file_ext in ['xlsx', 'xls']:
-                    # ✅ ไม่พึ่ง available_engines flag — ลอง import โดยตรง
-                    if file_ext == 'xlsx':
-                        engines_to_try = ['openpyxl', 'xlrd']
-                    else:
-                        engines_to_try = ['xlrd', 'openpyxl']
-                    
-                    success = False
-                    errors = []
-                    
-                    for engine in engines_to_try:
-                        try:
-                            uploaded_file.seek(0)
-                            df = pd.read_excel(uploaded_file, engine=engine)
-                            st.success(f"✅ อ่านไฟล์ Excel สำเร็จด้วย engine: {engine}")
-                            success = True
-                            break
-                        except ImportError as e:
-                            errors.append(f"- {engine} (ไม่ได้ติดตั้ง): {str(e)[:80]}")
-                            continue
-                        except Exception as e:
-                            errors.append(f"- {engine}: {str(e)[:80]}")
-                            continue
+                        # ✅ ไม่พึ่ง available_engines flag — ลอง import โดยตรง
+                        if file_ext == 'xlsx':
+                            engines_to_try = ['openpyxl', 'xlrd']
+                        else:
+                            engines_to_try = ['xlrd', 'openpyxl']
+                        
+                        success = False
+                        errors = []
+                        
+                        for engine in engines_to_try:
+                            try:
+                                uploaded_file.seek(0)
+                                df = pd.read_excel(uploaded_file, engine=engine)
+                                st.success(f"✅ อ่านไฟล์ Excel สำเร็จด้วย engine: {engine}")
+                                success = True
+                                break
+                            except ImportError as e:
+                                errors.append(f"- {engine} (ไม่ได้ติดตั้ง): {str(e)[:80]}")
+                                continue
+                            except Exception as e:
+                                errors.append(f"- {engine}: {str(e)[:80]}")
+                                continue
                         
                         # ถ้าทุก engine ล้มเหลว ลอง fallback methods
                         if not success:
