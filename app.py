@@ -1,8 +1,9 @@
 import streamlit as st
 import pandas as pd
-from supabase import create_client
 from datetime import datetime
 import io
+import requests
+import json
 
 # ตั้งค่าหน้าเว็บ
 st.set_page_config(
@@ -110,12 +111,56 @@ st.markdown("""
 
 # ตั้งค่า Supabase
 SUPABASE_URL = "https://qwxnsusfydrhtfqdcsqn.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3eG5zdXNmeWRyaHRmcWRjc3FuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk0NjM0NjUsImV4cCI6MjA1NTAzOTQ2NX0.kJOrd2rQeb1yNYFW"  # ใช้ anon/public key
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3eG5zdXNmeWRyaHRmcWRjc3FuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk0NjM0NjUsImV4cCI6MjA1NTAzOTQ2NX0.Zk6vL-8wqVHxYGqLqO3qK_g8JN0YxJjqVZ8ZQxNqYzI"
+
+class SupabaseClient:
+    """Simple Supabase client using REST API"""
+    
+    def __init__(self, url, key):
+        self.url = url
+        self.headers = {
+            "apikey": key,
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=representation"
+        }
+    
+    def insert(self, table, data):
+        """Insert data into table"""
+        url = f"{self.url}/rest/v1/{table}"
+        response = requests.post(url, headers=self.headers, json=data)
+        if response.status_code in [200, 201]:
+            return {"data": response.json(), "error": None}
+        else:
+            return {"data": None, "error": response.text}
+    
+    def select(self, table, columns="*", filters=None):
+        """Select data from table"""
+        url = f"{self.url}/rest/v1/{table}?select={columns}"
+        if filters:
+            for key, value in filters.items():
+                url += f"&{key}=eq.{value}"
+        response = requests.get(url, headers=self.headers)
+        if response.status_code == 200:
+            return {"data": response.json(), "count": len(response.json()), "error": None}
+        else:
+            return {"data": None, "count": 0, "error": response.text}
+    
+    def count(self, table):
+        """Count records in table"""
+        url = f"{self.url}/rest/v1/{table}?select=count"
+        headers = self.headers.copy()
+        headers["Prefer"] = "count=exact"
+        response = requests.head(url, headers=headers)
+        if response.status_code == 200:
+            count = response.headers.get("Content-Range", "0-0/0").split("/")[-1]
+            return int(count)
+        return 0
 
 @st.cache_resource
 def init_supabase():
     """เชื่อมต่อ Supabase"""
-    return create_client(SUPABASE_URL, SUPABASE_KEY)
+    return SupabaseClient(SUPABASE_URL, SUPABASE_KEY)
 
 def get_fiscal_year(date_value):
     """คำนวณปีงบประมาณ (ตุลาคม-กันยายน)"""
@@ -159,17 +204,22 @@ def validate_and_prepare_data(df):
         if col in df_clean.columns:
             try:
                 df_clean[col] = pd.to_datetime(df_clean[col], errors='coerce')
+                # แปลงเป็น ISO format string
+                df_clean[col] = df_clean[col].apply(lambda x: x.isoformat() if pd.notna(x) else None)
             except:
                 warnings.append(f"ไม่สามารถแปลงวันที่ในคอลัมน์ {col} บางรายการ")
     
     # คำนวณปีงบประมาณ
     if 'month_year' in df_clean.columns:
-        df_clean['fiscal_year'] = df_clean['month_year'].apply(get_fiscal_year)
+        df_clean['fiscal_year'] = df.apply(
+            lambda row: get_fiscal_year(row['month_year']) if 'month_year' in row else None,
+            axis=1
+        )
     
     # คำนวณจำนวนวันนอน
-    if 'admit_date' in df_clean.columns and 'discharge_date' in df_clean.columns:
-        df_clean['length_of_stay'] = df_clean.apply(
-            lambda row: calculate_length_of_stay(row['admit_date'], row['discharge_date']),
+    if 'admit_date' in df.columns and 'discharge_date' in df.columns:
+        df_clean['length_of_stay'] = df.apply(
+            lambda row: calculate_length_of_stay(row.get('admit_date'), row.get('discharge_date')),
             axis=1
         )
     
@@ -190,14 +240,14 @@ def validate_and_prepare_data(df):
     if not duplicates.empty:
         warnings.append(f"พบข้อมูลซ้ำ {len(duplicates)} รายการ (AN + month_year ซ้ำ)")
     
-    # แทนที่ NaN ด้วย None สำหรับ Supabase
+    # แทนที่ NaN ด้วย None
     df_clean = df_clean.where(pd.notna(df_clean), None)
     
     return df_clean, errors, warnings
 
 def import_to_supabase(df, batch_size=100):
     """นำเข้าข้อมูลไปยัง Supabase"""
-    supabase = init_supabase()
+    client = init_supabase()
     total_rows = len(df)
     success_count = 0
     error_count = 0
@@ -219,8 +269,13 @@ def import_to_supabase(df, batch_size=100):
                     del record['id']
             
             # Insert ข้อมูล
-            response = supabase.table('ipd_monthly').insert(batch_data).execute()
-            success_count += len(batch_data)
+            result = client.insert('ipd_monthly', batch_data)
+            
+            if result['error'] is None:
+                success_count += len(batch_data)
+            else:
+                error_count += len(batch_data)
+                error_details.append(f"Batch {i//batch_size + 1}: {result['error']}")
             
         except Exception as e:
             error_count += len(batch_data)
@@ -308,11 +363,10 @@ def show_home():
     
     # แสดงสถิติเบื้องต้น
     try:
-        supabase = init_supabase()
+        client = init_supabase()
         
         # นับจำนวนรายการทั้งหมด
-        response = supabase.table('ipd_monthly').select('id', count='exact').execute()
-        total_records = response.count if hasattr(response, 'count') else 0
+        total_records = client.count('ipd_monthly')
         
         col1, col2, col3, col4 = st.columns(4)
         
