@@ -2001,18 +2001,290 @@ def show_home():
             st.altair_chart(chart_combo, use_container_width=True)
         
         st.markdown("---")
-        
+         
+
+
         # ========================================
         # SECTION 3: OPERATIONAL INSIGHTS
         # ========================================
         st.markdown("""
             <div style="background:white;padding:1.5rem;border-radius:12px;
-                        box-shadow:0 4px 16px rgba(0,0,0,0.08);margin-bottom:1.5rem;">
-                <h3 style="color:#1565C0;margin:0 0 1rem 0;font-size:1.4rem;font-weight:600;">
+                        box-shadow:0 4px 16px rgba(0,0,0,0.08);margin-bottom:1rem;">
+                <h3 style="color:#1565C0;margin:0 0 0.5rem 0;font-size:1.4rem;font-weight:600;">
                     🎯 Operational Insights
                 </h3>
+                <p style="color:#546E7A;margin:0;font-size:0.95rem;">
+                    ข้อมูลเชิงปฏิบัติการ สำหรับการตัดสินใจระดับหน้างาน
+                </p>
             </div>
         """, unsafe_allow_html=True)
+        
+        # ✅ เพิ่มส่วนนี้ (Info Banner คำอธิบาย)
+        st.markdown("""
+            <div style="background:linear-gradient(135deg, #FFF3E0 0%, #FFE0B2 100%);
+                        padding:0.8rem 1.2rem;border-radius:8px;margin-bottom:1.5rem;
+                        border-left:4px solid #FF9800;">
+                <div style="display:flex;align-items:center;gap:0.8rem;">
+                    <div style="font-size:1.5rem;">💡</div>
+                    <div style="flex:1;color:#37474F;font-size:0.9rem;line-height:1.5;">
+                        <b>3 ข้อมูลสำคัญ:</b> 
+                        🏆 <b>Top 5 ผู้ป่วยที่มีมูลค่าสูง</b> (adjRW สูงสุด) · 
+                        ⚠️ <b>ผู้ป่วยนอนนาน</b> (> 30 วัน ต้องติดตาม) · 
+                        🏥 <b>Ward ที่มี CMI สูงสุด</b> (รักษาผู้ป่วยหนัก)
+                    </div>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        col_i1, col_i2, col_i3 = st.columns(3)
+        
+        with col_i1:
+            # ✅ เพิ่มหัวข้อพร้อมคำอธิบาย
+            st.markdown("""
+                <div style="margin-bottom:0.8rem;">
+                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                        <h4 style="margin:0;color:#1976D2;font-size:1.1rem;">🏆 Top 5 High-Value Cases</h4>
+                    </div>
+                    <p style="color:#757575;font-size:0.85rem;margin:0.3rem 0 0.8rem 0;">
+                        ผู้ป่วย 5 รายที่มีค่า adjRW สูงสุดในเดือนนี้ (มูลค่างานสูง)
+                    </p>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # Top 5 High-RW Cases
+            top_rw = df_current.nlargest(5, 'adjrw')[['pdx', 'adjrw', 'ward_name']]
+            if not top_rw.empty:
+                for idx, row in enumerate(top_rw.itertuples(), 1):
+                    st.markdown(f"""
+                        <div style="background:#F5F5F5;padding:0.8rem;border-radius:8px;
+                                    margin-bottom:0.5rem;border-left:4px solid #1976D2;">
+                            <div style="display:flex;justify-content:space-between;margin-bottom:0.3rem;">
+                                <b style="color:#1976D2;">#{idx}</b>
+                                <span style="color:#1976D2;font-weight:600;font-size:1.1rem;">
+                                    RW: {row.adjrw:.2f}
+                                </span>
+                            </div>
+                            <div style="color:#37474F;font-size:0.9rem;">
+                                <b>รหัสโรค:</b> {row.pdx}
+                            </div>
+                            <div style="color:#757575;font-size:0.85rem;">
+                                <b>หอผู้ป่วย:</b> {row.ward_name}
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.info("ไม่มีข้อมูล")
+        
+        with col_i2:
+            # ✅ เพิ่มหัวข้อพร้อมคำอธิบาย
+            st.markdown("""
+                <div style="margin-bottom:0.8rem;">
+                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                        <h4 style="margin:0;color:#FF6F00;font-size:1.1rem;">⚠️ Long Stay Alert (>30 days)</h4>
+                    </div>
+                    <p style="color:#757575;font-size:0.85rem;margin:0.3rem 0 0.8rem 0;">
+                        ผู้ป่วยที่นอนเกิน 30 วัน ต้องติดตามและหาสาเหตุ
+                    </p>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # Alert: Long Stay Cases
+            long_stay = df_current[df_current['length_of_stay'] > 30]
+            if len(long_stay) > 0:
+                st.markdown(f"""
+                    <div style="background:#FFF3E0;padding:0.8rem 1rem;border-radius:8px;
+                                margin-bottom:1rem;border-left:4px solid #FF6F00;text-align:center;">
+                        <div style="color:#E65100;font-size:1.8rem;font-weight:700;">
+                            🚨 {len(long_stay)} ราย
+                        </div>
+                        <div style="color:#757575;font-size:0.85rem;margin-top:0.3rem;">
+                            ต้องตรวจสอบและติดตาม
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+                for row in long_stay.head(5).itertuples():
+                    st.markdown(f"""
+                        <div style="background:#FFF3E0;padding:0.6rem;border-radius:6px;
+                                    margin-bottom:0.4rem;border-left:3px solid #FF6F00;">
+                            <div style="color:#37474F;font-size:0.9rem;margin-bottom:0.2rem;">
+                                <b>AN:</b> {row.an} · 
+                                <b style="color:#FF6F00;">นอน {row.length_of_stay:.0f} วัน</b>
+                            </div>
+                            <div style="color:#757575;font-size:0.85rem;">
+                                {row.pdx} · {row.ward_name}
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.markdown("""
+                    <div style="background:#E8F5E9;padding:1.5rem;border-radius:8px;
+                                text-align:center;border-left:4px solid #4CAF50;">
+                        <div style="font-size:2rem;margin-bottom:0.5rem;">✅</div>
+                        <div style="color:#2E7D32;font-weight:600;font-size:1rem;">
+                            ไม่มีผู้ป่วยนอนนาน
+                        </div>
+                        <div style="color:#757575;font-size:0.85rem;margin-top:0.3rem;">
+                            ทุกรายนอนไม่เกิน 30 วัน
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+        
+        with col_i3:
+            # ✅ เพิ่มหัวข้อพร้อมคำอธิบาย
+            st.markdown("""
+                <div style="margin-bottom:0.8rem;">
+                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                        <h4 style="margin:0;color:#2E7D32;font-size:1.1rem;">🏥 Ward CMI Ranking</h4>
+                    </div>
+                    <p style="color:#757575;font-size:0.85rem;margin:0.3rem 0 0.8rem 0;">
+                        หอผู้ป่วยที่มี CMI สูงสุด = รักษาผู้ป่วยหนัก/ซับซ้อน
+                    </p>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # Ward Performance
+            ward_cmi = (df_current.groupby('ward_name')['adjrw']
+                        .mean()
+                        .sort_values(ascending=False)
+                        .head(5))
+            
+            if not ward_cmi.empty:
+                for idx, (ward, cmi) in enumerate(ward_cmi.items(), 1):
+                    bar_width = int((cmi / ward_cmi.max()) * 100)
+                    
+                    # กำหนดสีตาม CMI
+                    if cmi >= 2.0:
+                        color = "#D32F2F"  # แดง - หนักมาก
+                        badge = "🔴"
+                    elif cmi >= 1.5:
+                        color = "#F57C00"  # ส้m - หนักปานกลาง
+                        badge = "🟠"
+                    elif cmi >= 1.0:
+                        color = "#2E7D32"  # เขียว - ปกติ
+                        badge = "🟢"
+                    else:
+                        color = "#1976D2"  # น้ำเงิน - เบา
+                        badge = "🔵"
+                    
+                    st.markdown(f"""
+                        <div style="margin-bottom:1rem;">
+                            <div style="display:flex;justify-content:space-between;
+                                        align-items:center;margin-bottom:0.3rem;">
+                                <div style="font-size:0.9rem;font-weight:500;color:#37474F;">
+                                    {badge} #{idx} {ward}
+                                </div>
+                                <div style="color:{color};font-weight:700;font-size:1.1rem;">
+                                    {cmi:.3f}
+                                </div>
+                            </div>
+                            <div style="background:#ECEFF1;border-radius:4px;height:8px;">
+                                <div style="background:{color};height:8px;width:{bar_width}%;
+                                            border-radius:4px;transition:width 0.3s;"></div>
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.info("ไม่มีข้อมูล Ward")
+        
+        # ✅ เพิ่มคำอธิบายเพิ่มเติมด้านล่าง (Expandable)
+        with st.expander("💡 คำอธิบายเพิ่มเติม - Operational Insights", expanded=False):
+            st.markdown("""
+            ### 📖 คู่มือการใช้งาน
+            
+            ---
+            
+            #### 🏆 Top 5 High-Value Cases คืออะไร?
+            
+            **ความหมาย:**  
+            ผู้ป่วย 5 รายที่มีค่า **Adjusted RW สูงสุด** ในเดือนนี้
+            
+            **ใช้ประโยชน์:**
+            - ✅ ตรวจสอบว่ารักษาถูกต้องตามมาตรฐานหรือไม่
+            - ✅ ตรวจสอบ Coding ว่าถูกต้องหรือไม่
+            - ✅ วางแผน Resource สำหรับผู้ป่วยหนัก
+            - ✅ ทบทวน Outcome และ Complication
+            
+            **ตัวอย่างการตีความ:**
+            - **RW > 20** = ผู้ป่วยหนักมาก (ICU, Surgery ซับซ้อน)
+            - **RW 10-20** = ผู้ป่วยหนักปานกลาง
+            - **RW 5-10** = ผู้ป่วยหนักเล็กน้อย
+            
+            ---
+            
+            #### ⚠️ Long Stay Alert (>30 days) คืออะไร?
+            
+            **ความหมาย:**  
+            ผู้ป่วยที่นอนโรงพยาบาล **เกิน 30 วัน** ซึ่งถือว่า "นอนนานมาก"
+            
+            **ทำไมต้องติดตาม:**
+            - 🔴 เสี่ยงต่อ Hospital-acquired infection (HAI)
+            - 🔴 ค่าใช้จ่ายสูง (Cost per case ↑)
+            - 🔴 เตียงเต็ม (Bed occupancy ↑)
+            - 🔴 อาจมี Delay discharge
+            
+            **สาเหตุที่พบบ่อย:**
+            1. **Medical:** Chronic disease, Complication, Slow recovery
+            2. **Social:** ไม่มีผู้ดูแล, รอ Home care, รอ Hospice
+            3. **Administrative:** รอประสานงาน, รอเตียง Long-term care
+            
+            **ควรทำอย่างไร:**
+            - ✅ ประชุม MDT (Multi-Disciplinary Team)
+            - ✅ Review discharge plan
+            - ✅ ประสานงาน Social worker
+            - ✅ พิจารณา Home care / Transfer
+            
+            ---
+            
+            #### 🏥 Ward CMI Ranking คืออะไร?
+            
+            **ความหมาย:**  
+            หอผู้ป่วยที่มี **CMI (Case Mix Index) สูงสุด** 
+            = หอที่รักษาผู้ป่วยหนัก/ซับซ้อนที่สุด
+            
+            **การตีความสี:**
+            - 🔴 **CMI ≥ 2.0** = หนักมาก (ICU, CCU)
+            - 🟠 **CMI 1.5-2.0** = หนักปานกลาง (Step-down, Specialty ward)
+            - 🟢 **CMI 1.0-1.5** = ปกติ (General ward)
+            - 🔵 **CMI < 1.0** = เบา (Observation, Same-day)
+            
+            **ใช้ประโยชน์:**
+            - ✅ วางแผน Nurse-to-patient ratio
+            - ✅ จัดสรร Budget และ Equipment
+            - ✅ Training staff ตามความซับซ้อน
+            - ✅ Benchmark ระหว่าง Ward
+            
+            **ตัวอย่าง:**
+            - **หอผู้ป่วยหนัก ICU** → CMI สูง (2.5-4.0) ✅ ปกติ
+            - **หอผู้ป่วยทั่วไป** → CMI ปานกลาง (1.0-1.5) ✅ ปกติ
+            - **หอผู้ป่วยทั่วไป แต่ CMI สูง (> 2.0)** → ⚠️ ควรย้ายไป ICU?
+            
+            ---
+            
+            ### 🎯 การใช้งานจริง
+            
+            **ตัวอย่างสถานการณ์:**
+            
+            1. **เห็น Long Stay = 50 ราย**
+               - → เรียกประชุม Discharge planning team
+               - → Review ทีละราย
+               - → ตั้ง target ลด 20% ภายใน 2 สัปดาห์
+            
+            2. **เห็น Top RW มีผู้ป่วย Surgery ซับซ้อนเยอะ**
+               - → Check ว่า OR มี capacity พอหรือไม่
+               - → วางแผน Post-op care
+               - → เตรียม ICU bed
+            
+            3. **เห็น Ward ทั่วไปมี CMI สูงกว่า ICU**
+               - → ⚠️ ผิดปกติ!
+               - → ตรวจสอบว่ามีผู้ป่วยหนักค้างอยู่หรือไม่
+               - → พิจารณาย้าย Ward
+            """)
+        
+        st.markdown("---")
+
+
+
         
         col_i1, col_i2, col_i3 = st.columns(3)
         
