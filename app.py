@@ -593,23 +593,7 @@ def show_import():
         - `ipd-ก.พ.68.xls` → กุมภาพันธ์ 2568 (2025-02-01)
         
         เดือนที่รองรับ: ม.ค., ก.พ., มี.ค., เม.ย., พ.ค., มิ.ย., ก.ค., ส.ค., ก.ย., ต.ค., พ.ย., ธ.ค.
-        
-        ### คอลัมน์ที่จำเป็นต้องมีในไฟล์:
-        - **an** - รหัสผู้ป่วยใน (Admission Number)
-        - **hn** - รหัสผู้ป่วย (Hospital Number)
-        
-        ### คอลัมน์ที่รองรับ:
-        - vn, birthday, Age, sex
-        - AdmitDate, D/C Date, จำนวนวันนอน
-        - wardname, pttypename, clinic
-        - pdx, dx0-dx10 (รหัสโรค ICD-10)
-        - op0-op11 (รหัสหัตถการ)
-        - adjrw, discharge_status, type_description
-        
-        ### หมายเหตุ:
-        - ระบบจะอ่าน **month_year** จากชื่อไฟล์โดยอัตโนมัติ
-        - ระบบจะคำนวณ **fiscal_year** ให้อัตโนมัติ
-        - ข้อมูลที่มี AN ซ้ำในเดือนเดียวกันจะไม่สามารถนำเข้าได้
+         
         """)
         
         if not excel_available:
