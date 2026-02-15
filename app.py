@@ -547,7 +547,8 @@ def show_reports():
         - 💊 สถิติแยกตามโรค (ICD-10)
         - 📉 แนวโน้มและกราฟ
     """)
- 
+
+
 def show_import():
     """หน้านำเข้าข้อมูล"""
     st.markdown("## 📥 นำเข้าข้อมูล IPD Monthly")
@@ -614,6 +615,92 @@ def show_import():
     
     st.markdown("---")
     
+    # ============================================
+    # แสดงข้อมูลที่มีในระบบ
+    # ============================================
+    st.markdown("### 📊 ข้อมูลที่มีในระบบ")
+    
+    try:
+        client = init_supabase()
+        
+        # ดึงข้อมูล month_year ที่ไม่ซ้ำพร้อมสถิติ
+        with st.spinner("กำลังโหลดข้อมูลในระบบ..."):
+            result = client.select('ipd_monthly', columns='month_year,fiscal_year,an,created_at')
+        
+        if result['data'] and len(result['data']) > 0:
+            df_existing = pd.DataFrame(result['data'])
+            df_existing['month_year'] = pd.to_datetime(df_existing['month_year'], errors='coerce')
+            df_existing['created_at'] = pd.to_datetime(df_existing['created_at'], errors='coerce')
+            
+            # สรุปข้อมูลรายเดือน
+            summary = df_existing.groupby('month_year').agg({
+                'an': 'count',
+                'created_at': 'max'
+            }).reset_index()
+            
+            summary.columns = ['เดือน-ปี', 'จำนวนรายการ', 'นำเข้าล่าสุด']
+            summary['เดือน-ปี_sort'] = summary['เดือน-ปี']  # เก็บไว้สำหรับ sort
+            summary['เดือน-ปี'] = summary['เดือน-ปี'].dt.strftime('%B %Y')
+            summary['นำเข้าล่าสุด'] = summary['นำเข้าล่าสุด'].dt.strftime('%d/%m/%Y %H:%M')
+            summary = summary.sort_values('เดือน-ปี_sort', ascending=False)
+            summary = summary.drop('เดือน-ปี_sort', axis=1)
+            summary.index = range(1, len(summary) + 1)
+            
+            # แสดงข้อมูลสถิติและตาราง
+            col_stat1, col_stat2, col_stat3 = st.columns(3)
+            
+            with col_stat1:
+                st.metric("📅 จำนวนเดือนที่มีข้อมูล", f"{len(summary)} เดือน")
+            
+            with col_stat2:
+                st.metric("📋 รายการทั้งหมด", f"{len(df_existing):,} ราย")
+            
+            with col_stat3:
+                latest_month = df_existing['month_year'].max()
+                if pd.notna(latest_month):
+                    st.metric("🗓️ เดือนล่าสุด", latest_month.strftime('%B %Y'))
+            
+            # แสดงตาราง
+            with st.expander("📋 รายละเอียดข้อมูลแต่ละเดือน", expanded=True):
+                st.dataframe(
+                    summary,
+                    use_container_width=True,
+                    column_config={
+                        "เดือน-ปี": st.column_config.TextColumn("เดือน-ปี", width="medium"),
+                        "จำนวนรายการ": st.column_config.NumberColumn(
+                            "จำนวนรายการ", 
+                            format="%d ราย",
+                            help="จำนวนรายการทั้งหมดในเดือนนี้"
+                        ),
+                        "นำเข้าล่าสุด": st.column_config.TextColumn(
+                            "นำเข้าล่าสุด", 
+                            width="medium",
+                            help="วันเวลาที่นำเข้าข้อมูลล่าสุด"
+                        ),
+                    }
+                )
+                
+                # แสดงรายการเดือนที่มี (สำหรับเช็คซ้ำ)
+                existing_months = df_existing['month_year'].dt.strftime('%Y-%m-01').unique().tolist()
+                st.info(f"💡 **เดือนที่มีข้อมูลแล้ว:** {len(existing_months)} เดือน")
+                
+                # เก็บไว้ใน session state เพื่อใช้ตรวจสอบข้อมูลซ้ำ
+                st.session_state['existing_months'] = existing_months
+        
+        else:
+            st.info("📭 ยังไม่มีข้อมูลในระบบ - เริ่มนำเข้าข้อมูลได้เลย")
+            st.session_state['existing_months'] = []
+    
+    except Exception as e:
+        st.warning(f"⚠️ ไม่สามารถโหลดข้อมูลในระบบได้: {str(e)}")
+        st.session_state['existing_months'] = []
+    
+    st.markdown("---")
+    
+    # ============================================
+    # File Uploader
+    # ============================================
+    
     uploaded_file = st.file_uploader(
         "เลือกไฟล์ข้อมูล",
         type=['xlsx', 'xls', 'csv', 'html'],
@@ -628,6 +715,25 @@ def show_import():
             if month_year:
                 month_year_display = pd.to_datetime(month_year).strftime('%B %Y')
                 st.success(f"📅 **เดือน-ปีที่จะนำเข้า:** {month_year_display} ({month_year})")
+                
+                # ============================================
+                # เตือนถ้าข้อมูลเดือนนี้มีแล้ว
+                # ============================================
+                existing_months = st.session_state.get('existing_months', [])
+                if month_year in existing_months:
+                    st.warning(f"""
+                    ⚠️ **พบข้อมูลเดือนนี้ในระบบแล้ว!**
+                    
+                    เดือน **{month_year_display}** มีข้อมูลในระบบแล้ว  
+                    การนำเข้าใหม่อาจทำให้เกิดข้อมูลซ้ำ (ขึ้นอยู่กับ AN)
+                    
+                    **ตัวเลือก:**
+                    - ถ้า AN ซ้ำ → ระบบจะ **ไม่นำเข้า** (ป้องกันโดย unique constraint)
+                    - ถ้า AN ใหม่ → ระบบจะ **เพิ่มเข้าไป**
+                    """)
+                else:
+                    st.success(f"✅ เดือนนี้ยังไม่มีข้อมูลในระบบ - พร้อมนำเข้า")
+                
             else:
                 st.error("❌ ไม่สามารถอ่าน month_year จากชื่อไฟล์ได้ กรุณาตั้งชื่อไฟล์ให้ถูกต้อง")
                 st.stop()
@@ -813,7 +919,7 @@ def show_import():
         
         except Exception as e:
             st.error(f"❌ เกิดข้อผิดพลาดที่ไม่คาดคิด: {str(e)}")
-            st.exception(e)
+            st.exception(e) 
 
 def show_reports():
     """หน้ารายงาน — 4 tabs"""
