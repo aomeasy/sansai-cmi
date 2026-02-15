@@ -2551,6 +2551,9 @@ def create_kpi_card(title, value, delta=None, icon="📊", color="#1565C0"):
 # MAIN APP
 # ============================================
 
+
+
+
 def main():
     # Header (เดิม)
     st.markdown("""
@@ -2561,92 +2564,240 @@ def main():
     """, unsafe_allow_html=True)
     
     # ========================================
-    # SIDEBAR NAVIGATION
+    # ENHANCED SIDEBAR NAVIGATION
     # ========================================
-    with st.sidebar:
-        # Logo
-        st.markdown("""
-            <div style="text-align:center;padding:1rem 0 1.5rem;">
-                <div style="font-size:2.5rem;">🏥</div>
-                <div style="color:white;font-size:1.2rem;
-                            font-weight:700;margin-top:0.3rem;">
-                    Sansai Hospital
-                </div>
-                <div style="color:#B3E5FC;font-size:0.75rem;
-                            letter-spacing:2px;margin-top:0.2rem;">
-                    CASE MIX INTELLIGENCE
+  
+
+
+with st.sidebar:
+    # Logo & Title (คงเดิม)
+    st.markdown("""
+        <div style="text-align:center;padding:1.5rem 0;
+                    border-bottom:1px solid rgba(255,255,255,0.15);">
+            <div style="font-size:3rem;margin-bottom:0.5rem;">🏥</div>
+            <h2 style="color:white;margin:0;font-size:1.3rem;font-weight:700;
+                       letter-spacing:0.5px;">
+                Sansai Hospital
+            </h2>
+            <p style="color:#B3E5FC;font-size:0.8rem;margin:0.3rem 0 0;
+                      letter-spacing:1px;text-transform:uppercase;">
+                Case Mix Intelligence
+            </p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<div style='height:1rem'></div>", unsafe_allow_html=True)
+
+    # ── Navigation Label ──
+    st.markdown("""
+        <div style="color:rgba(255,255,255,0.5);font-size:0.7rem;
+                    font-weight:700;letter-spacing:2px;
+                    text-transform:uppercase;padding:0 0.5rem;
+                    margin-bottom:0.5rem;">
+            ▸ MAIN MENU
+        </div>
+    """, unsafe_allow_html=True)
+
+    # ── Menu Items ──
+    menu_items = [
+        ("🏠", "หน้าแรก",     "Executive Dashboard",  "🏠 หน้าแรก"),
+        ("📊", "รายงาน",      "Analytics & Reports",  "📊 รายงาน"),
+        ("📥", "นำเข้าข้อมูล", "Data Import",          "📥 นำเข้าข้อมูล"),
+    ]
+
+    current = st.session_state.get('selected_menu', '🏠 หน้าแรก')
+
+    for icon, label, sublabel, key in menu_items:
+        is_active = current == key
+
+        # Active style vs Normal style
+        if is_active:
+            btn_style = """
+                background:rgba(255,255,255,0.18);
+                border-left:3px solid #4FC3F7;
+                border-radius:0 8px 8px 0;
+                margin-left:-1rem;
+                padding-left:calc(1rem - 3px);
+            """
+            text_color  = "white"
+            sub_color   = "#B3E5FC"
+            dot         = "●"
+            dot_color   = "#4FC3F7"
+        else:
+            btn_style   = "background:transparent;border-left:3px solid transparent;"
+            text_color  = "rgba(255,255,255,0.75)"
+            sub_color   = "rgba(255,255,255,0.4)"
+            dot         = "○"
+            dot_color   = "rgba(255,255,255,0.3)"
+
+        # แสดง visual indicator
+        st.markdown(f"""
+            <div style="{btn_style}
+                        padding:0.65rem 0.8rem 0.65rem 1.2rem;
+                        margin-bottom:2px;cursor:pointer;
+                        transition:all 0.2s;">
+                <div style="display:flex;align-items:center;gap:0.7rem;">
+                    <span style="font-size:1.1rem;">{icon}</span>
+                    <div>
+                        <div style="color:{text_color};font-weight:600;
+                                    font-size:0.95rem;line-height:1.2;">
+                            {label}
+                        </div>
+                        <div style="color:{sub_color};font-size:0.72rem;
+                                    margin-top:1px;">
+                            {sublabel}
+                        </div>
+                    </div>
+                    <span style="margin-left:auto;color:{dot_color};
+                                 font-size:0.6rem;">
+                        {dot}
+                    </span>
                 </div>
             </div>
-            <hr style="border-color:rgba(255,255,255,0.15);margin:0 0 1rem;">
         """, unsafe_allow_html=True)
 
-        # Navigation
-        current = st.session_state.get('selected_menu', '🏠 หน้าแรก')
+        # Streamlit button (invisible — ทับบน visual)
+        if st.button(
+            f"{icon} {label}",
+            key=f"nav_{key}",
+            use_container_width=True,
+        ):
+            st.session_state['selected_menu'] = key
+            st.rerun()
 
-        # หน้าแรก
-        if current == '🏠 หน้าแรก':
-            st.success("🏠  หน้าแรก")
-        else:
-            if st.button("🏠  หน้าแรก",
-                         use_container_width=True,
-                         key="nav_home"):
-                st.session_state['selected_menu'] = '🏠 หน้าแรก'
-                st.rerun()
+    # ── Divider ──
+    st.markdown("""
+        <div style="border-top:1px solid rgba(255,255,255,0.12);
+                    margin:1.2rem 0;"></div>
+    """, unsafe_allow_html=True)
 
-        # รายงาน
-        if current == '📊 รายงาน':
-            st.success("📊  รายงาน")
-        else:
-            if st.button("📊  รายงาน",
-                         use_container_width=True,
-                         key="nav_report"):
-                st.session_state['selected_menu'] = '📊 รายงาน'
-                st.rerun()
+    # ── Quick Stats ──
+    st.markdown("""
+        <div style="color:rgba(255,255,255,0.5);font-size:0.7rem;
+                    font-weight:700;letter-spacing:2px;
+                    text-transform:uppercase;padding:0 0.5rem;
+                    margin-bottom:0.8rem;">
+            ▸ SYSTEM INFO
+        </div>
+    """, unsafe_allow_html=True)
 
-        # นำเข้าข้อมูล
-        if current == '📥 นำเข้าข้อมูล':
-            st.success("📥  นำเข้าข้อมูล")
-        else:
-            if st.button("📥  นำเข้าข้อมูล",
-                         use_container_width=True,
-                         key="nav_import"):
-                st.session_state['selected_menu'] = '📥 นำเข้าข้อมูล'
-                st.rerun()
+    current_date = datetime.now()
+    fiscal_month = current_date.month
+    fiscal_year  = current_date.year + 1 if fiscal_month >= 10 else current_date.year
 
-        # Divider + System Info
-        st.markdown("""
-            <hr style="border-color:rgba(255,255,255,0.15);margin:1rem 0;">
-            <div style="color:rgba(255,255,255,0.5);font-size:0.7rem;
-                        letter-spacing:2px;font-weight:700;
-                        padding:0 0.2rem;margin-bottom:0.8rem;">
-                ▸ SYSTEM INFO
+    st.markdown(f"""
+        <div style="padding:0 0.3rem;">
+
+            <div style="display:flex;align-items:center;justify-content:space-between;
+                        padding:0.5rem 0.8rem;margin-bottom:4px;
+                        background:rgba(255,255,255,0.07);border-radius:8px;">
+                <span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">
+                    📅 วันที่
+                </span>
+                <span style="color:white;font-size:0.8rem;font-weight:600;">
+                    {current_date.strftime('%d %b %Y')}
+                </span>
             </div>
-        """, unsafe_allow_html=True)
 
-        # System info
+            <div style="display:flex;align-items:center;justify-content:space-between;
+                        padding:0.5rem 0.8rem;margin-bottom:4px;
+                        background:rgba(255,255,255,0.07);border-radius:8px;">
+                <span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">
+                    📆 ปีงบประมาณ
+                </span>
+                <span style="color:white;font-size:0.8rem;font-weight:600;">
+                    {fiscal_year}
+                </span>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;
+                        padding:0.5rem 0.8rem;margin-bottom:4px;
+                        background:rgba(255,255,255,0.07);border-radius:8px;">
+                <span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">
+                    🔄 Version
+                </span>
+                <span style="color:white;font-size:0.8rem;font-weight:600;">
+                    v2.1.0
+                </span>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;
+                        padding:0.5rem 0.8rem;
+                        background:rgba(76,175,80,0.15);border-radius:8px;
+                        border:1px solid rgba(76,175,80,0.3);">
+                <span style="color:rgba(255,255,255,0.5);font-size:0.75rem;">
+                    ⚡ Status
+                </span>
+                <span style="color:#69F0AE;font-size:0.8rem;font-weight:700;">
+                    ● Online
+                </span>
+            </div>
+
+        </div>
+    """, unsafe_allow_html=True)
+
+    # ── Footer ──
+    st.markdown(f"""
+        <div style="position:absolute;bottom:1rem;left:0;right:0;
+                    text-align:center;padding:0 1rem;">
+            <div style="border-top:1px solid rgba(255,255,255,0.1);
+                        padding-top:0.8rem;">
+                <p style="color:rgba(255,255,255,0.3);font-size:0.7rem;margin:0;">
+                    Sansai Hospital CMI System<br>
+                    © {current_date.year} All rights reserved
+                </p>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    menu = st.session_state.get('selected_menu', '🏠 หน้าแรก')
+ 
+     
+        
+        # Info cards
         current_date = datetime.now()
-        fiscal_year  = current_date.year + 1 \
-                       if current_date.month >= 10 \
-                       else current_date.year
-
-        st.caption(f"📅 {current_date.strftime('%d %b %Y')}")
-        st.caption(f"📆 ปีงบประมาณ {fiscal_year}")
-        st.caption("🔄 Version  v2.1.0")
-        st.caption("⚡ Status  🟢 Online")
-
+        st.markdown(f"""
+            <div style="background:rgba(255,255,255,0.1);padding:0.8rem;
+                        border-radius:8px;margin-bottom:0.5rem;">
+                <div style="color:#B3E5FC;font-size:0.75rem;margin-bottom:0.2rem;">
+                    📅 CURRENT DATE
+                </div>
+                <div style="color:white;font-weight:600;font-size:0.9rem;">
+                    {current_date.strftime('%d %B %Y')}
+                </div>
+            </div>
+            
+            <div style="background:rgba(255,255,255,0.1);padding:0.8rem;
+                        border-radius:8px;margin-bottom:0.5rem;">
+                <div style="color:#B3E5FC;font-size:0.75rem;margin-bottom:0.2rem;">
+                    🔄 VERSION
+                </div>
+                <div style="color:white;font-weight:600;font-size:0.9rem;">
+                    v2.0.0 (Enterprise)
+                </div>
+            </div>
+            
+            <div style="background:rgba(76,175,80,0.2);padding:0.8rem;
+                        border-radius:8px;border:1px solid rgba(76,175,80,0.4);">
+                <div style="color:#C8E6C9;font-size:0.75rem;margin-bottom:0.2rem;">
+                    ✅ STATUS
+                </div>
+                <div style="color:#4CAF50;font-weight:600;font-size:0.9rem;">
+                    System Online
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+    
     # ========================================
     # ROUTE TO PAGES
     # ========================================
-    menu = st.session_state.get('selected_menu', '🏠 หน้าแรก')
-    
     if menu == "🏠 หน้าแรก":
         show_home()
     elif menu == "📊 รายงาน":
         show_reports()
     elif menu == "📥 นำเข้าข้อมูล":
         show_import()
-
- 
+  
 
 def show_home():
     """Executive Dashboard Homepage - Hospital Intelligence"""
