@@ -2749,8 +2749,7 @@ with st.sidebar:
             </div>
         </div>
     """, unsafe_allow_html=True)
-
-    menu = st.session_state.get('selected_menu', '🏠 หน้าแรก')
+        menu = st.session_state.get('selected_menu', '🏠 หน้าแรก')
  
      
         
