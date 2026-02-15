@@ -691,10 +691,8 @@ def show_import():
                         st.success(f"✅ อ่านไฟล์ HTML สำเร็จ (ตารางที่ 1/{len(tables)})")
                     
                     # === Excel Files (.xlsx, .xls) ===
-                    
-
-                    elif file_ext in ['xlsx', 'xls']:
-                        # ✅ ไม่พึ่ง available_engines flag — ลอง import โดยตรง
+                     
+                     elif file_ext in ['xlsx', 'xls']:
                         if file_ext == 'xlsx':
                             engines_to_try = ['openpyxl', 'xlrd']
                         else:
@@ -717,11 +715,8 @@ def show_import():
                                 errors.append(f"- {engine}: {str(e)[:80]}")
                                 continue
                         
-                        # ถ้าทุก engine ล้มเหลว ลอง fallback methods
+                        # Fallback 1: HTML
                         if not success:
-                            st.warning("⚠️ ไม่สามารถอ่านด้วย Excel engine มาตรฐาน กำลังลองวิธีอื่น...")
-                            
-                            # Fallback 1: ลองอ่านเป็น HTML (บาง .xls เป็น HTML จริงๆ)
                             try:
                                 uploaded_file.seek(0)
                                 raw_content = uploaded_file.read(4096)
@@ -737,26 +732,22 @@ def show_import():
                                         success = True
                             except Exception as e:
                                 errors.append(f"- HTML fallback: {str(e)[:80]}")
+                        
+                        # ❌ ถ้ายังไม่สำเร็จ — หยุดทันที ไม่ fallback CSV
+                        if not success:
+                            st.error(f"""
+                            ❌ **ไม่สามารถอ่านไฟล์ Excel ได้**
                             
-                            # Fallback 2: ลองอ่านเป็น CSV
-                         
-
-
-                           if not success:
-                               st.error(f"""
-                               ❌ **ไม่สามารถอ่านไฟล์ Excel ได้ เนื่องจาก openpyxl/xlrd ยังไม่ได้ติดตั้ง**
-                               
-                               **ข้อผิดพลาดที่พบ:**
-                               {chr(10).join(errors)}
-                               
-                               **วิธีแก้ที่เร็วที่สุด — แปลงไฟล์เป็น CSV:**
-                               1. เปิดไฟล์ด้วย Excel
-                               2. กด File → Save As
-                               3. เลือก CSV UTF-8 (Comma delimited) (*.csv)
-                               4. อัปโหลดไฟล์ .csv ที่ได้แทน
-                               """)
-                               st.stop()
+                            **ข้อผิดพลาดที่พบ:**  
+                            {chr(10).join(errors)}
                             
+                            **วิธีแก้ — แปลงไฟล์เป็น CSV:**  
+                            1. เปิดไฟล์ด้วย Excel  
+                            2. กด File → Save As  
+                            3. เลือก CSV UTF-8 (Comma delimited) (*.csv)  
+                            4. อัปโหลดไฟล์ .csv แทน
+                            """)
+                            st.stop()
                         # ถ้ายังไม่สำเร็จ แสดง error
                         if not success:
                             st.error(f"""
