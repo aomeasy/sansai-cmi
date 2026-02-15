@@ -136,32 +136,36 @@ class SupabaseClient:
             return {"data": response.json(), "error": None}
         else:
             return {"data": None, "error": response.text}
+
+
+
+ def select(self, table, columns="*", filters=None, limit=100000):
+    """
+    Select data from table with default high limit
     
-    def select(self, table, columns="*", filters=None, limit=None):
-        """
-        Select data from table with optional limit
-        
-        Args:
-            table: ชื่อตาราง
-            columns: คอลัมน์ที่ต้องการ (default: "*")
-            filters: เงื่อนไขการกรอง (dict)
-            limit: จำกัดจำนวนผลลัพธ์ (None = ไม่จำกัด แต่ Supabase จะ limit ที่ 1000)
-        """
-        url = f"{self.url}/rest/v1/{table}?select={columns}"
-        
-        # เพิ่ม limit ถ้ามีการระบุ
-        if limit is not None:
-            url += f"&limit={limit}"
-        
-        if filters:
-            for key, value in filters.items():
-                url += f"&{key}=eq.{value}"
-        
-        response = requests.get(url, headers=self.headers)
-        if response.status_code == 200:
-            return {"data": response.json(), "count": len(response.json()), "error": None}
-        else:
-            return {"data": None, "count": 0, "error": response.text}
+    Args:
+        table: ชื่อตาราง
+        columns: คอลัมน์ที่ต้องการ (default: "*")
+        filters: เงื่อนไขการกรอง (dict)
+        limit: จำกัดจำนวนผลลัพธ์ (default: 100000)
+    """
+    url = f"{self.url}/rest/v1/{table}?select={columns}"
+    
+    # เพิ่ม limit
+    url += f"&limit={limit}"
+    
+    if filters:
+        for key, value in filters.items():
+            url += f"&{key}=eq.{value}"
+    
+    response = requests.get(url, headers=self.headers)
+    if response.status_code == 200:
+        return {"data": response.json(), "count": len(response.json()), "error": None}
+    else:
+        return {"data": None, "count": 0, "error": response.text} 
+
+
+    
     
     def count(self, table):
         """Count records in table"""
@@ -642,7 +646,7 @@ def show_import():
         
         # ดึงข้อมูล month_year ที่ไม่ซ้ำพร้อมสถิติ
         with st.spinner("กำลังโหลดข้อมูลในระบบ..."):
-            result = client.select('ipd_monthly', columns='month_year,fiscal_year,an,created_at', limit=100000)
+            result = client.select('ipd_monthly', columns='month_year,fiscal_year,an,created_at')
         
         if result['data'] and len(result['data']) > 0:
             df_existing = pd.DataFrame(result['data'])
@@ -951,7 +955,7 @@ def show_reports():
     # ── โหลดข้อมูล ────────────────────────────────────────
     client = init_supabase()
     with st.spinner("กำลังโหลดข้อมูล..."):
-        result = client.select('ipd_monthly', limit=100000)
+        result = client.select('ipd_monthly')
 
     if result['error'] or not result['data']:
         st.warning("⚠️ ไม่พบข้อมูลในระบบ กรุณานำเข้าข้อมูลก่อน")
