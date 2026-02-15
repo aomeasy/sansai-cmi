@@ -155,13 +155,18 @@ class SupabaseClient:
         try:
             response = requests.post(url, headers=self.headers, json=data, timeout=30)
             
-            if response.status_code in [200, 201]:
+            # 200, 201, 206 ถือว่าสำเร็จ
+            if response.status_code in [200, 201, 206]:
                 return {"data": response.json(), "error": None}
             else:
                 error_detail = response.text
                 try:
                     error_json = response.json()
                     error_detail = error_json.get('message', error_detail)
+                    
+                    # ถ้าเป็น Foreign Key error ให้อธิบายชัดเจน
+                    if 'foreign key' in error_detail.lower() or 'fkey' in error_detail.lower():
+                        error_detail = f"⚠️ Foreign Key Error: รหัสโรค (ICD-10) ไม่มีในฐานข้อมูล icd10_master\n{error_detail}"
                 except:
                     pass
                 return {"data": None, "error": f"HTTP {response.status_code}: {error_detail}"}
@@ -197,7 +202,8 @@ class SupabaseClient:
             try:
                 response = requests.get(url, headers=headers, timeout=30)
                 
-                if response.status_code != 200:
+                # Supabase ส่ง 206 (Partial Content) เมื่อมี pagination - นี่เป็นเรื่องปกติ
+                if response.status_code not in [200, 206]:
                     error_detail = response.text
                     try:
                         error_json = response.json()
@@ -489,11 +495,55 @@ def validate_and_prepare_data(df, filename):
     if 'sex' in df_clean.columns:
         df_clean['sex'] = df_clean['sex'].astype(str).str[:1]
     
-    # แปลง op ทั้งหมดเป็น string
+    # ========================================
+    # ⚠️ สำคัญ: จัดการ Foreign Key Constraints
+    # ========================================
+    # ICD-10 codes ต้องมีอยู่ใน icd10_master table
+    # ถ้าไม่มี จะเกิด Foreign Key constraint error
+    # วิธีแก้: ตั้งเป็น NULL ถ้า code ไม่ถูกต้อง (ไม่ใช่รูปแบบ ICD-10)
+    
+    icd_columns = ['pdx'] + [f'dx{i}' for i in range(11)]
     op_columns = [f'op{i}' for i in range(12)]
+    
+    # ทำความสะอาด ICD-10 codes
+    invalid_icd_count = 0
+    for col in icd_columns:
+        if col in df_clean.columns:
+            # แปลงเป็น string และ clean
+            df_clean[col] = df_clean[col].apply(lambda x: str(x).strip().upper() if pd.notna(x) and str(x).strip() not in ['', 'nan', 'None', 'NaN'] else None)
+            
+            # นับ code ที่ไม่ valid (เพื่อแจ้งเตือน)
+            before_count = df_clean[col].notna().sum()
+            
+            # ถ้า code มีความยาวผิดปกติมาก (>10 ตัวอักษร) ให้ตั้งเป็น NULL
+            # เพราะ schema กำหนดไว้ varchar(10)
+            df_clean.loc[df_clean[col].str.len() > 10, col] = None
+            
+            after_count = df_clean[col].notna().sum()
+            if before_count > after_count:
+                invalid_icd_count += (before_count - after_count)
+    
+    if invalid_icd_count > 0:
+        warnings.append(f"⚠️ พบรหัส ICD-10 ที่ไม่ถูกต้อง {invalid_icd_count} รายการ (ตั้งเป็น NULL)")
+        warnings.append("💡 หมายเหตุ: ถ้ารหัสถูกต้องแต่ยังไม่มีใน icd10_master table ต้องเพิ่มเข้าไปก่อน")
+    
+    # ทำความสะอาด OP codes
+    invalid_op_count = 0
     for col in op_columns:
         if col in df_clean.columns:
-            df_clean[col] = df_clean[col].apply(lambda x: str(x) if pd.notna(x) and str(x) != 'nan' else None)
+            before_count = df_clean[col].notna().sum()
+            
+            df_clean[col] = df_clean[col].apply(lambda x: str(x).strip() if pd.notna(x) and str(x).strip() not in ['', 'nan', 'None', 'NaN'] else None)
+            
+            # ตัด length ถ้ายาวเกิน 10
+            df_clean.loc[df_clean[col].str.len() > 10, col] = None
+            
+            after_count = df_clean[col].notna().sum()
+            if before_count > after_count:
+                invalid_op_count += (before_count - after_count)
+    
+    if invalid_op_count > 0:
+        warnings.append(f"⚠️ พบรหัส OP ที่ไม่ถูกต้อง {invalid_op_count} รายการ (ตั้งเป็น NULL)")
     
     # เพิ่มข้อมูลการนำเข้า
     df_clean['imported_by'] = st.session_state.get('username', 'system')
@@ -556,6 +606,159 @@ def import_to_supabase(df, batch_size=100):
     
     return success_count, error_count, error_details
 
+def show_troubleshooting():
+    """หน้าแก้ไขปัญหา"""
+    st.markdown("## 🩹 แก้ไขปัญหาที่พบบ่อย")
+    
+    st.info("""
+    หน้านี้รวบรวมวิธีแก้ไขปัญหาที่พบบ่อยในการใช้งานระบบ
+    """)
+    
+    # ปัญหาที่ 1: Foreign Key Constraints
+    with st.expander("❌ **ปัญหา: Foreign Key Constraint Error (รหัส ICD-10 ไม่มีในฐานข้อมูล)**", expanded=True):
+        st.markdown("""
+        ### 🔴 อาการ:
+        - นำเข้าข้อมูลแล้วขึ้น error: `foreign key constraint` หรือ `violates foreign key constraint "ipd_monthly_pdx_fkey"`
+        - ข้อมูลไม่เข้าฐานข้อมูล
+        
+        ### 💡 สาเหตุ:
+        Table `ipd_monthly` มี Foreign Key Constraints กับ table `icd10_master` สำหรับคอลัมน์:
+        - `pdx` (Principal Diagnosis)
+        - `dx0` - `dx10` (Secondary Diagnoses)
+        
+        **หมายความว่า:** รหัส ICD-10 ทุกตัวที่ใส่ลงไปต้อง**มีอยู่แล้ว**ใน table `icd10_master`
+        
+        ### ✅ วิธีแก้:
+        
+        **ตัวเลือกที่ 1: ลบ Foreign Key Constraints (แนะนำ)**
+        
+        รัน SQL นี้ใน Supabase SQL Editor:
+        
+        ```sql
+        -- ลบ Foreign Key Constraints ทั้งหมด
+        ALTER TABLE ipd_monthly DROP CONSTRAINT IF EXISTS ipd_monthly_pdx_fkey;
+        ALTER TABLE ipd_monthly DROP CONSTRAINT IF EXISTS ipd_monthly_dx0_fkey;
+        ALTER TABLE ipd_monthly DROP CONSTRAINT IF EXISTS ipd_monthly_dx1_fkey;
+        ALTER TABLE ipd_monthly DROP CONSTRAINT IF EXISTS ipd_monthly_dx2_fkey;
+        ALTER TABLE ipd_monthly DROP CONSTRAINT IF EXISTS ipd_monthly_dx3_fkey;
+        ALTER TABLE ipd_monthly DROP CONSTRAINT IF EXISTS ipd_monthly_dx4_fkey;
+        ALTER TABLE ipd_monthly DROP CONSTRAINT IF EXISTS ipd_monthly_dx5_fkey;
+        ALTER TABLE ipd_monthly DROP CONSTRAINT IF EXISTS ipd_monthly_dx6_fkey;
+        ALTER TABLE ipd_monthly DROP CONSTRAINT IF EXISTS ipd_monthly_dx7_fkey;
+        ALTER TABLE ipd_monthly DROP CONSTRAINT IF EXISTS ipd_monthly_dx8_fkey;
+        ALTER TABLE ipd_monthly DROP CONSTRAINT IF EXISTS ipd_monthly_dx9_fkey;
+        ALTER TABLE ipd_monthly DROP CONSTRAINT IF EXISTS ipd_monthly_dx10_fkey;
+        ```
+        
+        **ตัวเลือกที่ 2: เพิ่มรหัส ICD-10 เข้า table icd10_master**
+        
+        ถ้าต้องการเก็บ Foreign Key Constraints ไว้ (เพื่อ data integrity):
+        
+        1. Export รหัส ICD-10 ที่ใช้จากไฟล์ของคุณ
+        2. Import เข้า table `icd10_master` ก่อน
+        3. แล้วค่อย import ข้อมูล IPD
+        
+        **ตัวเลือกที่ 3: ให้ระบบจัดการให้อัตโนมัติ**
+        
+        ระบบปัจจุบันจะตั้งค่า ICD-10 codes ที่ไม่ถูกต้องเป็น NULL โดยอัตโนมัติ
+        แต่ข้อมูลอาจสูญหายบางส่วน
+        """)
+    
+    # ปัญหาที่ 2: วันที่ผิดรูปแบบ
+    with st.expander("📅 **ปัญหา: วันที่แสดงผลผิด (ปี พ.ศ. vs ค.ศ.)**"):
+        st.markdown("""
+        ### 🔴 อาการ:
+        - วันที่ admit/discharge แสดงเป็นปี 2568 (พ.ศ.) แทนที่จะเป็น 2025 (ค.ศ.)
+        - กราฟแสดงผลผิดพลาด
+        
+        ### 💡 สาเหตุ:
+        - ข้อมูลใน Excel เป็นปี พ.ศ. แต่ระบบคาดหวังปี ค.ศ.
+        - ไม่มีการแปลง พ.ศ. → ค.ศ.
+        
+        ### ✅ วิธีแก้:
+        
+        **ใน Excel ก่อน import:**
+        ```
+        = วันที่เดิม - 543 ปี
+        เช่น: 01/01/2568 → 01/01/2025
+        ```
+        
+        **หรือแก้โค้ดในส่วน validate_and_prepare_data() เพิ่ม:**
+        ```python
+        # แปลง พ.ศ. เป็น ค.ศ.
+        if col in ['admit_date', 'discharge_date']:
+            df_clean[col] = pd.to_datetime(df_clean[col], errors='coerce')
+            # ลบ 543 ปีถ้าปีมากกว่า 2500
+            df_clean[col] = df_clean[col].apply(
+                lambda x: x.replace(year=x.year-543) if pd.notna(x) and x.year > 2500 else x
+            )
+        ```
+        """)
+    
+    # ปัญหาที่ 3: อ่านข้อมูลไม่ได้
+    with st.expander("📭 **ปัญหา: แสดง 'ไม่พบข้อมูลในระบบ' แต่มีข้อมูลอยู่**"):
+        st.markdown("""
+        ### 🔴 อาการ:
+        - ไปหน้า "รายงาน" แล้วแสดงว่า "ไม่พบข้อมูล"
+        - แต่เช็คใน Supabase เห็นข้อมูลอยู่
+        
+        ### 💡 สาเหตุ:
+        - RLS (Row Level Security) ยังเปิดอยู่
+        - API Key ไม่มีสิทธิ์อ่านข้อมูล
+        
+        ### ✅ วิธีแก้:
+        
+        **1. ปิด RLS ใน Supabase:**
+        
+        ```sql
+        ALTER TABLE ipd_monthly DISABLE ROW LEVEL SECURITY;
+        ```
+        
+        **2. หรือสร้าง Policy ที่อนุญาตให้ anon role อ่านได้:**
+        
+        ```sql
+        CREATE POLICY "Allow public read access"
+        ON ipd_monthly
+        FOR SELECT
+        TO anon
+        USING (true);
+        ```
+        
+        **3. ตรวจสอบว่า RLS ปิดแล้ว:**
+        
+        ไปที่หน้า "🔧 ทดสอบการเชื่อมต่อ" → กด "📥 ดึงข้อมูลตัวอย่าง"
+        """)
+    
+    # ปัญหาที่ 4: ไฟล์ Excel อ่านไม่ได้
+    with st.expander("📄 **ปัญหา: อัปโหลดไฟล์ Excel แล้ว error**"):
+        st.markdown("""
+        ### 🔴 อาการ:
+        - อัปโหลด .xlsx/.xls แล้วขึ้น error "ไม่สามารถอ่านไฟล์ได้"
+        - error: `Missing optional dependency 'openpyxl'`
+        
+        ### 💡 สาเหตุ:
+        - ไม่มี library สำหรับอ่าน Excel (openpyxl, xlrd)
+        - ไฟล์ Excel เสียหาย
+        
+        ### ✅ วิธีแก้:
+        
+        **แนะนำ: แปลงเป็น CSV**
+        
+        1. เปิดไฟล์ใน Excel
+        2. File → Save As
+        3. เลือก **CSV UTF-8 (Comma delimited) (*.csv)**
+        4. Save
+        5. อัปโหลดไฟล์ .csv แทน
+        
+        **หรือติดตั้ง library:**
+        ```bash
+        pip install openpyxl xlrd
+        ```
+        """)
+    
+    st.markdown("---")
+    st.info("💡 **หากยังมีปัญหา** ลองไปที่เมนู '🔧 ทดสอบการเชื่อมต่อ' เพื่อตรวจสอบขั้นตอนการทำงาน")
+
 # ============================================
 # MAIN APP
 # ============================================
@@ -574,7 +777,7 @@ def main():
         st.markdown("### 📋 เมนูหลัก")
         menu = st.radio(
             "เลือกเมนู",
-            ["🏠 หน้าแรก", "📊 รายงาน", "📥 นำเข้าข้อมูล", "🔧 ทดสอบการเชื่อมต่อ"],
+            ["🏠 หน้าแรก", "📊 รายงาน", "📥 นำเข้าข้อมูล", "🔧 ทดสอบการเชื่อมต่อ", "🩹 แก้ไขปัญหา"],
             label_visibility="collapsed"
         )
         
@@ -597,6 +800,10 @@ def main():
     # ทดสอบการเชื่อมต่อ
     elif menu == "🔧 ทดสอบการเชื่อมต่อ":
         show_connection_test()
+    
+    # แก้ไขปัญหา
+    elif menu == "🩹 แก้ไขปัญหา":
+        show_troubleshooting()
 
 def show_connection_test():
     """หน้าทดสอบการเชื่อมต่อ Supabase"""
