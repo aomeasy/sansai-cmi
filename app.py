@@ -563,13 +563,44 @@ def show_reports():
             readmit_pct = (readmit_n / total * 100) if total > 0 else 0
 
             c1, c2, c3, c4, c5, c6 = st.columns(6)
-            c1.metric("👥 จำหน่ายทั้งหมด", f"{total:,} ราย")
-            c2.metric("📊 CMI", f"{cmi:.3f}")
-            c3.metric("💰 Total adjRW", f"{total_rw:,.1f}")
-            c4.metric("🛏 LOS เฉลี่ย", f"{los_mean:.1f} วัน")
-            c5.metric("💀 เสียชีวิต", f"{death_n} ราย", f"{death_pct:.1f}%")
-            c6.metric("🔄 Readmit ≤28 วัน", f"{readmit_n} ราย", f"{readmit_pct:.1f}%")
-
+        
+            c1.metric(
+                "👥 จำหน่ายทั้งหมด", 
+                f"{total:,} ราย",
+                help="📊 **จำนวนผู้ป่วยจำหน่ายทั้งหมด**\n\nรวมผู้ป่วยทุกรายที่ออกจาก รพ. ในช่วงเวลาที่เลือก (ข้อมูลทั้งหมดในระบบ)\n\n🔹 **นับจาก:** Admit Date ถึง Discharge Date\n🔹 **รวมทุกสถานะ:** กลับบ้าน, ส่งต่อ, เสียชีวิต, AMA"
+            )
+            
+            c2.metric(
+                "📊 CMI", 
+                f"{cmi:.3f}",
+                help="📈 **ดัชนีความหนักของโรค (Case Mix Index)**\n\nค่าเฉลี่ยของ Adjusted RW ทั้งหมด บ่งบอกความซับซ้อนของผู้ป่วย\n\n🔹 **CMI = 1.0** = ความหนักมาตรฐาน\n🔹 **CMI > 1.5** = รพ.รักษาผู้ป่วยหนักสูง\n🔹 **CMI < 0.8** = รักษาผู้ป่วยเบา\n\n💡 **สูตร:** ΣadjRW ÷ จำนวนผู้ป่วย"
+            )
+            
+            c3.metric(
+                "💰 Total adjRW", 
+                f"{total_rw:,.1f}",
+                help="💰 **น้ำหนักสัมพัทธ์รวม (Total Adjusted RW)**\n\nผลรวม Adjusted RW ทั้งหมด ใช้คำนวณรายได้จาก สปสช.\n\n🔹 **ใช้สำหรับ:** คำนวณค่า DRG Payment\n🔹 **1 RW** ≈ ค่าตอบแทนฐาน × RW Rate\n🔹 **ยิ่งสูง** = รายได้มากขึ้น (ถ้า CMI เหมาะสม)\n\n💡 **RW รวมสูง + CMI ต่ำ** = ปริมาณงานมาก"
+            )
+            
+            c4.metric(
+                "🛏 LOS เฉลี่ย", 
+                f"{los_mean:.1f} วัน",
+                help="🛏️ **ระยะเวลานอน รพ. เฉลี่ย (Average Length of Stay)**\n\nจำนวนวันเฉลี่ยที่ผู้ป่วยนอนใน รพ.\n\n🔹 **LOS ต่ำ** = ประสิทธิภาพสูง, หมุนเวียนเตียงดี\n🔹 **LOS สูง** = อาจมีผู้ป่วยซับซ้อน หรือ Delay Discharge\n🔹 **เกณฑ์:** 3-5 วัน (ขึ้นกับประเภท รพ.)\n\n⚠️ **LOS > 30 วัน** = ควรตรวจสอบ"
+            )
+            
+            c5.metric(
+                "💀 เสียชีวิต", 
+                f"{death_n} ราย", 
+                f"{death_pct:.1f}%",
+                help="💀 **จำนวนและอัตราการเสียชีวิต**\n\nผู้ป่วยที่เสียชีวิตระหว่างนอน รพ.\n\n🔹 **ไม่รวม:** DOA (Dead on Arrival)\n🔹 **เกณฑ์:** < 2% (รพ.ทั่วไป)\n🔹 **Adjusted Mortality Rate** ควรคำนวณตาม CMI\n\n💡 **Mortality สูง + CMI ต่ำ** = ควรตรวจสอบคุณภาพ"
+            )
+            
+            c6.metric(
+                "🔄 Readmit ≤28 วัน", 
+                f"{readmit_n} ราย", 
+                f"{readmit_pct:.1f}%",
+                help="🔄 **อัตราผู้ป่วยกลับเข้ารักษาซ้ำภายใน 28 วัน**\n\nผู้ป่วยที่กลับมารักษาซ้ำหลังจำหน่ายไม่เกิน 28 วัน (Same HN)\n\n🔹 **เกณฑ์:** < 10%\n🔹 **Readmit สูง** = อาจเกิดจาก:\n   • จำหน่ายเร็วเกินไป\n   • Follow-up ไม่ดี\n   • โรคซับซ้อน\n\n💡 **ไม่รวม:** Planned Readmission (เช่น Chemo)"
+            )
             st.markdown("---")
 
             # ── กราฟ 1: จำหน่ายรายเดือน ──
@@ -591,6 +622,7 @@ def show_reports():
                 if 'month_label' in df_all.columns and 'adjrw' in df_all.columns:
                     m_cmi = (df_all.groupby('month_label')['adjrw']
                              .mean().reset_index(name='CMI').round(3))
+                    
                     ch2 = alt.Chart(m_cmi).mark_line(
                         point=True, strokeWidth=2, color='#2E7D32'
                     ).encode(
@@ -729,12 +761,41 @@ def show_reports():
                     if len(same) > 0:
                         readmit_pn += 1
 
+  
+
             k1,k2,k3,k4,k5 = st.columns(5)
-            k1.metric("🏥 จำหน่ายทั้งหมด", f"{tot_pn:,} ราย")
-            k2.metric("💀 เสียชีวิต", f"{death_pn} ราย", f"{death_pn/tot_pn*100:.1f}%" if tot_pn else "0%")
-            k3.metric("✅ Improve", f"{improve_pn} ราย")
-            k4.metric("🔄 Readmit ≤28 วัน", f"{readmit_pn} ราย", f"{readmit_pn/tot_pn*100:.1f}%" if tot_pn else "0%")
-            k5.metric("💨 On Ventilator", f"{int(vent_pn)} ราย")
+            
+            k1.metric(
+                "🏥 จำหน่ายทั้งหมด", 
+                f"{tot_pn:,} ราย",
+                help="🫁 **ผู้ป่วยปอดบวมทั้งหมด**\n\nผู้ป่วยที่มี PDX เป็นรหัสโรคปอดบวม (J10-J18, J85.0, J85.1)\n\n🔹 **J10-J11:** Influenza pneumonia\n🔹 **J12-J18:** Pneumonia (bacterial, viral, etc.)\n🔹 **J85:** Lung abscess\n\n💡 **ไม่รวม:** Aspiration pneumonia, VAP (ดูใน Tab VAP)"
+            )
+            
+            k2.metric(
+                "💀 เสียชีวิต", 
+                f"{death_pn} ราย", 
+                f"{death_pn/tot_pn*100:.1f}%" if tot_pn else "0%",
+                help="💀 **อัตราเสียชีวิตในผู้ป่วยปอดบวม**\n\nเปอร์เซ็นต์ของผู้ป่วยปอดบวมที่เสียชีวิตใน รพ.\n\n🔹 **เกณฑ์ทั่วไป:** 5-10% (ขึ้นกับ severity)\n🔹 **Pneumonia with sepsis:** 20-30%\n🔹 **Ventilator pneumonia:** 30-50%\n\n⚠️ **Mortality สูง** → ตรวจสอบ:\n   • ระยะเวลารอรักษา\n   • Antibiotic appropriateness\n   • Comorbidity"
+            )
+            
+            k3.metric(
+                "✅ Improve", 
+                f"{improve_pn} ราย",
+                help="✅ **จำหน่ายโดยอาการดีขึ้น**\n\nผู้ป่วยปอดบวมที่รักษาหายและจำหน่ายกลับบ้าน\n\n🔹 **Discharge Status:** 'ดีขึ้น', 'หาย'\n🔹 **เป้าหมาย:** > 85%\n\n💡 **ปัจจัยสำเร็จ:**\n   • Early antibiotic\n   • Appropriate treatment\n   • Good respiratory care"
+            )
+            
+            k4.metric(
+                "🔄 Readmit ≤28 วัน", 
+                f"{readmit_pn} ราย", 
+                f"{readmit_pn/tot_pn*100:.1f}%" if tot_pn else "0%",
+                help="🔄 **ผู้ป่วยปอดบวมกลับเข้ารักษาซ้ำภายใน 28 วัน**\n\nผู้ป่วยปอดบวมที่จำหน่ายแล้วกลับมารักษาซ้ำ\n\n🔹 **เกณฑ์:** < 15% (สำหรับ pneumonia)\n🔹 **Readmit สูง** อาจเกิดจาก:\n   • Treatment failure\n   • Recurrent infection\n   • Underlying chronic disease\n   • Poor compliance\n\n💡 **ป้องกัน:** Patient education + Follow-up plan"
+            )
+            
+            k5.metric(
+                "💨 On Ventilator", 
+                f"{int(vent_pn)} ราย",
+                help="💨 **ผู้ป่วยปอดบวมที่ใช้เครื่องช่วยหายใจ**\n\nผู้ป่วยปอดบวมที่มี OP Code 96.7x (Mechanical Ventilation)\n\n🔹 **OP 96.71:** < 96 hours\n🔹 **OP 96.72:** >= 96 hours\n\n⚠️ **Risk:**\n   • VAP (Ventilator-Associated Pneumonia)\n   • Prolonged LOS\n   • Higher mortality\n\n💡 **ควรตรวจสอบ:** VAP bundle compliance"
+            )
 
             st.markdown("---")
 
@@ -847,14 +908,34 @@ def show_reports():
         df_all['on_vent'] = df_all.apply(has_ventilator, axis=1)
         df_vent_all = df_all[df_all['on_vent']].copy()
 
+ 
         k1, k2, k3, k4 = st.columns(4)
-        k1.metric("🔴 J95.851 (VAP code)", f"{len(df_vap_coded)} ราย",
-                  "⚠️ ควรตรวจสอบ" if len(df_vap_coded)==0 else "")
-        k2.metric("💨 ใช้ Ventilator ทั้งหมด", f"{len(df_vent_all)} ราย")
-        k3.metric("🫁 ปอดบวม + Ventilator", f"{len(df_pn_vent)} ราย")
-        death_pn_vent = df_pn_vent['discharge_status'].str.contains('ตาย',na=False).sum() if 'discharge_status' in df_pn_vent.columns and not df_pn_vent.empty else 0
-        k4.metric("💀 เสียชีวิตใน ปอดบวม+Vent", f"{death_pn_vent} ราย")
-
+        
+        k1.metric(
+            "🔴 J95.851 (VAP code)", 
+            f"{len(df_vap_coded)} ราย",
+            "⚠️ ควรตรวจสอบ" if len(df_vap_coded)==0 else "",
+            help="🔴 **VAP ที่ลง Code โดยตรง (J95.851)**\n\nVentilator-Associated Pneumonia ที่ Coder ลงรหัสไว้แล้ว\n\n🔹 **เกณฑ์วินิจฉัย VAP:**\n   • ใส่ท่อช่วยหายใจ > 48 ชม.\n   • เกิดปอดบวมใหม่หลังใส่ท่อ\n   • มี Clinical + Radiologic evidence\n\n⚠️ **ถ้าเป็น 0:**\n   • ยังไม่มี VAP ✅\n   • หรือมีแต่ยังไม่ได้ลง Code ❌\n\n💡 **ต้อง cross-check กับ IC records**"
+        )
+        
+        k2.metric(
+            "💨 ใช้ Ventilator ทั้งหมด", 
+            f"{len(df_vent_all)} ราย",
+            help="💨 **ผู้ป่วยทั้งหมดที่ใช้เครื่องช่วยหายใจ**\n\nผู้ป่วยทุกรายที่มี OP 96.7x (Mechanical Ventilation)\n\n🔹 **รวมทุก diagnosis:** ไม่เฉพาะปอดบวม\n🔹 **At risk for VAP:** ทุกรายที่ใส่ท่อ > 48 ชม.\n\n💡 **VAP rate = (จำนวน VAP / Ventilator days) × 1000**\n\n⚠️ **Target:** < 2-3 per 1000 ventilator days"
+        )
+        
+        k3.metric(
+            "🫁 ปอดบวม + Ventilator", 
+            f"{len(df_pn_vent)} ราย",
+            help="🫁 **ผู้ป่วยปอดบวมที่ใช้ Ventilator (Possible VAP)**\n\nผู้ป่วยที่มีทั้ง:\n• PDX = Pneumonia (J10-J18)\n• OP = Ventilator (96.7x)\n\n⚠️ **ไม่ใช่ VAP ทุกราย!**\n\nต้องตรวจสอบ:\n🔹 **Timeline:** ใส่ท่อก่อนหรือหลังเกิดปอดบวม?\n🔹 **Community-acquired** vs **Hospital-acquired**\n🔹 **Aspiration pneumonia** vs **VAP**\n\n💡 **การยืนยัน:** ดูจาก medical records + IC team"
+        )
+        
+        k4.metric(
+            "💀 เสียชีวิตใน ปอดบวม+Vent", 
+            f"{death_pn_vent} ราย",
+            help="💀 **Mortality ในผู้ป่วยปอดบวมที่ใช้ Ventilator**\n\nอัตราเสียชีวิตในกลุ่ม high-risk นี้\n\n🔹 **Expected mortality:** 30-50%\n🔹 **ปัจจัยเสี่ยง:**\n   • VAP\n   • Sepsis\n   • Multi-organ failure\n   • Prolonged ventilation\n\n💡 **Quality indicators:**\n   • VAP bundle compliance\n   • Time to appropriate antibiotic\n   • Weaning protocol"
+        )
+        
         st.markdown("---")
 
         # ── VAP coded ──
@@ -975,7 +1056,12 @@ def show_reports():
 
         # ── sub2: LOS Outlier ──
         with sub2:
-            threshold = st.slider("กำหนด LOS threshold (วัน)", 7, 60, 30)
+            
+            threshold = st.slider(
+                "กำหนด LOS threshold (วัน)", 
+                7, 60, 30,
+                help="🛏️ **กำหนดจำนวนวันขั้นต่ำที่ถือว่า 'นอนนาน'**\n\n🔹 **7-14 วัน:** Long stay\n🔹 **15-29 วัน:** Very long stay\n🔹 **30+ วัน:** Outlier (ควรตรวจสอบ)\n\n💡 **LOS นานมาก** อาจเกิดจาก:\n   • Chronic care\n   • Complication\n   • Social admission\n   • Waiting for transfer"
+            )
             if 'length_of_stay' in df_all.columns:
                 df_long = df_all[df_all['length_of_stay'] > threshold].copy()
                 st.metric(f"ผู้ป่วย LOS > {threshold} วัน",
@@ -1660,7 +1746,66 @@ def show_home():
                 </h3>
             </div>
         """, unsafe_allow_html=True)
+
+
+
+        # ========================================
+        # SECTION 1: PRIMARY KPIs (ระดับ C-Level)
+        # ========================================
+  
         
+        # ✅ เพิ่มส่วนนี้ (Info Banner สั้น ๆ)
+        st.markdown("""
+            <div style="background:linear-gradient(135deg, #E3F2FD 0%, #F3E5F5 100%);
+                        padding:0.8rem 1.2rem;border-radius:8px;margin-bottom:1.5rem;
+                        border-left:4px solid #1565C0;">
+                <div style="display:flex;align-items:center;gap:0.8rem;">
+                    <div style="font-size:1.5rem;">💡</div>
+                    <div style="flex:1;color:#37474F;font-size:0.9rem;">
+                        <b>วิธีอ่าน:</b> 
+                        <span style="color:#4CAF50;">🟢 สีเขียว (↑)</span> = เพิ่มขึ้น · 
+                        <span style="color:#F44336;">🔴 สีแดง (↓)</span> = ลดลง · 
+                        <b>Delta</b> = เทียบกับเดือนก่อน · 
+                        <span style="color:#1565C0;cursor:pointer;">คลิก <b>ⓘ</b> ข้าง KPI เพื่อดูรายละเอียด</span>
+                    </div>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        # ✅ เพิ่มตารางอ้างอิงสั้น ๆ (Optional - แสดงด้านบน KPI)
+        col_ref1, col_ref2, col_ref3 = st.columns(3)
+        
+        with col_ref1:
+            st.markdown("""
+                <div style="background:#E8F5E9;padding:0.6rem 1rem;border-radius:6px;text-align:center;">
+                    <div style="color:#2E7D32;font-size:0.75rem;font-weight:600;">✅ ยิ่งสูงยิ่งดี</div>
+                    <div style="color:#546E7A;font-size:0.8rem;margin-top:0.2rem;">
+                        Discharges · RW · Turnover
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        with col_ref2:
+            st.markdown("""
+                <div style="background:#FFF3E0;padding:0.6rem 1rem;border-radius:6px;text-align:center;">
+                    <div style="color:#E65100;font-size:0.75rem;font-weight:600;">⚖️ ควรอยู่ในช่วง</div>
+                    <div style="color:#546E7A;font-size:0.8rem;margin-top:0.2rem;">
+                        CMI: 1.0-1.5 · LOS: 3-5 วัน
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        with col_ref3:
+            st.markdown("""
+                <div style="background:#FFEBEE;padding:0.6rem 1rem;border-radius:6px;text-align:center;">
+                    <div style="color:#C62828;font-size:0.75rem;font-weight:600;">⚠️ ยิ่งต่ำยิ่งดี</div>
+                    <div style="color:#546E7A;font-size:0.8rem;margin-top:0.2rem;">
+                        Mortality · Readmit
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
         # คำนวณ KPIs
         total_current = len(df_current)
         total_previous = len(df_previous)
