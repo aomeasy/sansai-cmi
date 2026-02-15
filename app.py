@@ -115,6 +115,7 @@ st.markdown("""
 SUPABASE_URL = "https://qwxnsusfydrhtfqdcsqn.supabase.co"
 SUPABASE_KEY = "sb_publishable_Q2bzMBe3jSlQWlGAZhyJig_ILZ8heFz"
 
+
 class SupabaseClient:
     """Simple Supabase client using REST API"""
     
@@ -136,19 +137,26 @@ class SupabaseClient:
         else:
             return {"data": None, "error": response.text}
     
-    def select(self, table, columns="*", filters=None):
-        """Select data from table"""
+    def select(self, table, columns="*", filters=None, limit=None):
+        """
+        Select data from table with optional limit
+        
+        Args:
+            table: ชื่อตาราง
+            columns: คอลัมน์ที่ต้องการ (default: "*")
+            filters: เงื่อนไขการกรอง (dict)
+            limit: จำกัดจำนวนผลลัพธ์ (None = ไม่จำกัด แต่ Supabase จะ limit ที่ 1000)
+        """
         url = f"{self.url}/rest/v1/{table}?select={columns}"
-
-        if limit:
+        
+        # เพิ่ม limit ถ้ามีการระบุ
+        if limit is not None:
             url += f"&limit={limit}"
+        
         if filters:
             for key, value in filters.items():
                 url += f"&{key}=eq.{value}"
-             
-        headers = self.headers.copy()
-        headers["Range-Unit"] = "items"
-     
+        
         response = requests.get(url, headers=self.headers)
         if response.status_code == 200:
             return {"data": response.json(), "count": len(response.json()), "error": None}
@@ -165,6 +173,8 @@ class SupabaseClient:
             count = response.headers.get("Content-Range", "0-0/0").split("/")[-1]
             return int(count)
         return 0
+ 
+ 
 
 @st.cache_resource
 def init_supabase():
@@ -632,7 +642,7 @@ def show_import():
         
         # ดึงข้อมูล month_year ที่ไม่ซ้ำพร้อมสถิติ
         with st.spinner("กำลังโหลดข้อมูลในระบบ..."):
-            result = client.select('ipd_monthly', columns='month_year,fiscal_year,an,created_at', limit=600000)
+            result = client.select('ipd_monthly', columns='month_year,fiscal_year,an,created_at', limit=100000)
         
         if result['data'] and len(result['data']) > 0:
             df_existing = pd.DataFrame(result['data'])
