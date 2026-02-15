@@ -115,7 +115,7 @@ st.markdown("""
 SUPABASE_URL = "https://qwxnsusfydrhtfqdcsqn.supabase.co"
 SUPABASE_KEY = "sb_publishable_Q2bzMBe3jSlQWlGAZhyJig_ILZ8heFz"
 
- 
+
 class SupabaseClient:
     """Simple Supabase client using REST API"""
     
@@ -137,30 +137,57 @@ class SupabaseClient:
         else:
             return {"data": None, "error": response.text}
     
-    def select(self, table, columns="*", filters=None, limit=100000):
+    def select(self, table, columns="*", filters=None, limit=None):
         """
-        Select data from table with default high limit
+        Select data from table with pagination support
         
         Args:
             table: ชื่อตาราง
             columns: คอลัมน์ที่ต้องการ (default: "*")
             filters: เงื่อนไขการกรอง (dict)
-            limit: จำกัดจำนวนผลลัพธ์ (default: 100000)
+            limit: จำกัดจำนวนผลลัพธ์ (None = ดึงทั้งหมด)
         """
-        url = f"{self.url}/rest/v1/{table}?select={columns}"
+        all_data = []
+        offset = 0
+        page_size = 1000  # Supabase limit per request
         
-        # เพิ่ม limit
-        url += f"&limit={limit}"
+        while True:
+            url = f"{self.url}/rest/v1/{table}?select={columns}"
+            url += f"&limit={page_size}&offset={offset}"
+            
+            if filters:
+                for key, value in filters.items():
+                    url += f"&{key}=eq.{value}"
+            
+            # เพิ่ม header สำหรับ pagination
+            headers = self.headers.copy()
+            headers["Prefer"] = "count=exact"
+            
+            response = requests.get(url, headers=headers)
+            
+            if response.status_code != 200:
+                return {"data": None, "count": 0, "error": response.text}
+            
+            data = response.json()
+            
+            # ถ้าไม่มีข้อมูลแล้ว หยุด
+            if not data:
+                break
+            
+            all_data.extend(data)
+            
+            # ถ้าได้ข้อมูลน้อยกว่า page_size แสดงว่าหมดแล้ว
+            if len(data) < page_size:
+                break
+            
+            # ถ้ามี limit และได้ครบแล้ว
+            if limit and len(all_data) >= limit:
+                all_data = all_data[:limit]
+                break
+            
+            offset += page_size
         
-        if filters:
-            for key, value in filters.items():
-                url += f"&{key}=eq.{value}"
-        
-        response = requests.get(url, headers=self.headers)
-        if response.status_code == 200:
-            return {"data": response.json(), "count": len(response.json()), "error": None}
-        else:
-            return {"data": None, "count": 0, "error": response.text}
+        return {"data": all_data, "count": len(all_data), "error": None}
     
     def count(self, table):
         """Count records in table"""
@@ -171,9 +198,8 @@ class SupabaseClient:
         if response.status_code == 200:
             count = response.headers.get("Content-Range", "0-0/0").split("/")[-1]
             return int(count)
-        return 0 
- 
-
+        return 0
+  
 @st.cache_resource
 def init_supabase():
     """เชื่อมต่อ Supabase"""
