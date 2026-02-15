@@ -771,16 +771,50 @@ def main():
             <p>โรงพยาบาลสันทราย | Case Mix Information System</p>
         </div>
     """, unsafe_allow_html=True)
-    
-    # Sidebar Menu
+   
+# Sidebar Menu
     with st.sidebar:
         st.markdown("### 📋 เมนูหลัก")
-        menu = st.radio(
-            "เลือกเมนู",
-            ["🏠 หน้าแรก", "📊 รายงาน", "📥 นำเข้าข้อมูล", "🔧 ทดสอบการเชื่อมต่อ", "🩹 แก้ไขปัญหา"],
-            label_visibility="collapsed"
-        )
         
+        # ตรวจสอบว่า user เป็น admin หรือไม่
+        is_admin = st.session_state.get('is_admin', False)
+        
+        # ถ้ายังไม่ได้ login เป็น admin
+        if not is_admin:
+            # แสดงเมนูปกติ (ไม่มีเมนูแอดมิน)
+            menu = st.radio(
+                "เลือกเมนู",
+                ["🏠 หน้าแรก", "📊 รายงาน", "📥 นำเข้าข้อมูล"],
+                label_visibility="collapsed"
+            )
+            
+            # ปุ่มสำหรับเข้าสู่โหมด Admin
+            st.markdown("---")
+            with st.expander("🔐 Admin Tools", expanded=False):
+                admin_password = st.text_input("รหัสผ่าน Admin", type="password", key="admin_pw")
+                if st.button("เข้าสู่ระบบ Admin"):
+                    # เปลี่ยนรหัสผ่านนี้เป็นของคุณเอง
+                    if admin_password == "aom":  # ⚠️ เปลี่ยนรหัสผ่านนี้!
+                        st.session_state.is_admin = True
+                        st.success("✅ เข้าสู่โหมด Admin สำเร็จ")
+                        st.rerun()
+                    else:
+                        st.error("❌ รหัสผ่านไม่ถูกต้อง")
+        else:
+            # ถ้า login เป็น admin แล้ว - แสดงเมนูเต็ม
+            menu = st.radio(
+                "เลือกเมนู",
+                ["🏠 หน้าแรก", "📊 รายงาน", "📥 นำเข้าข้อมูล", "🔧 ทดสอบการเชื่อมต่อ", "🩹 แก้ไขปัญหา"],
+                label_visibility="collapsed"
+            )
+            
+            # ปุ่มออกจากระบบ Admin
+            st.markdown("---")
+            st.success("🔓 โหมด Admin")
+            if st.button("🚪 ออกจากโหมด Admin"):
+                st.session_state.is_admin = False
+                st.rerun()
+     
         st.markdown("---")
         st.markdown("### ℹ️ ข้อมูลระบบ")
         st.info(f"**วันที่:** {datetime.now().strftime('%d/%m/%Y')}\n\n**เวอร์ชัน:** 1.0.1 (Fixed)")
