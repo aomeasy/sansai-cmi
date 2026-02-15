@@ -115,7 +115,7 @@ st.markdown("""
 SUPABASE_URL = "https://qwxnsusfydrhtfqdcsqn.supabase.co"
 SUPABASE_KEY = "sb_publishable_Q2bzMBe3jSlQWlGAZhyJig_ILZ8heFz"
 
-
+ 
 class SupabaseClient:
     """Simple Supabase client using REST API"""
     
@@ -136,36 +136,31 @@ class SupabaseClient:
             return {"data": response.json(), "error": None}
         else:
             return {"data": None, "error": response.text}
-
-
-
- def select(self, table, columns="*", filters=None, limit=100000):
-    """
-    Select data from table with default high limit
     
-    Args:
-        table: ชื่อตาราง
-        columns: คอลัมน์ที่ต้องการ (default: "*")
-        filters: เงื่อนไขการกรอง (dict)
-        limit: จำกัดจำนวนผลลัพธ์ (default: 100000)
-    """
-    url = f"{self.url}/rest/v1/{table}?select={columns}"
-    
-    # เพิ่ม limit
-    url += f"&limit={limit}"
-    
-    if filters:
-        for key, value in filters.items():
-            url += f"&{key}=eq.{value}"
-    
-    response = requests.get(url, headers=self.headers)
-    if response.status_code == 200:
-        return {"data": response.json(), "count": len(response.json()), "error": None}
-    else:
-        return {"data": None, "count": 0, "error": response.text} 
-
-
-    
+    def select(self, table, columns="*", filters=None, limit=100000):
+        """
+        Select data from table with default high limit
+        
+        Args:
+            table: ชื่อตาราง
+            columns: คอลัมน์ที่ต้องการ (default: "*")
+            filters: เงื่อนไขการกรอง (dict)
+            limit: จำกัดจำนวนผลลัพธ์ (default: 100000)
+        """
+        url = f"{self.url}/rest/v1/{table}?select={columns}"
+        
+        # เพิ่ม limit
+        url += f"&limit={limit}"
+        
+        if filters:
+            for key, value in filters.items():
+                url += f"&{key}=eq.{value}"
+        
+        response = requests.get(url, headers=self.headers)
+        if response.status_code == 200:
+            return {"data": response.json(), "count": len(response.json()), "error": None}
+        else:
+            return {"data": None, "count": 0, "error": response.text}
     
     def count(self, table):
         """Count records in table"""
@@ -176,8 +171,7 @@ class SupabaseClient:
         if response.status_code == 200:
             count = response.headers.get("Content-Range", "0-0/0").split("/")[-1]
             return int(count)
-        return 0
- 
+        return 0 
  
 
 @st.cache_resource
