@@ -1674,7 +1674,7 @@ def show_home():
         death_previous = df_previous['discharge_status'].str.contains('ตาย', na=False).sum()
         death_rate_current = (death_current / total_current * 100) if total_current else 0
         death_rate_previous = (death_previous / total_previous * 100) if total_previous else 0
-        
+
         # แสดง KPI Cards แบบ Delta
         k1, k2, k3, k4, k5, k6 = st.columns(6)
         
@@ -1684,7 +1684,8 @@ def show_home():
                 "👥 Total Discharges",
                 f"{total_current:,}",
                 f"{delta_discharge:+,} vs prev month",
-                delta_color="normal"
+                delta_color="normal",
+                help="📊 **จำนวนผู้ป่วยที่จำหน่ายทั้งหมด**\n\nนับจากผู้ป่วยที่ออกจากโรงพยาบาล (Discharge) ในเดือนล่าสุด รวมทุกสถานะ (กลับบ้าน, ส่งต่อ, เสียชีวิต)\n\n🔹 **Delta:** เปรียบเทียบกับเดือนก่อนหน้า"  # ⬅️ เพิ่มบรรทัดนี้
             )
         
         with k2:
@@ -1693,7 +1694,8 @@ def show_home():
                 "📈 CMI (Case Mix Index)",
                 f"{cmi_current:.3f}",
                 f"{delta_cmi:+.3f}",
-                delta_color="normal"
+                delta_color="normal",
+                help="📈 **ดัชนีความหนักของโรค (Case Mix Index)**\n\nค่าเฉลี่ย Adjusted RW ของผู้ป่วยทั้งหมด บ่งบอกความซับซ้อนของผู้ป่วย\n\n🔹 **CMI สูง** = รักษาผู้ป่วยหนัก/ซับซ้อน\n🔹 **CMI ต่ำ** = รักษาผู้ป่วยเบา\n🔹 **เกณฑ์มาตรฐาน:** 1.0-1.5"  # ⬅️ เพิ่มบรรทัดนี้
             )
         
         with k3:
@@ -1702,7 +1704,8 @@ def show_home():
                 "💰 Total Adjusted RW",
                 f"{total_rw_current:,.1f}",
                 f"{delta_rw:+,.1f}",
-                delta_color="normal"
+                delta_color="normal",
+                help="💰 **น้ำหนักสัมพัทธ์รวม (Total Adjusted Relative Weight)**\n\nผลรวมของ Adjusted RW ทั้งหมด ใช้คำนวณค่าตอบแทนจาก สปสช.\n\n🔹 **สูตร:** ΣadjRW ทุกราย\n🔹 **ใช้สำหรับ:** คำนวณรายได้จาก DRG Payment\n🔹 **หน่วย:** RW Points"  # ⬅️ เพิ่มบรรทัดนี้
             )
         
         with k4:
@@ -1711,7 +1714,8 @@ def show_home():
                 "🛏️ Average LOS",
                 f"{los_current:.1f} days",
                 f"{delta_los:+.1f}",
-                delta_color="inverse"  # LOS ต่ำกว่าดีกว่า
+                delta_color="inverse",  # LOS ต่ำกว่าดีกว่า
+                help="🛏️ **ระยะเวลานอนโรงพยาบาลเฉลี่ย (Length of Stay)**\n\nจำนวนวันเฉลี่ยที่ผู้ป่วยนอนใน รพ. นับจากวันรับ (Admit) ถึงวันจำหน่าย (Discharge)\n\n🔹 **LOS ต่ำ** = ดีขึ้น (ประสิทธิภาพสูง)\n🔹 **LOS สูง** = ควรตรวจสอบ\n🔹 **เกณฑ์มาตรฐาน:** 3-5 วัน"  # ⬅️ เพิ่มบรรทัดนี้
             )
         
         with k5:
@@ -1720,7 +1724,8 @@ def show_home():
                 "💀 Mortality Rate",
                 f"{death_rate_current:.2f}%",
                 f"{delta_death_rate:+.2f}%",
-                delta_color="inverse"
+                delta_color="inverse",
+                help="💀 **อัตราการเสียชีวิต (Mortality Rate)**\n\nเปอร์เซ็นต์ของผู้ป่วยที่เสียชีวิตใน รพ. เทียบกับผู้ป่วยทั้งหมด\n\n🔹 **สูตร:** (จำนวนเสียชีวิต ÷ จำนวนจำหน่าย) × 100\n🔹 **ต่ำกว่า** = ดีขึ้น\n🔹 **เกณฑ์มาตรฐาน:** < 2%"  # ⬅️ เพิ่มบรรทัดนี้
             )
         
         with k6:
@@ -1729,9 +1734,9 @@ def show_home():
             st.metric(
                 "🔄 Bed Turnover",
                 f"{turnover_current:.1f}/day",
-                help="Average discharges per day"
+                help="🔄 **อัตราการหมุนเวียนเตียง (Bed Turnover Rate)**\n\nจำนวนผู้ป่วยเฉลี่ยที่จำหน่ายต่อวัน สะท้อนการใช้ประโยชน์จากเตียง\n\n🔹 **สูตร:** จำนวนจำหน่าย ÷ จำนวนวันในเดือน\n🔹 **สูงขึ้น** = ใช้เตียงคุ้มค่า\n🔹 **หมายเหตุ:** คำนวณจากจำนวนเตียงโดยประมาณ"  # ⬅️ เพิ่มบรรทัดนี้
             )
-        
+         
         st.markdown("---")
         
         # ========================================
