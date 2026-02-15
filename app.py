@@ -739,23 +739,24 @@ def show_import():
                                 errors.append(f"- HTML fallback: {str(e)[:80]}")
                             
                             # Fallback 2: ลองอ่านเป็น CSV
-                           
-                            if not success:
-                                for enc in ['utf-8', 'cp874', 'tis-620', 'latin-1']:
-                                    try:
-                                        uploaded_file.seek(0)
-                                        df = pd.read_csv(
-                                            uploaded_file,
-                                            on_bad_lines='skip',
-                                            encoding=enc
-                                        )
-                                        st.info(f"✅ อ่านไฟล์สำเร็จในรูปแบบ CSV (encoding: {enc})")
-                                        success = True
-                                        break
-                                    except Exception as e:
-                                        errors.append(f"- CSV fallback ({enc}): {str(e)[:80]}")
-                                        continue
-                        
+                         
+
+
+                           if not success:
+                               st.error(f"""
+                               ❌ **ไม่สามารถอ่านไฟล์ Excel ได้ เนื่องจาก openpyxl/xlrd ยังไม่ได้ติดตั้ง**
+                               
+                               **ข้อผิดพลาดที่พบ:**
+                               {chr(10).join(errors)}
+                               
+                               **วิธีแก้ที่เร็วที่สุด — แปลงไฟล์เป็น CSV:**
+                               1. เปิดไฟล์ด้วย Excel
+                               2. กด File → Save As
+                               3. เลือก CSV UTF-8 (Comma delimited) (*.csv)
+                               4. อัปโหลดไฟล์ .csv ที่ได้แทน
+                               """)
+                               st.stop()
+                            
                         # ถ้ายังไม่สำเร็จ แสดง error
                         if not success:
                             st.error(f"""
