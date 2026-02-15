@@ -2640,19 +2640,7 @@ def main():
 
     # route ──────────────────────────────────
     menu = st.session_state.get('selected_menu', '🏠 หน้าแรก')
-    
-        st.markdown("<br><br>", unsafe_allow_html=True)
-        
-        # System Info Section
-        st.markdown("""
-            <div style="border-top:2px solid rgba(255,255,255,0.2);
-                        padding-top:1.5rem;margin-top:2rem;">
-                <div style="color:#B3E5FC;font-weight:600;font-size:0.9rem;
-                            margin-bottom:1rem;letter-spacing:0.5px;">
-                    ℹ️ SYSTEM INFO
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
+     
         
         # Info cards
         current_date = datetime.now()
