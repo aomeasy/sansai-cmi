@@ -6,6 +6,7 @@ import requests
 import json
 import re
 import altair as alt  # ⚠️ ต้องมีบรรทัดนี้
+import streamlit.components.v1 as components
 
 # ตั้งค่าหน้าเว็บ
 st.set_page_config(
@@ -1028,8 +1029,14 @@ def show_reports():
                 </table>
                 </div>
                 """
-            
-            st.markdown(render_matrix_table(df_summary_matrix), unsafe_allow_html=True)
+             
+            import streamlit.components.v1 as components
+            html_content = render_matrix_table(df_summary_matrix)
+            components.html(
+                f"<div style='font-family:sans-serif;font-size:14px;'>{html_content}</div>",
+                height=280,
+                scrolling=False
+            )
             
             # ── Download ────────────────────────────────────────────────────
             csv_matrix = df_summary_matrix.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
@@ -1648,14 +1655,17 @@ def show_reports():
                     delta_color="inverse",
                     help="อัตราเสียชีวิตใน Hemorrhagic Stroke (มักสูงกว่า)"
                 )
-    
-        st.markdown(render_two_type_table(
-            df_stroke,
-            'Ischemic', 'Hemorrhagic',
-            '#3949AB', '#C62828',
-            '🔵', '🔴'
-        ), unsafe_allow_html=True)
-    
+ 
+
+        html_stroke = render_two_type_table(
+            df_stroke, 'Ischemic', 'Hemorrhagic',
+            '#3949AB', '#C62828', '🔵', '🔴'
+        )
+        components.html(
+            f"<div style='font-family:sans-serif;font-size:14px;'>{html_stroke}</div>",
+            height=300,
+            scrolling=False
+        )
         # Download Stroke
         if not df_stroke.empty:
             csv_s = df_stroke.to_csv(
@@ -1830,12 +1840,17 @@ def show_reports():
                     help="อัตราเสียชีวิตใน NSTEMI/UA"
                 )
     
-        st.markdown(render_two_type_table(
-            df_acs,
-            'STEMI', 'NSTEMI',
-            '#BF360C', '#F9A825',
-            '🔴', '🟡'
-        ), unsafe_allow_html=True)
+    
+
+        html_acs = render_two_type_table(
+            df_acs, 'STEMI', 'NSTEMI',
+            '#BF360C', '#F9A825', '🔴', '🟡'
+        )
+        components.html(
+            f"<div style='font-family:sans-serif;font-size:14px;'>{html_acs}</div>",
+            height=300,
+            scrolling=False
+        )        
     
         # Download ACS
         if not df_acs.empty:
