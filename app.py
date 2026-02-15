@@ -547,34 +547,50 @@ def show_reports():
         - 📉 แนวโน้มและกราฟ
     """)
 
-
-
 def show_import():
     """หน้านำเข้าข้อมูล"""
     st.markdown("## 📥 นำเข้าข้อมูล IPD Monthly")
     
-    # ✅ เพิ่ม: ตรวจสอบว่ามี openpyxl หรือไม่
+    # ✅ เพิ่ม: ตรวจสอบ libraries ที่มีอยู่
+    available_engines = {
+        'openpyxl': False,
+        'xlrd': False,
+        'html': True  # pandas มี read_html built-in
+    }
+    
     try:
         import openpyxl
-        excel_available = True
+        available_engines['openpyxl'] = True
     except ImportError:
-        excel_available = False
-        st.warning("⚠️ ระบบไม่สามารถอ่านไฟล์ Excel ได้ กรุณาใช้ไฟล์ CSV แทน")
+        pass
+    
+    try:
+        import xlrd
+        available_engines['xlrd'] = True
+    except ImportError:
+        pass
+    
+    # ✅ เพิ่ม: แสดงสถานะ engines ที่รองรับ
+    excel_available = available_engines['openpyxl'] or available_engines['xlrd']
     
     # คำแนะนำ
     with st.expander("📖 คำแนะนำการนำเข้าข้อมูล", expanded=True):
-        st.markdown("""
+        st.markdown(f"""
         ### รูปแบบไฟล์ที่รองรับ:
-        - Excel (.xlsx, .xls) """ + ("✅" if excel_available else "❌ ไม่พร้อมใช้งาน") + """
-        - CSV (.csv) ✅
+        - **Excel (.xlsx)** {'✅' if available_engines['openpyxl'] else '⚠️ จำกัด'}
+        - **Excel เก่า (.xls)** {'✅' if available_engines['xlrd'] else '⚠️ จำกัด'}
+        - **CSV (.csv)** ✅ (แนะนำ)
+        - **HTML Table (.html)** ✅
+        
+        {"⚠️ **หมายเหตุ:** ระบบอาจอ่านไฟล์ Excel ได้ไม่สมบูรณ์ แนะนำให้แปลงเป็น CSV ก่อน" if not excel_available else ""}
         
         ### 🔴 สำคัญ: รูปแบบชื่อไฟล์
-        ชื่อไฟล์ต้องมีรูปแบบ: **`ipd-[เดือน].[ปี].xlsx`** หรือ **`ipd-[เดือน].[ปี].csv`**
+        ชื่อไฟล์ต้องมีรูปแบบ: **`ipd-[เดือน].[ปี].[นามสกุล]`**
         
         ตัวอย่าง:
         - `3_ipd-ธ.ค.68.xlsx` → ธันวาคม 2568 (2025-12-01)
         - `ipd-ม.ค.69.csv` → มกราคม 2569 (2026-01-01)
-        - `ipd-ก.พ.68.xlsx` → กุมภาพันธ์ 2568 (2025-02-01)
+        - `ipd-ก.พ.68.xls` → กุมภาพันธ์ 2568 (2025-02-01)
         
         เดือนที่รองรับ: ม.ค., ก.พ., มี.ค., เม.ย., พ.ค., มิ.ย., ก.ค., ส.ค., ก.ย., ต.ค., พ.ย., ธ.ค.
         
@@ -596,28 +612,30 @@ def show_import():
         - ข้อมูลที่มี AN ซ้ำในเดือนเดียวกันจะไม่สามารถนำเข้าได้
         """)
         
-        # ✅ เพิ่ม: คำแนะนำแปลง Excel เป็น CSV
+        # ✅ เพิ่ม: คำแนะนำแปลงไฟล์
         if not excel_available:
-            st.info("""
-            💡 **วิธีแปลงไฟล์ Excel เป็น CSV:**
+            st.warning("""
+            ### ⚠️ ระบบอ่านไฟล์ Excel ได้จำกัด
+            
+            **วิธีแปลงไฟล์ Excel เป็น CSV (แนะนำ):**
             1. เปิดไฟล์ Excel
             2. คลิก **File** → **Save As**
-            3. เลือก **File Format** เป็น **"CSV UTF-8 (Comma delimited) (.csv)"**
-            4. กด **Save** แล้วอัปโหลดไฟล์ CSV ที่นี่
+            3. เลือก **Save as type:** → **CSV UTF-8 (Comma delimited) (*.csv)**
+            4. กด **Save**
+            5. อัปโหลดไฟล์ CSV ที่นี่
+            
+            **ทางเลือกอื่น:**
+            - ใช้ Google Sheets: File → Download → Comma Separated Values (.csv)
+            - ใช้ LibreOffice Calc: File → Save As → Text CSV (.csv)
             """)
     
     st.markdown("---")
     
-    # อัพโหลดไฟล์
-    # ✅ แก้ไข: เปลี่ยน type ตามสถานะของ openpyxl
-    allowed_types = ['csv']
-    if excel_available:
-        allowed_types.extend(['xlsx', 'xls'])
-    
+    # ✅ แก้ไข: รองรับหลายนามสกุล
     uploaded_file = st.file_uploader(
         "เลือกไฟล์ข้อมูล",
-        type=allowed_types,
-        help="อัพโหลดไฟล์ " + ("Excel หรือ " if excel_available else "") + "CSV ที่ตั้งชื่อตามรูปแบบ: ipd-ธ.ค.68" + (".xlsx" if excel_available else ".csv")
+        type=['xlsx', 'xls', 'csv', 'html'],  # ✅ รองรับทุกนามสกุล
+        help="อัพโหลดไฟล์ Excel, CSV, หรือ HTML ที่ตั้งชื่อตามรูปแบบ: ipd-ธ.ค.68.xlsx"
     )
     
     if uploaded_file is not None:
@@ -633,52 +651,143 @@ def show_import():
                 st.error("❌ ไม่สามารถอ่าน month_year จากชื่อไฟล์ได้ กรุณาตั้งชื่อไฟล์ให้ถูกต้อง")
                 st.stop()
             
-            # ✅ แก้ไข: อ่านไฟล์ด้วย error handling ที่ดีขึ้น
-            try:
-                if uploaded_file.name.endswith('.csv'):
-                    df = pd.read_csv(uploaded_file)
-                elif uploaded_file.name.endswith(('.xlsx', '.xls')):
-                    if not excel_available:
-                        st.error("❌ ระบบไม่สามารถอ่านไฟล์ Excel ได้ กรุณาแปลงเป็น CSV ก่อน")
-                        st.stop()
-                    
-                    # ลองใช้ engine ต่างๆ
-                    try:
-                        df = pd.read_excel(uploaded_file, engine='openpyxl')
-                    except Exception as e1:
+            # ✅ แก้ไข: อ่านไฟล์ด้วย Multi-Engine Support
+            df = None
+            file_ext = uploaded_file.name.split('.')[-1].lower()
+            
+            with st.spinner(f"กำลังอ่านไฟล์ .{file_ext}..."):
+                try:
+                    # === CSV File ===
+                    if file_ext == 'csv':
                         try:
-                            # ลอง xlrd สำหรับไฟล์ .xls เก่า
-                            df = pd.read_excel(uploaded_file, engine='xlrd')
-                        except Exception as e2:
+                            df = pd.read_csv(uploaded_file, encoding='utf-8')
+                        except UnicodeDecodeError:
+                            uploaded_file.seek(0)
+                            df = pd.read_csv(uploaded_file, encoding='cp874')  # Thai encoding
+                        st.success("✅ อ่านไฟล์ CSV สำเร็จ")
+                    
+                    # === HTML File ===
+                    elif file_ext == 'html':
+                        uploaded_file.seek(0)
+                        html_content = uploaded_file.read().decode('utf-8', errors='replace')
+                        tables = pd.read_html(html_content)
+                        
+                        if not tables:
+                            st.error("❌ ไม่พบตารางในไฟล์ HTML")
+                            st.stop()
+                        
+                        # ถ้ามีหลายตาราง ให้ผู้ใช้เลือก
+                        if len(tables) > 1:
+                            table_index = st.selectbox(
+                                f"พบ {len(tables)} ตาราง กรุณาเลือกตารางที่ต้องการ:",
+                                range(len(tables)),
+                                format_func=lambda x: f"ตารางที่ {x+1} ({len(tables[x])} แถว, {len(tables[x].columns)} คอลัมน์)"
+                            )
+                            df = tables[table_index]
+                        else:
+                            df = tables[0]
+                        
+                        st.success(f"✅ อ่านไฟล์ HTML สำเร็จ (ตารางที่ 1/{len(tables)})")
+                    
+                    # === Excel Files (.xlsx, .xls) ===
+                    elif file_ext in ['xlsx', 'xls']:
+                        engines_to_try = []
+                        
+                        # กำหนด engine ตามนามสกุล
+                        if file_ext == 'xlsx' and available_engines['openpyxl']:
+                            engines_to_try.append('openpyxl')
+                        if file_ext == 'xls' and available_engines['xlrd']:
+                            engines_to_try.append('xlrd')
+                        
+                        # ลองทุก engine ที่มี
+                        if available_engines['openpyxl'] and 'openpyxl' not in engines_to_try:
+                            engines_to_try.append('openpyxl')
+                        if available_engines['xlrd'] and 'xlrd' not in engines_to_try:
+                            engines_to_try.append('xlrd')
+                        
+                        # ลอง engine ทีละตัว
+                        success = False
+                        errors = []
+                        
+                        for engine in engines_to_try:
+                            try:
+                                uploaded_file.seek(0)
+                                df = pd.read_excel(uploaded_file, engine=engine)
+                                st.success(f"✅ อ่านไฟล์ Excel สำเร็จด้วย engine: {engine}")
+                                success = True
+                                break
+                            except Exception as e:
+                                errors.append(f"- {engine}: {str(e)[:80]}")
+                                continue
+                        
+                        # ถ้าทุก engine ล้มเหลว ลอง fallback methods
+                        if not success:
+                            st.warning("⚠️ ไม่สามารถอ่านด้วย Excel engine มาตรฐาน กำลังลองวิธีอื่น...")
+                            
+                            # Fallback 1: ลองอ่านเป็น HTML (บาง .xls เป็น HTML จริงๆ)
+                            try:
+                                uploaded_file.seek(0)
+                                raw_content = uploaded_file.read(4096)
+                                uploaded_file.seek(0)
+                                
+                                if b"<table" in raw_content.lower() or b"<html" in raw_content.lower():
+                                    html_text = uploaded_file.read().decode('utf-8', errors='replace')
+                                    tables = pd.read_html(html_text)
+                                    
+                                    if tables:
+                                        df = tables[0]
+                                        st.info("✅ อ่านไฟล์สำเร็จในรูปแบบ HTML Table")
+                                        success = True
+                            except Exception as e:
+                                errors.append(f"- HTML fallback: {str(e)[:80]}")
+                            
+                            # Fallback 2: ลองอ่านเป็น CSV
+                            if not success:
+                                try:
+                                    uploaded_file.seek(0)
+                                    df = pd.read_csv(uploaded_file, on_bad_lines='skip', encoding='utf-8')
+                                    st.info("✅ อ่านไฟล์สำเร็จในรูปแบบ CSV")
+                                    success = True
+                                except Exception as e:
+                                    errors.append(f"- CSV fallback: {str(e)[:80]}")
+                        
+                        # ถ้ายังไม่สำเร็จ แสดง error
+                        if not success:
                             st.error(f"""
-                            ❌ ไม่สามารถอ่านไฟล์ Excel ได้
+                            ❌ **ไม่สามารถอ่านไฟล์ Excel ได้**
                             
-                            **ข้อผิดพลาด:**
-                            - openpyxl: {str(e1)[:100]}
-                            - xlrd: {str(e2)[:100]}
+                            **ข้อผิดพลาดที่พบ:**
+                            {chr(10).join(errors)}
                             
-                            **แนะนำ:** ลองแปลงไฟล์เป็น CSV ก่อนอัปโหลด
+                            **แนะนำวิธีแก้:**
+                            1. แปลงไฟล์เป็น **CSV** (วิธีที่ดีที่สุด)
+                               - เปิดไฟล์ → File → Save As → CSV UTF-8
+                            2. ลองบันทึกไฟล์ Excel ใหม่ด้วย Excel รุ่นใหม่
+                            3. ใช้ Google Sheets เปิดแล้ว Download เป็น CSV
                             """)
                             st.stop()
-                else:
-                    st.error(f"❌ ไฟล์นามสกุล .{uploaded_file.name.split('.')[-1]} ไม่รองรับ")
-                    st.stop()
                     
-            except Exception as e:
-                st.error(f"❌ เกิดข้อผิดพลาดในการอ่านไฟล์: {str(e)}")
-                if not uploaded_file.name.endswith('.csv'):
+                    else:
+                        st.error(f"❌ ไฟล์นามสกุล .{file_ext} ไม่รองรับ")
+                        st.stop()
+                
+                except Exception as e:
+                    st.error(f"❌ เกิดข้อผิดพลาดในการอ่านไฟล์: {str(e)}")
                     st.info("""
-                    💡 **แนะนำ:** ลองแปลงไฟล์ Excel เป็น CSV แล้วลองใหม่อีกครั้ง
-                    
-                    **วิธีแปลง:**
-                    1. เปิดไฟล์ Excel
-                    2. File → Save As
-                    3. เลือก Format: CSV UTF-8
-                    4. Save และอัปโหลดใหม่
+                    💡 **แนะนำวิธีแก้:**
+                    1. แปลงไฟล์เป็น **CSV** (แนะนำที่สุด)
+                       - Excel: File → Save As → CSV UTF-8
+                       - Google Sheets: File → Download → CSV
+                    2. ตรวจสอบว่าไฟล์ไม่เสียหาย
+                    3. ลองเปิดไฟล์ด้วย Excel/LibreOffice แล้วบันทึกใหม่
                     """)
-                st.stop()
+                    st.exception(e)
+                    st.stop()
             
-            st.success(f"✅ อ่านไฟล์สำเร็จ!")
+            # ✅ เพิ่ม: ตรวจสอบว่าอ่านไฟล์ได้หรือไม่
+            if df is None or df.empty:
+                st.error("❌ ไม่สามารถอ่านข้อมูลจากไฟล์ได้ หรือไฟล์ว่างเปล่า")
+                st.stop()
             
             # แสดงข้อมูลตัวอย่าง
             st.markdown("### 👀 ตัวอย่างข้อมูลจากไฟล์")
@@ -757,7 +866,7 @@ def show_import():
         except Exception as e:
             st.error(f"❌ เกิดข้อผิดพลาดที่ไม่คาดคิด: {str(e)}")
             st.exception(e)
-
+ 
  
 
 # เรียกใช้งาน
