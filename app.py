@@ -817,74 +817,66 @@ def show_reports():
             }
             
             # ── อธิบาย ICD-10 ──────────────────────────────────────────────
+            
             st.markdown("""
-            <div style="background:linear-gradient(135deg,#E3F2FD,#F3E5F5);
-                        padding:1.2rem 1.5rem;border-radius:12px;margin-bottom:1.2rem;
-                        border:1px solid #BBDEFB;">
-                <h4 style="color:#1565C0;margin:0 0 0.8rem 0;">
-                    📋 นิยามและรหัส ICD-10 ที่ใช้จำแนกประเภทปอดบวม
-                </h4>
-                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;">
+            <table style="width:100%;border-collapse:separate;border-spacing:12px;">
+            <tr>
+              <td style="background:white;padding:1rem;border-radius:8px;
+                         border-left:4px solid #1976D2;vertical-align:top;width:33%;">
+                <b style="color:#1976D2;">🏘️ CAP</b><br>
+                <span style="color:#37474F;font-size:0.85rem;">
+                  <b>Community-Acquired Pneumonia</b><br>
+                  ปอดบวมที่ติดเชื้อจากชุมชน (ก่อน admit หรือ ≤48 ชม.หลัง admit)<br><br>
+                  <b>รหัส ICD-10:</b><br>
+                  J10 – Flu w/ pneumonia (identified)<br>
+                  J11 – Flu w/ pneumonia (unidentified)<br>
+                  J12 – Viral pneumonia NEC<br>
+                  J13 – Pneumococcal pneumonia<br>
+                  J14 – H. influenzae pneumonia<br>
+                  J15 – Bacterial pneumonia NEC<br>
+                  J16 – Pneumonia (other organisms)<br>
+                  J17 – Pneumonia in diseases<br>
+                  J18 – Pneumonia, unspecified
+                </span>
+              </td>
             
-                    <div style="background:white;padding:1rem;border-radius:8px;
-                                border-left:4px solid #1976D2;">
-                        <b style="color:#1976D2;">🏘️ CAP</b>
-                        <p style="color:#37474F;font-size:0.85rem;margin:0.5rem 0 0 0;">
-                            <b>Community-Acquired Pneumonia</b><br>
-                            ปอดบวมที่ติดเชื้อจากชุมชน (ก่อน admit หรือ ≤48 ชม.หลัง admit)<br><br>
-                            <b>รหัส ICD-10:</b><br>
-                            J10 – Flu w/ pneumonia (identified)<br>
-                            J11 – Flu w/ pneumonia (unidentified)<br>
-                            J12 – Viral pneumonia NEC<br>
-                            J13 – Pneumococcal pneumonia<br>
-                            J14 – H. influenzae pneumonia<br>
-                            J15 – Bacterial pneumonia NEC<br>
-                            J16 – Pneumonia (other organisms)<br>
-                            J17 – Pneumonia in diseases<br>
-                            J18 – Pneumonia, unspecified
-                        </p>
-                    </div>
+              <td style="background:white;padding:1rem;border-radius:8px;
+                         border-left:4px solid #F57C00;vertical-align:top;width:33%;">
+                <b style="color:#F57C00;">🏥 HAP</b><br>
+                <span style="color:#37474F;font-size:0.85rem;">
+                  <b>Hospital-Acquired Pneumonia</b><br>
+                  ปอดบวมที่เกิดขณะนอน รพ. >48 ชม. แต่ยังไม่ได้ใช้เครื่องช่วยหายใจ<br><br>
+                  <b>รหัส ICD-10:</b><br>
+                  J95.0 – Tracheostomy complication w/ infection<br>
+                  J22 – Unspecified acute lower respiratory infection<br><br>
+                  <b>หมายเหตุ:</b><br>
+                  โรงพยาบาลบางแห่งยังใช้ J18.x ควร cross-check กับ IC team
+                </span>
+              </td>
             
-                    <div style="background:white;padding:1rem;border-radius:8px;
-                                border-left:4px solid #F57C00;">
-                        <b style="color:#F57C00;">🏥 HAP</b>
-                        <p style="color:#37474F;font-size:0.85rem;margin:0.5rem 0 0 0;">
-                            <b>Hospital-Acquired Pneumonia</b><br>
-                            ปอดบวมที่เกิดขณะนอน รพ. >48 ชม. แต่ยังไม่ได้ใช้เครื่องช่วยหายใจ<br><br>
-                            <b>รหัส ICD-10:</b><br>
-                            J95.0 – Tracheostomy complication w/ infection<br>
-                            J22 – Unspecified acute lower respiratory infection<br><br>
-                            <b>หมายเหตุ:</b><br>
-                            โรงพยาบาลบางแห่งยังใช้ J18.x โดยระบุใน <br>
-                            Clinical note ว่าเป็น HAP ควร cross-check<br>
-                            กับ IC team
-                        </p>
-                    </div>
-            
-                    <div style="background:white;padding:1rem;border-radius:8px;
-                                border-left:4px solid #D32F2F;">
-                        <b style="color:#D32F2F;">💨 VAP</b>
-                        <p style="color:#37474F;font-size:0.85rem;margin:0.5rem 0 0 0;">
-                            <b>Ventilator-Associated Pneumonia</b><br>
-                            ปอดบวมที่เกิดขณะใส่ท่อช่วยหายใจ >48 ชม.<br><br>
-                            <b>รหัส ICD-10:</b><br>
-                            J95.851 – VAP (specific code)<br>
-                            J95.85 – VAP (broader)<br><br>
-                            <b>เงื่อนไขเพิ่มเติม:</b><br>
-                            ปอดบวม J10-J18 + OP 96.71/96.72<br>
-                            (ใส่ใน Possible VAP เท่านั้น)<br><br>
-                            <b>ควร cross-check:</b> IC records + สมุด VAP
-                        </p>
-                    </div>
-                </div>
-                <div style="margin-top:0.8rem;padding:0.6rem 1rem;background:rgba(255,152,0,0.1);
-                            border-radius:6px;border-left:3px solid #FF9800;">
-                    <span style="color:#E65100;font-size:0.85rem;">
-                        ⚠️ <b>ข้อจำกัด:</b> การจำแนก CAP/HAP ในรายงานนี้ใช้เฉพาะ <b>รหัส pdx</b>
-                        ไม่ได้นับ วันที่ admit vs onset จริง
-                        ควรใช้ <b>ร่วมกับการ review clinical records</b> โดยทีม IC
-                    </span>
-                </div>
+              <td style="background:white;padding:1rem;border-radius:8px;
+                         border-left:4px solid #D32F2F;vertical-align:top;width:33%;">
+                <b style="color:#D32F2F;">💨 VAP</b><br>
+                <span style="color:#37474F;font-size:0.85rem;">
+                  <b>Ventilator-Associated Pneumonia</b><br>
+                  ปอดบวมที่เกิดขณะใส่ท่อช่วยหายใจ >48 ชม.<br><br>
+                  <b>รหัส ICD-10:</b><br>
+                  J95.851 – VAP (specific code)<br>
+                  J95.85 – VAP (broader)<br><br>
+                  <b>เงื่อนไขเพิ่มเติม:</b><br>
+                  ปอดบวม J10-J18 + OP 96.71/96.72<br>
+                  ควร cross-check: IC records + สมุด VAP
+                </span>
+              </td>
+            </tr>
+            </table>
+            <div style="margin-top:0.8rem;padding:0.6rem 1rem;background:rgba(255,152,0,0.1);
+                        border-radius:6px;border-left:3px solid #FF9800;">
+              <span style="color:#E65100;font-size:0.85rem;">
+                ⚠️ <b>ข้อจำกัด:</b> การจำแนก CAP/HAP ในรายงานนี้ใช้เฉพาะ <b>รหัส pdx</b>
+                ไม่ได้นับวันที่ admit vs onset จริง
+                ควรใช้ <b>ร่วมกับการ review clinical records</b> โดยทีม IC
+              </span>
             </div>
             """, unsafe_allow_html=True)
             
