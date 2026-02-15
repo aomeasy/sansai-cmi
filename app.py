@@ -505,10 +505,11 @@ def show_reports():
         st.error("❌ ไม่สามารถโหลด Altair library กรุณาติดตั้ง: pip install altair")
         return
         
-    tab1, tab2, tab3, tab4 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "🏥 Dashboard ภาพรวม",
         "🫁 ปอดบวม (Pneumonia)",
         "💨 VAP Analysis",
+        "🧠 Stroke & ACS",
         "🔬 เชิงลึก"
     ])
 
@@ -797,6 +798,289 @@ def show_reports():
                 help="💨 **ผู้ป่วยปอดบวมที่ใช้เครื่องช่วยหายใจ**\n\nผู้ป่วยปอดบวมที่มี OP Code 96.7x (Mechanical Ventilation)\n\n🔹 **OP 96.71:** < 96 hours\n🔹 **OP 96.72:** >= 96 hours\n\n⚠️ **Risk:**\n   • VAP (Ventilator-Associated Pneumonia)\n   • Prolonged LOS\n   • Higher mortality\n\n💡 **ควรตรวจสอบ:** VAP bundle compliance"
             )
 
+            # ── คำนิยาม ICD-10 ──────────────────────────────────────────────
+            # CAP: Community-Acquired Pneumonia
+            CAP_CODES = ['J13', 'J14', 'J15', 'J16', 'J17', 'J18',
+                         'J10', 'J11', 'J12']
+            # HAP: Hospital-Acquired Pneumonia (รวม J95.0 = Tracheostomy complications with infection)
+            HAP_CODES = ['J95.0', 'J22']
+            # VAP: Ventilator-Associated Pneumonia
+            VAP_CODES = ['J95.851', 'J95.85']
+            
+            # Ward ที่สนใจ
+            TARGET_WARDS_KEYWORDS = {
+                'MB2':  ['MB2', 'mb2'],
+                'MB4':  ['MB4', 'mb4'],
+                'MB5':  ['MB5', 'mb5'],
+                'VIP':  ['VIP', 'vip'],
+                'ICU':  ['ICU', 'icu'],
+            }
+            
+            # ── อธิบาย ICD-10 ──────────────────────────────────────────────
+            st.markdown("""
+            <div style="background:linear-gradient(135deg,#E3F2FD,#F3E5F5);
+                        padding:1.2rem 1.5rem;border-radius:12px;margin-bottom:1.2rem;
+                        border:1px solid #BBDEFB;">
+                <h4 style="color:#1565C0;margin:0 0 0.8rem 0;">
+                    📋 นิยามและรหัส ICD-10 ที่ใช้จำแนกประเภทปอดบวม
+                </h4>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;">
+            
+                    <div style="background:white;padding:1rem;border-radius:8px;
+                                border-left:4px solid #1976D2;">
+                        <b style="color:#1976D2;">🏘️ CAP</b>
+                        <p style="color:#37474F;font-size:0.85rem;margin:0.5rem 0 0 0;">
+                            <b>Community-Acquired Pneumonia</b><br>
+                            ปอดบวมที่ติดเชื้อจากชุมชน (ก่อน admit หรือ ≤48 ชม.หลัง admit)<br><br>
+                            <b>รหัส ICD-10:</b><br>
+                            J10 – Flu w/ pneumonia (identified)<br>
+                            J11 – Flu w/ pneumonia (unidentified)<br>
+                            J12 – Viral pneumonia NEC<br>
+                            J13 – Pneumococcal pneumonia<br>
+                            J14 – H. influenzae pneumonia<br>
+                            J15 – Bacterial pneumonia NEC<br>
+                            J16 – Pneumonia (other organisms)<br>
+                            J17 – Pneumonia in diseases<br>
+                            J18 – Pneumonia, unspecified
+                        </p>
+                    </div>
+            
+                    <div style="background:white;padding:1rem;border-radius:8px;
+                                border-left:4px solid #F57C00;">
+                        <b style="color:#F57C00;">🏥 HAP</b>
+                        <p style="color:#37474F;font-size:0.85rem;margin:0.5rem 0 0 0;">
+                            <b>Hospital-Acquired Pneumonia</b><br>
+                            ปอดบวมที่เกิดขณะนอน รพ. >48 ชม. แต่ยังไม่ได้ใช้เครื่องช่วยหายใจ<br><br>
+                            <b>รหัส ICD-10:</b><br>
+                            J95.0 – Tracheostomy complication w/ infection<br>
+                            J22 – Unspecified acute lower respiratory infection<br><br>
+                            <b>หมายเหตุ:</b><br>
+                            โรงพยาบาลบางแห่งยังใช้ J18.x โดยระบุใน <br>
+                            Clinical note ว่าเป็น HAP ควร cross-check<br>
+                            กับ IC team
+                        </p>
+                    </div>
+            
+                    <div style="background:white;padding:1rem;border-radius:8px;
+                                border-left:4px solid #D32F2F;">
+                        <b style="color:#D32F2F;">💨 VAP</b>
+                        <p style="color:#37474F;font-size:0.85rem;margin:0.5rem 0 0 0;">
+                            <b>Ventilator-Associated Pneumonia</b><br>
+                            ปอดบวมที่เกิดขณะใส่ท่อช่วยหายใจ >48 ชม.<br><br>
+                            <b>รหัส ICD-10:</b><br>
+                            J95.851 – VAP (specific code)<br>
+                            J95.85 – VAP (broader)<br><br>
+                            <b>เงื่อนไขเพิ่มเติม:</b><br>
+                            ปอดบวม J10-J18 + OP 96.71/96.72<br>
+                            (ใส่ใน Possible VAP เท่านั้น)<br><br>
+                            <b>ควร cross-check:</b> IC records + สมุด VAP
+                        </p>
+                    </div>
+                </div>
+                <div style="margin-top:0.8rem;padding:0.6rem 1rem;background:rgba(255,152,0,0.1);
+                            border-radius:6px;border-left:3px solid #FF9800;">
+                    <span style="color:#E65100;font-size:0.85rem;">
+                        ⚠️ <b>ข้อจำกัด:</b> การจำแนก CAP/HAP ในรายงานนี้ใช้เฉพาะ <b>รหัส pdx</b>
+                        ไม่ได้นับ วันที่ admit vs onset จริง
+                        ควรใช้ <b>ร่วมกับการ review clinical records</b> โดยทีม IC
+                    </span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # ── Helper functions (เฉพาะ section นี้) ─────────────────────
+            def classify_pneumonia_type(row):
+                """จำแนกประเภทปอดบวม: cap / hap / vap / other"""
+                pdx_val = str(row.get('pdx', '') or '').strip().upper()
+            
+                # VAP ก่อน (highest priority)
+                if any(pdx_val.startswith(c.upper()) for c in VAP_CODES):
+                    return 'vap'
+            
+                # HAP
+                if any(pdx_val.startswith(c.upper()) for c in HAP_CODES):
+                    return 'hap'
+            
+                # CAP
+                if any(pdx_val.startswith(c.upper()) for c in CAP_CODES):
+                    return 'cap'
+            
+                return 'other'
+            
+            def get_ward_group(ward_name):
+                """จับ ward ที่สนใจ → key"""
+                if pd.isna(ward_name):
+                    return None
+                s = str(ward_name).strip()
+                for key, keywords in TARGET_WARDS_KEYWORDS.items():
+                    if any(kw in s for kw in keywords):
+                        return key
+                return None
+            
+            # ── เตรียมข้อมูล ──────────────────────────────────────────────
+            df_pn2 = df_pn.copy()  # ใช้ df_pn ที่ filter เดือนมาแล้ว
+            
+            df_pn2['pneu_type']  = df_pn2.apply(classify_pneumonia_type, axis=1)
+            df_pn2['ward_group'] = df_pn2['ward_name'].apply(get_ward_group) \
+                                   if 'ward_name' in df_pn2.columns else None
+            df_pn2['is_death']   = df_pn2['discharge_status'].str.contains('ตาย', na=False) \
+                                   if 'discharge_status' in df_pn2.columns \
+                                   else pd.Series([False] * len(df_pn2))
+            
+            # ── สร้างตาราง Summary Matrix ──────────────────────────────────
+            WARD_ORDER = ['MB2', 'MB4', 'MB5', 'VIP', 'ICU']
+            TYPES      = ['cap', 'hap', 'vap']
+            TYPE_LABEL = {'cap': 'CAP', 'hap': 'HAP', 'vap': 'VAP'}
+            TYPE_COLOR = {'cap': '#1976D2', 'hap': '#F57C00', 'vap': '#D32F2F'}
+            
+            def build_summary_row(subset):
+                row = {}
+                for t in TYPES:
+                    grp = subset[subset['pneu_type'] == t]
+                    row[f'{TYPE_LABEL[t]}_n']     = len(grp)
+                    row[f'{TYPE_LABEL[t]}_death'] = int(grp['is_death'].sum())
+                row['Total_n']     = len(subset)
+                row['Total_death'] = int(subset['is_death'].sum())
+                return row
+            
+            table_rows = []
+            for ward in WARD_ORDER:
+                ward_df = df_pn2[df_pn2['ward_group'] == ward]
+                r = build_summary_row(ward_df)
+                r['Ward'] = ward
+                table_rows.append(r)
+            
+            # Total row
+            total_r = build_summary_row(df_pn2)
+            total_r['Ward'] = '🔷 Total (All Wards)'
+            table_rows.append(total_r)
+            
+            df_summary_matrix = pd.DataFrame(table_rows)
+            
+            # ── แสดงตาราง ──────────────────────────────────────────────────
+            st.markdown("#### 📊 ตารางสรุป CAP / HAP / VAP แยกตาม Ward")
+            
+            # สร้าง HTML table แบบ custom (เพราะต้องการ multi-header)
+            def render_matrix_table(df_m):
+                rows_html = ""
+                for i, row in df_m.iterrows():
+                    is_total = 'Total' in str(row['Ward'])
+                    bg = "#EDE7F6" if is_total else ("white" if i % 2 == 0 else "#F5F5F5")
+                    fw = "700" if is_total else "400"
+            
+                    def cell(val, color="#37474F", bold=False):
+                        b = "font-weight:700;" if bold else ""
+                        return f'<td style="text-align:center;padding:0.6rem 0.8rem;{b}color:{color};">{val}</td>'
+            
+                    def death_badge(n):
+                        if n == 0:
+                            return '<span style="color:#9E9E9E;">—</span>'
+                        return f'<span style="background:#FFCDD2;color:#C62828;padding:2px 8px;border-radius:10px;font-size:0.85rem;font-weight:700;">{n}</span>'
+            
+                    rows_html += f"""
+                    <tr style="background:{bg};font-weight:{fw};">
+                        <td style="padding:0.6rem 1rem;font-weight:{fw};color:#1565C0;">{row['Ward']}</td>
+                        {cell(row['CAP_n'],   '#1976D2', True)}
+                        {cell(death_badge(row['CAP_death']))}
+                        {cell(row['HAP_n'],   '#F57C00', True)}
+                        {cell(death_badge(row['HAP_death']))}
+                        {cell(row['VAP_n'],   '#D32F2F', True)}
+                        {cell(death_badge(row['VAP_death']))}
+                        {cell(row['Total_n'], '#4CAF50', True)}
+                        {cell(death_badge(row['Total_death']))}
+                    </tr>
+                    """
+            
+                return f"""
+                <div style="overflow-x:auto;">
+                <table style="width:100%;border-collapse:collapse;border-radius:12px;overflow:hidden;
+                              box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+                  <thead>
+                    <tr style="background:linear-gradient(135deg,#1565C0,#283593);color:white;">
+                      <th rowspan="2" style="padding:0.8rem 1rem;text-align:left;min-width:160px;">
+                          🏥 Ward
+                      </th>
+                      <th colspan="2" style="padding:0.8rem;text-align:center;
+                                              border-right:2px solid rgba(255,255,255,0.3);">
+                          🏘️ CAP
+                      </th>
+                      <th colspan="2" style="padding:0.8rem;text-align:center;
+                                              border-right:2px solid rgba(255,255,255,0.3);">
+                          🏥 HAP
+                      </th>
+                      <th colspan="2" style="padding:0.8rem;text-align:center;
+                                              border-right:2px solid rgba(255,255,255,0.3);">
+                          💨 VAP
+                      </th>
+                      <th colspan="2" style="padding:0.8rem;text-align:center;">
+                          📊 Total
+                      </th>
+                    </tr>
+                    <tr style="background:#1976D2;color:white;font-size:0.85rem;">
+                      <th style="padding:0.5rem 0.8rem;text-align:center;">จำนวน</th>
+                      <th style="padding:0.5rem 0.8rem;text-align:center;
+                                 border-right:2px solid rgba(255,255,255,0.3);">💀 ตาย</th>
+                      <th style="padding:0.5rem 0.8rem;text-align:center;">จำนวน</th>
+                      <th style="padding:0.5rem 0.8rem;text-align:center;
+                                 border-right:2px solid rgba(255,255,255,0.3);">💀 ตาย</th>
+                      <th style="padding:0.5rem 0.8rem;text-align:center;">จำนวน</th>
+                      <th style="padding:0.5rem 0.8rem;text-align:center;
+                                 border-right:2px solid rgba(255,255,255,0.3);">💀 ตาย</th>
+                      <th style="padding:0.5rem 0.8rem;text-align:center;">จำนวน</th>
+                      <th style="padding:0.5rem 0.8rem;text-align:center;">💀 ตาย</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows_html}
+                  </tbody>
+                </table>
+                </div>
+                """
+            
+            st.markdown(render_matrix_table(df_summary_matrix), unsafe_allow_html=True)
+            
+            # ── Download ────────────────────────────────────────────────────
+            csv_matrix = df_summary_matrix.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
+            st.download_button(
+                "📥 ดาวน์โหลดตาราง CSV",
+                csv_matrix,
+                f"cap_hap_vap_summary_{pd.Timestamp.now().strftime('%Y%m%d')}.csv",
+                "text/csv",
+                key='dl_cap_hap_vap'
+            )
+            
+            # ── กราฟ Stacked Bar ───────────────────────────────────────────
+            st.markdown("#### 📊 จำนวนผู้ป่วยแยกประเภทตาม Ward")
+            
+            chart_rows = []
+            for _, row in df_summary_matrix.iterrows():
+                if 'Total' not in str(row['Ward']):
+                    for t in TYPES:
+                        chart_rows.append({
+                            'Ward': row['Ward'],
+                            'ประเภท': TYPE_LABEL[t],
+                            'จำนวน': row[f'{TYPE_LABEL[t]}_n']
+                        })
+            
+            df_chart = pd.DataFrame(chart_rows)
+            
+            if not df_chart.empty and df_chart['จำนวน'].sum() > 0:
+                color_scale = alt.Scale(
+                    domain=['CAP', 'HAP', 'VAP'],
+                    range=['#1976D2', '#F57C00', '#D32F2F']
+                )
+                ch_stack = alt.Chart(df_chart).mark_bar(cornerRadiusTopLeft=4,
+                                                         cornerRadiusTopRight=4).encode(
+                    x=alt.X('Ward:N', title='หอผู้ป่วย', sort=WARD_ORDER),
+                    y=alt.Y('จำนวน:Q', title='จำนวนราย', stack=True),
+                    color=alt.Color('ประเภท:N', scale=color_scale,
+                                    legend=alt.Legend(title='ประเภทปอดบวม')),
+                    tooltip=['Ward', 'ประเภท', 'จำนวน']
+                ).properties(height=300)
+                st.altair_chart(ch_stack, use_container_width=True)
+            else:
+                st.info("ℹ️ ไม่มีข้อมูลเพียงพอสำหรับแสดงกราฟ")
+             
             st.markdown("---")
 
             # ── ตารางรายเดือน ──
@@ -999,9 +1283,635 @@ def show_reports():
         """)
 
     # ════════════════════════════════════════════════════
-    # TAB 4 : เชิงลึก
+    # TAB 4 : Stroke & ACS 
     # ════════════════════════════════════════════════════
-    with tab4:
+    with tab5:
+        st.markdown("""
+        <div style="background:linear-gradient(135deg,#B71C1C,#880E4F);
+                    padding:1.2rem 2rem;border-radius:12px;margin-bottom:1.2rem;">
+            <h2 style="color:white;margin:0;font-size:1.5rem;">
+                🧠 Stroke & ACS Summary Report
+            </h2>
+            <p style="color:#FFCDD2;margin:.3rem 0 0;font-size:.9rem;">
+                Stroke (Ischemic / Hemorrhagic) · ACS (STEMI / NSTEMI) | วิเคราะห์จาก pdx
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+        # ── ICD-10 Definitions ──────────────────────────────────────
+        ISCHEMIC_CODES = [
+            'I63',           # Cerebral infarction (ทุก subtype)
+            'I64',           # Stroke NOS (not specified as haemorrhage/infarction)
+            'I65',           # Occlusion/stenosis precerebral → ischemic territory
+            'I66',           # Occlusion/stenosis cerebral arteries
+        ]
+    
+        HEMORRHAGIC_CODES = [
+            'I60',           # Subarachnoid haemorrhage
+            'I61',           # Intracerebral haemorrhage
+            'I62',           # Other nontraumatic intracranial haemorrhage
+        ]
+    
+        STEMI_CODES = [
+            'I21.0',         # Anterior STEMI
+            'I21.1',         # Inferior STEMI
+            'I21.2',         # Other STEMI
+            'I21.3',         # STEMI, unspecified site
+            'I22.0',         # Subsequent anterior STEMI
+            'I22.1',         # Subsequent inferior STEMI
+            'I22.8',         # Subsequent STEMI, other site
+            'I22.9',         # Subsequent STEMI, unspecified
+        ]
+    
+        NSTEMI_CODES = [
+            'I21.4',         # NSTEMI
+            'I21.9',         # Acute MI, unspecified (มักถูกใช้แทน NSTEMI)
+            'I22.2',         # Subsequent NSTEMI
+            'I20.0',         # Unstable angina (บางสถาบันรวมใน ACS)
+            'I24.0',         # Coronary thrombosis not resulting in MI
+            'I24.8',         # Other forms of acute ischaemic heart disease
+            'I24.9',         # Acute ischaemic heart disease, unspecified
+        ]
+    
+        # Ward ที่สนใจ (เพิ่ม ER)
+        TARGET_WARDS_STROKE_ACS = {
+            'ER':  ['ER', 'er', 'ห้องฉุกเฉิน', 'emergency', 'ฉุกเฉิน', 'er ', ' er'],
+            'MB2': ['MB2', 'mb2'],
+            'MB4': ['MB4', 'mb4'],
+            'MB5': ['MB5', 'mb5'],
+            'VIP': ['VIP', 'vip'],
+            'ICU': ['ICU', 'icu'],
+        }
+        WARD_ORDER_5 = ['ER', 'MB2', 'MB4', 'MB5', 'VIP', 'ICU']
+    
+        # ── Filter เดือน (ใช้ df_all ทั้งหมด ไม่ผ่าน df_pneumonia) ──
+        months_avail5 = sorted(
+            df_all['month_sort'].dropna().unique()
+        )
+        months_labels5 = [str(m) for m in months_avail5]
+    
+        if len(months_labels5) > 1:
+            cf5a, cf5b = st.columns(2)
+            with cf5a:
+                s_m5 = st.selectbox(
+                    "เดือนเริ่มต้น", months_labels5,
+                    index=0, key='stroke_s'
+                )
+            with cf5b:
+                e_m5 = st.selectbox(
+                    "เดือนสิ้นสุด", months_labels5,
+                    index=len(months_labels5)-1, key='stroke_e'
+                )
+            df_sa = df_all[
+                (df_all['month_sort'] >= s_m5) &
+                (df_all['month_sort'] <= e_m5)
+            ].copy()
+        else:
+            df_sa = df_all.copy()
+    
+        if 'discharge_status' not in df_sa.columns:
+            df_sa['discharge_status'] = ''
+        df_sa['is_death'] = df_sa['discharge_status'].str.contains('ตาย', na=False)
+    
+        # ── Helper ─────────────────────────────────────────────────
+        def starts_with_any(code_str, code_list):
+            """ตรวจสอบว่า code ขึ้นต้นด้วย code ใดใน list"""
+            if pd.isna(code_str):
+                return False
+            s = str(code_str).strip().upper()
+            return any(s.startswith(c.upper()) for c in code_list)
+    
+        def get_ward_group5(ward_name):
+            if pd.isna(ward_name):
+                return None
+            s = str(ward_name).strip()
+            for key, keywords in TARGET_WARDS_STROKE_ACS.items():
+                if any(kw.lower() in s.lower() for kw in keywords):
+                    return key
+            return None
+    
+        def build_matrix(df_src, type_a_codes, type_b_codes,
+                         label_a, label_b):
+            """
+            สร้าง summary matrix 2 ประเภท × N ward
+            Returns: DataFrame พร้อมแสดงผล
+            """
+            if 'pdx' not in df_src.columns:
+                return pd.DataFrame()
+    
+            df_src = df_src.copy()
+            df_src['ward_group'] = df_src['ward_name'].apply(get_ward_group5) \
+                                   if 'ward_name' in df_src.columns else None
+    
+            df_src['is_type_a'] = df_src['pdx'].apply(
+                lambda x: starts_with_any(x, type_a_codes)
+            )
+            df_src['is_type_b'] = df_src['pdx'].apply(
+                lambda x: starts_with_any(x, type_b_codes)
+            )
+            df_src['is_either'] = df_src['is_type_a'] | df_src['is_type_b']
+    
+            rows = []
+            for ward in WARD_ORDER_5:
+                sub = df_src[
+                    (df_src['ward_group'] == ward) & df_src['is_either']
+                ]
+                sub_a = sub[sub['is_type_a']]
+                sub_b = sub[sub['is_type_b']]
+                rows.append({
+                    'Ward': ward,
+                    f'{label_a}_n':     len(sub_a),
+                    f'{label_a}_death': int(sub_a['is_death'].sum()),
+                    f'{label_b}_n':     len(sub_b),
+                    f'{label_b}_death': int(sub_b['is_death'].sum()),
+                    'Total_n':          len(sub),
+                    'Total_death':      int(sub['is_death'].sum()),
+                })
+    
+            # Total row (ทุก ward รวมกัน)
+            df_all_either = df_src[df_src['is_either']]
+            df_all_a = df_src[df_src['is_type_a']]
+            df_all_b = df_src[df_src['is_type_b']]
+            rows.append({
+                'Ward': '🔷 Total',
+                f'{label_a}_n':     len(df_all_a),
+                f'{label_a}_death': int(df_all_a['is_death'].sum()),
+                f'{label_b}_n':     len(df_all_b),
+                f'{label_b}_death': int(df_all_b['is_death'].sum()),
+                'Total_n':          len(df_all_either),
+                'Total_death':      int(df_all_either['is_death'].sum()),
+            })
+    
+            return pd.DataFrame(rows)
+    
+        # ── Render HTML Table (reusable) ───────────────────────────
+        def render_two_type_table(df_m, label_a, label_b,
+                                   color_a, color_b, icon_a, icon_b):
+            """สร้าง HTML table แบบ 2-type matrix"""
+            if df_m.empty:
+                return "<p style='color:#757575;'>ไม่พบข้อมูล</p>"
+    
+            def death_badge(n):
+                if n == 0:
+                    return '<span style="color:#BDBDBD;">—</span>'
+                return (f'<span style="background:#FFCDD2;color:#C62828;'
+                        f'padding:2px 8px;border-radius:10px;'
+                        f'font-size:0.85rem;font-weight:700;">{n}</span>')
+    
+            def num_cell(val, color, bold=True):
+                fw = "font-weight:700;" if bold else ""
+                return (f'<td style="text-align:center;padding:0.55rem 0.7rem;'
+                        f'{fw}color:{color};font-size:1rem;">{val}</td>')
+    
+            def dc_cell(val):
+                return (f'<td style="text-align:center;padding:0.55rem 0.7rem;">'
+                        f'{death_badge(val)}</td>')
+    
+            rows_html = ""
+            for i, row in df_m.iterrows():
+                is_total = 'Total' in str(row['Ward'])
+                bg = "#F3E5F5" if is_total else ("white" if i % 2 == 0 else "#FAFAFA")
+                fw = "700" if is_total else "400"
+                ward_color = "#6A1B9A" if is_total else "#1565C0"
+    
+                rows_html += f"""
+                <tr style="background:{bg};font-weight:{fw};">
+                  <td style="padding:0.55rem 1rem;font-weight:{fw};
+                             color:{ward_color};white-space:nowrap;">
+                      {row['Ward']}
+                  </td>
+                  {num_cell(row[f'{label_a}_n'],     color_a)}
+                  {dc_cell( row[f'{label_a}_death'])}
+                  {num_cell(row[f'{label_b}_n'],     color_b)}
+                  {dc_cell( row[f'{label_b}_death'])}
+                  {num_cell(row['Total_n'],           '#2E7D32')}
+                  {dc_cell( row['Total_death'])}
+                </tr>
+                """
+    
+            return f"""
+            <div style="overflow-x:auto;margin-bottom:1rem;">
+            <table style="width:100%;border-collapse:collapse;border-radius:12px;
+                          overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+              <thead>
+                <tr style="background:linear-gradient(135deg,#37474F,#546E7A);color:white;">
+                  <th rowspan="2"
+                      style="padding:0.8rem 1rem;text-align:left;min-width:140px;">
+                      🏥 Ward
+                  </th>
+                  <th colspan="2"
+                      style="padding:0.7rem;text-align:center;
+                             border-right:2px solid rgba(255,255,255,0.25);">
+                      {icon_a} {label_a}
+                  </th>
+                  <th colspan="2"
+                      style="padding:0.7rem;text-align:center;
+                             border-right:2px solid rgba(255,255,255,0.25);">
+                      {icon_b} {label_b}
+                  </th>
+                  <th colspan="2"
+                      style="padding:0.7rem;text-align:center;">
+                      📊 Total
+                  </th>
+                </tr>
+                <tr style="background:#455A64;color:white;font-size:0.85rem;">
+                  <th style="padding:0.45rem 0.7rem;text-align:center;">จำนวน</th>
+                  <th style="padding:0.45rem 0.7rem;text-align:center;
+                             border-right:2px solid rgba(255,255,255,0.25);">
+                      💀 ตาย
+                  </th>
+                  <th style="padding:0.45rem 0.7rem;text-align:center;">จำนวน</th>
+                  <th style="padding:0.45rem 0.7rem;text-align:center;
+                             border-right:2px solid rgba(255,255,255,0.25);">
+                      💀 ตาย
+                  </th>
+                  <th style="padding:0.45rem 0.7rem;text-align:center;">จำนวน</th>
+                  <th style="padding:0.45rem 0.7rem;text-align:center;">💀 ตาย</th>
+                </tr>
+              </thead>
+              <tbody>{rows_html}</tbody>
+            </table>
+            </div>
+            """
+    
+        # ════════════════════════════════════════════════════════════
+        # SECTION A : STROKE
+        # ════════════════════════════════════════════════════════════
+        st.markdown("""
+        <div style="background:linear-gradient(135deg,#1A237E,#283593);
+                    padding:1rem 1.5rem;border-radius:10px;margin:1.2rem 0 1rem 0;">
+            <h3 style="color:white;margin:0;font-size:1.2rem;">
+                🧠 STROKE — Ischemic vs Hemorrhagic
+            </h3>
+        </div>
+        """, unsafe_allow_html=True)
+    
+        # คำอธิบาย ICD-10 Stroke
+        with st.expander("📖 นิยามและรหัส ICD-10 — Stroke", expanded=False):
+            st.markdown(f"""
+            <div style="display:grid;grid-template-columns:1fr 1fr;
+                        gap:1rem;padding:0.5rem 0;">
+    
+                <div style="background:#E8EAF6;padding:1rem;border-radius:8px;
+                            border-left:4px solid #3949AB;">
+                    <b style="color:#283593;font-size:1rem;">🔵 Ischemic Stroke</b>
+                    <p style="color:#37474F;font-size:0.85rem;margin:0.6rem 0 0 0;
+                               line-height:1.7;">
+                        <b>นิยาม:</b> Stroke จากการอุดตันของหลอดเลือด<br>
+                        สมอง ทำให้เนื้อสมองขาดเลือด (Infarction)<br><br>
+                        <b>รหัส ICD-10:</b><br>
+                        <code>I63.x</code> – Cerebral infarction (ทุก subtype)<br>
+                        <code>I64</code> &nbsp;– Stroke, not specified as<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;haemorrhage or infarction (NOS)<br>
+                        <code>I65.x</code> – Occlusion/stenosis precerebral arteries<br>
+                        <code>I66.x</code> – Occlusion/stenosis cerebral arteries<br><br>
+                        <b>สัดส่วน:</b> ~80-85% ของ stroke ทั้งหมด<br>
+                        <b>การรักษา:</b> tPA, Thrombectomy
+                    </p>
+                </div>
+    
+                <div style="background:#FCE4EC;padding:1rem;border-radius:8px;
+                            border-left:4px solid #C62828;">
+                    <b style="color:#B71C1C;font-size:1rem;">🔴 Hemorrhagic Stroke</b>
+                    <p style="color:#37474F;font-size:0.85rem;margin:0.6rem 0 0 0;
+                               line-height:1.7;">
+                        <b>นิยาม:</b> Stroke จากการแตกของหลอดเลือด<br>
+                        ในสมองหรือรอบสมอง (Bleeding)<br><br>
+                        <b>รหัส ICD-10:</b><br>
+                        <code>I60.x</code> – Subarachnoid haemorrhage (SAH)<br>
+                        <code>I61.x</code> – Intracerebral haemorrhage (ICH)<br>
+                        <code>I62.x</code> – Other nontraumatic intracranial<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;haemorrhage (SDH, EDH)<br><br>
+                        <b>สัดส่วน:</b> ~15-20% ของ stroke ทั้งหมด<br>
+                        <b>การรักษา:</b> BP control, Surgery (กรณีจำเป็น)
+                    </p>
+                </div>
+    
+            </div>
+            <div style="margin-top:0.8rem;padding:0.6rem 1rem;
+                        background:rgba(33,33,33,0.05);border-radius:6px;
+                        border-left:3px solid #78909C;">
+                <span style="color:#455A64;font-size:0.85rem;">
+                    ⚠️ <b>ข้อจำกัด:</b> รายงานนี้จำแนกโดยใช้ <b>รหัส pdx เท่านั้น</b>
+                    ไม่ได้ยืนยันจาก CT/MRI
+                    I64 (Stroke NOS) ถูกนับใน Ischemic เนื่องจากสถิติชี้ว่า
+                    ส่วนใหญ่เป็น Ischemic — ควร review กับทีมแพทย์
+                </span>
+            </div>
+            """, unsafe_allow_html=True)
+    
+        # สร้างและแสดง Stroke Matrix
+        df_stroke = build_matrix(
+            df_sa,
+            ISCHEMIC_CODES,   HEMORRHAGIC_CODES,
+            'Ischemic',        'Hemorrhagic'
+        )
+    
+        # KPI Stroke
+        if not df_stroke.empty:
+            total_row_s = df_stroke[df_stroke['Ward'] == '🔷 Total'].iloc[0] \
+                          if len(df_stroke[df_stroke['Ward'] == '🔷 Total']) > 0 \
+                          else None
+            if total_row_s is not None:
+                ks1, ks2, ks3, ks4, ks5 = st.columns(5)
+                tot_s   = int(total_row_s['Total_n'])
+                isc_n   = int(total_row_s['Ischemic_n'])
+                hem_n   = int(total_row_s['Hemorrhagic_n'])
+                isc_d   = int(total_row_s['Ischemic_death'])
+                hem_d   = int(total_row_s['Hemorrhagic_death'])
+                tot_d   = int(total_row_s['Total_death'])
+    
+                ks1.metric(
+                    "🧠 Stroke ทั้งหมด",
+                    f"{tot_s} ราย",
+                    help="จำนวนผู้ป่วย Stroke ทุกประเภทในช่วงที่เลือก"
+                )
+                ks2.metric(
+                    "🔵 Ischemic",
+                    f"{isc_n} ราย",
+                    f"{isc_n/tot_s*100:.1f}%" if tot_s else "0%",
+                    help="Ischemic Stroke (I63, I64, I65, I66)"
+                )
+                ks3.metric(
+                    "🔴 Hemorrhagic",
+                    f"{hem_n} ราย",
+                    f"{hem_n/tot_s*100:.1f}%" if tot_s else "0%",
+                    help="Hemorrhagic Stroke (I60, I61, I62)"
+                )
+                ks4.metric(
+                    "💀 เสียชีวิต Ischemic",
+                    f"{isc_d} ราย",
+                    f"{isc_d/isc_n*100:.1f}%" if isc_n else "0%",
+                    delta_color="inverse",
+                    help="อัตราเสียชีวิตใน Ischemic Stroke"
+                )
+                ks5.metric(
+                    "💀 เสียชีวิต Hemorrhagic",
+                    f"{hem_d} ราย",
+                    f"{hem_d/hem_n*100:.1f}%" if hem_n else "0%",
+                    delta_color="inverse",
+                    help="อัตราเสียชีวิตใน Hemorrhagic Stroke (มักสูงกว่า)"
+                )
+    
+        st.markdown(render_two_type_table(
+            df_stroke,
+            'Ischemic', 'Hemorrhagic',
+            '#3949AB', '#C62828',
+            '🔵', '🔴'
+        ), unsafe_allow_html=True)
+    
+        # Download Stroke
+        if not df_stroke.empty:
+            csv_s = df_stroke.to_csv(
+                index=False, encoding='utf-8-sig'
+            ).encode('utf-8-sig')
+            st.download_button(
+                "📥 ดาวน์โหลด Stroke CSV",
+                csv_s,
+                f"stroke_summary_{pd.Timestamp.now().strftime('%Y%m%d')}.csv",
+                "text/csv", key='dl_stroke'
+            )
+    
+        # ── Stroke Stacked Bar ─────────────────────────────────────
+        stroke_chart_rows = []
+        if not df_stroke.empty:
+            for _, row in df_stroke.iterrows():
+                if 'Total' not in str(row['Ward']):
+                    stroke_chart_rows.append({
+                        'Ward': row['Ward'],
+                        'ประเภท': 'Ischemic',
+                        'จำนวน': row['Ischemic_n']
+                    })
+                    stroke_chart_rows.append({
+                        'Ward': row['Ward'],
+                        'ประเภท': 'Hemorrhagic',
+                        'จำนวน': row['Hemorrhagic_n']
+                    })
+    
+        df_stroke_chart = pd.DataFrame(stroke_chart_rows)
+        if not df_stroke_chart.empty and df_stroke_chart['จำนวน'].sum() > 0:
+            ch_stroke = alt.Chart(df_stroke_chart).mark_bar(
+                cornerRadiusTopLeft=4, cornerRadiusTopRight=4
+            ).encode(
+                x=alt.X('Ward:N', title='หอผู้ป่วย', sort=WARD_ORDER_5),
+                y=alt.Y('จำนวน:Q', title='จำนวนราย', stack=True),
+                color=alt.Color(
+                    'ประเภท:N',
+                    scale=alt.Scale(
+                        domain=['Ischemic', 'Hemorrhagic'],
+                        range=['#3949AB', '#C62828']
+                    ),
+                    legend=alt.Legend(title='ประเภท Stroke')
+                ),
+                tooltip=['Ward', 'ประเภท', 'จำนวน']
+            ).properties(height=260)
+            st.altair_chart(ch_stroke, use_container_width=True)
+        else:
+            st.info("ℹ️ ไม่มีข้อมูล Stroke ในช่วงเวลาที่เลือก")
+    
+        st.markdown("---")
+    
+        # ════════════════════════════════════════════════════════════
+        # SECTION B : ACS
+        # ════════════════════════════════════════════════════════════
+        st.markdown("""
+        <div style="background:linear-gradient(135deg,#BF360C,#E64A19);
+                    padding:1rem 1.5rem;border-radius:10px;margin:1rem 0;">
+            <h3 style="color:white;margin:0;font-size:1.2rem;">
+                ❤️ ACS — STEMI vs NSTEMI
+            </h3>
+        </div>
+        """, unsafe_allow_html=True)
+    
+        # คำอธิบาย ICD-10 ACS
+        with st.expander("📖 นิยามและรหัส ICD-10 — ACS", expanded=False):
+            st.markdown(f"""
+            <div style="display:grid;grid-template-columns:1fr 1fr;
+                        gap:1rem;padding:0.5rem 0;">
+    
+                <div style="background:#FBE9E7;padding:1rem;border-radius:8px;
+                            border-left:4px solid #BF360C;">
+                    <b style="color:#BF360C;font-size:1rem;">🔴 STEMI</b>
+                    <p style="color:#37474F;font-size:0.85rem;margin:0.6rem 0 0 0;
+                               line-height:1.7;">
+                        <b>นิยาม:</b> ST-Elevation Myocardial Infarction<br>
+                        หลอดเลือดหัวใจอุดตันสมบูรณ์ — <b>ฉุกเฉินสูงสุด</b><br><br>
+                        <b>รหัส ICD-10:</b><br>
+                        <code>I21.0</code> – Anterior wall STEMI<br>
+                        <code>I21.1</code> – Inferior wall STEMI<br>
+                        <code>I21.2</code> – Other specified STEMI<br>
+                        <code>I21.3</code> – STEMI, unspecified site<br>
+                        <code>I22.0</code> – Subsequent anterior STEMI<br>
+                        <code>I22.1</code> – Subsequent inferior STEMI<br>
+                        <code>I22.8</code> – Subsequent STEMI, other<br>
+                        <code>I22.9</code> – Subsequent STEMI, unspecified<br><br>
+                        <b>Door-to-balloon:</b> เป้าหมาย &lt; 90 นาที<br>
+                        <b>Mortality:</b> ~5-10% (in-hospital)
+                    </p>
+                </div>
+    
+                <div style="background:#FFF8E1;padding:1rem;border-radius:8px;
+                            border-left:4px solid #F9A825;">
+                    <b style="color:#F57F17;font-size:1rem;">🟡 NSTEMI / UA</b>
+                    <p style="color:#37474F;font-size:0.85rem;margin:0.6rem 0 0 0;
+                               line-height:1.7;">
+                        <b>นิยาม:</b> Non-ST-Elevation MI และ Unstable Angina<br>
+                        หลอดเลือดอุดตันบางส่วน — <b>ฉุกเฉินสูง</b><br><br>
+                        <b>รหัส ICD-10:</b><br>
+                        <code>I21.4</code> – NSTEMI (specific)<br>
+                        <code>I21.9</code> – Acute MI, unspecified<br>
+                        <code>I22.2</code> – Subsequent NSTEMI<br>
+                        <code>I20.0</code> – Unstable angina<br>
+                        <code>I24.0</code> – Coronary thrombosis (no MI)<br>
+                        <code>I24.8</code> – Other acute ischaemic HD<br>
+                        <code>I24.9</code> – Acute ischaemic HD, unspecified<br><br>
+                        <b>เป้าหมาย:</b> Early invasive strategy &lt; 24-72 ชม.<br>
+                        <b>Mortality:</b> ~3-5% (in-hospital)
+                    </p>
+                </div>
+    
+            </div>
+            <div style="margin-top:0.8rem;padding:0.6rem 1rem;
+                        background:rgba(33,33,33,0.05);border-radius:6px;
+                        border-left:3px solid #FF8F00;">
+                <span style="color:#E65100;font-size:0.85rem;">
+                    ⚠️ <b>หมายเหตุ:</b> I21.9 (Acute MI unspecified) ถูกนับใน NSTEMI/UA
+                    เนื่องจากมักใช้เมื่อยังไม่ได้ระบุประเภทชัดเจน
+                    ควรตรวจสอบกับ Cardiology team เพื่อ Coding ที่ถูกต้อง
+                </span>
+            </div>
+            """, unsafe_allow_html=True)
+    
+        # สร้างและแสดง ACS Matrix
+        df_acs = build_matrix(
+            df_sa,
+            STEMI_CODES,  NSTEMI_CODES,
+            'STEMI',       'NSTEMI'
+        )
+    
+        # KPI ACS
+        if not df_acs.empty:
+            total_row_a = df_acs[df_acs['Ward'] == '🔷 Total'].iloc[0] \
+                          if len(df_acs[df_acs['Ward'] == '🔷 Total']) > 0 \
+                          else None
+            if total_row_a is not None:
+                ka1, ka2, ka3, ka4, ka5 = st.columns(5)
+                tot_a   = int(total_row_a['Total_n'])
+                stemi_n = int(total_row_a['STEMI_n'])
+                nstemi_n= int(total_row_a['NSTEMI_n'])
+                stemi_d = int(total_row_a['STEMI_death'])
+                nstemi_d= int(total_row_a['NSTEMI_death'])
+    
+                ka1.metric(
+                    "❤️ ACS ทั้งหมด",
+                    f"{tot_a} ราย",
+                    help="จำนวนผู้ป่วย ACS (STEMI + NSTEMI/UA) ทั้งหมด"
+                )
+                ka2.metric(
+                    "🔴 STEMI",
+                    f"{stemi_n} ราย",
+                    f"{stemi_n/tot_a*100:.1f}%" if tot_a else "0%",
+                    help="STEMI: I21.0-I21.3, I22.0-I22.9"
+                )
+                ka3.metric(
+                    "🟡 NSTEMI/UA",
+                    f"{nstemi_n} ราย",
+                    f"{nstemi_n/tot_a*100:.1f}%" if tot_a else "0%",
+                    help="NSTEMI: I21.4, I21.9, I20.0, I24.x"
+                )
+                ka4.metric(
+                    "💀 เสียชีวิต STEMI",
+                    f"{stemi_d} ราย",
+                    f"{stemi_d/stemi_n*100:.1f}%" if stemi_n else "0%",
+                    delta_color="inverse",
+                    help="อัตราเสียชีวิตใน STEMI"
+                )
+                ka5.metric(
+                    "💀 เสียชีวิต NSTEMI",
+                    f"{nstemi_d} ราย",
+                    f"{nstemi_d/nstemi_n*100:.1f}%" if nstemi_n else "0%",
+                    delta_color="inverse",
+                    help="อัตราเสียชีวิตใน NSTEMI/UA"
+                )
+    
+        st.markdown(render_two_type_table(
+            df_acs,
+            'STEMI', 'NSTEMI',
+            '#BF360C', '#F9A825',
+            '🔴', '🟡'
+        ), unsafe_allow_html=True)
+    
+        # Download ACS
+        if not df_acs.empty:
+            csv_a = df_acs.to_csv(
+                index=False, encoding='utf-8-sig'
+            ).encode('utf-8-sig')
+            st.download_button(
+                "📥 ดาวน์โหลด ACS CSV",
+                csv_a,
+                f"acs_summary_{pd.Timestamp.now().strftime('%Y%m%d')}.csv",
+                "text/csv", key='dl_acs'
+            )
+    
+        # ── ACS Stacked Bar ────────────────────────────────────────
+        acs_chart_rows = []
+        if not df_acs.empty:
+            for _, row in df_acs.iterrows():
+                if 'Total' not in str(row['Ward']):
+                    acs_chart_rows.append({
+                        'Ward': row['Ward'],
+                        'ประเภท': 'STEMI',
+                        'จำนวน': row['STEMI_n']
+                    })
+                    acs_chart_rows.append({
+                        'Ward': row['Ward'],
+                        'ประเภท': 'NSTEMI',
+                        'จำนวน': row['NSTEMI_n']
+                    })
+    
+        df_acs_chart = pd.DataFrame(acs_chart_rows)
+        if not df_acs_chart.empty and df_acs_chart['จำนวน'].sum() > 0:
+            ch_acs = alt.Chart(df_acs_chart).mark_bar(
+                cornerRadiusTopLeft=4, cornerRadiusTopRight=4
+            ).encode(
+                x=alt.X('Ward:N', title='หอผู้ป่วย', sort=WARD_ORDER_5),
+                y=alt.Y('จำนวน:Q', title='จำนวนราย', stack=True),
+                color=alt.Color(
+                    'ประเภท:N',
+                    scale=alt.Scale(
+                        domain=['STEMI', 'NSTEMI'],
+                        range=['#BF360C', '#F9A825']
+                    ),
+                    legend=alt.Legend(title='ประเภท ACS')
+                ),
+                tooltip=['Ward', 'ประเภท', 'จำนวน']
+            ).properties(height=260)
+            st.altair_chart(ch_acs, use_container_width=True)
+        else:
+            st.info("ℹ️ ไม่มีข้อมูล ACS ในช่วงเวลาที่เลือก")
+    
+        # ── คำแนะนำ Quality Indicators ────────────────────────────
+        st.markdown("---")
+        st.markdown("""
+        #### 📌 Quality Indicators ที่ควรติดตาม
+        | ตัวชี้วัด | Stroke | ACS |
+        |-----------|--------|-----|
+        | **Time to Treatment** | Door-to-needle (tPA) < 60 นาที | Door-to-balloon < 90 นาที |
+        | **Mortality Rate** | Ischemic < 10% · Hemorrhagic < 30% | STEMI < 10% · NSTEMI < 5% |
+        | **Readmission 28 วัน** | < 15% | < 10% |
+        | **LOS** | 5-7 วัน | 3-5 วัน |
+        | **Coding ถูกต้อง** | I63 vs I64 ระบุให้ชัด | I21.x ระบุ site ให้ครบ |
+        """)
+    # ════════════════════════════════════════════════════
+    # [จบ TAB 4]
+    # ════════════════════════════════════════════════════
+
+
+    
+    # ════════════════════════════════════════════════════
+    # TAB 5 : เชิงลึก
+    # ════════════════════════════════════════════════════
+    with tab5:
         st.markdown("""
         <div style="background:linear-gradient(135deg,#4A148C,#6A1B9A);
                     padding:1.2rem 2rem;border-radius:12px;margin-bottom:1.2rem;">
