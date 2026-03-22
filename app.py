@@ -2079,6 +2079,115 @@ def show_reports():
 
         st.markdown("---")
         st.markdown("#### 🩸 ประมาณการ Bruise/Hematoma จาก Enoxaparin (ICU)")
+
+        with st.expander("📖 วิธีคำนวณและข้อจำกัด", expanded=False):
+            st.markdown("""
+            <div style="font-family:sans-serif;">
+        
+            <div style="background:linear-gradient(135deg,#E3F2FD,#BBDEFB);
+                        padding:1rem 1.5rem;border-radius:10px;margin-bottom:1rem;">
+                <h4 style="color:#1565C0;margin:0 0 0.5rem 0;">📐 สูตรคำนวณ</h4>
+                <div style="background:white;padding:1rem;border-radius:8px;
+                            text-align:center;font-size:1.1rem;">
+                    <b style="color:#1565C0;">อัตรา Bruise/Hematoma (%)</b>
+                    <br><br>
+                    <span style="font-size:1.3rem;">
+                        = 
+                        <span style="border-bottom:2px solid #1565C0;padding:0 0.5rem;">
+                            ผู้ป่วย ICU ที่มี Enoxaparin Indication <b>และ</b> พบ Bruise/Hematoma
+                        </span>
+                        <br>
+                        &nbsp;&nbsp;&nbsp;ผู้ป่วย ICU ที่มี Enoxaparin Indication ทั้งหมด
+                    </span>
+                    <br><br>
+                    <span style="color:#546E7A;font-size:0.95rem;">× 100</span>
+                </div>
+            </div>
+        
+            <table style="width:100%;border-collapse:separate;border-spacing:8px;">
+            <tr>
+              <td style="background:#E8F5E9;padding:1rem;border-radius:8px;
+                         border-left:4px solid #2E7D32;vertical-align:top;width:50%;">
+                <b style="color:#2E7D32;">✅ ตัวเศษ (Numerator)</b><br><br>
+                <span style="color:#37474F;font-size:0.88rem;line-height:1.8;">
+                  ผู้ป่วย ICU ที่มี <b>ครบทั้ง 2 เงื่อนไข</b><br><br>
+                  <b>เงื่อนไขที่ 1</b> — มี ICD-10 บ่งชี้ว่าได้ Enoxaparin<br>
+                  &nbsp;&nbsp;• I21, I22 — กล้ามเนื้อหัวใจตาย (MI)<br>
+                  &nbsp;&nbsp;• I20.0 — Unstable angina<br>
+                  &nbsp;&nbsp;• I24 — Acute ischaemic HD<br>
+                  &nbsp;&nbsp;• I26 — Pulmonary embolism<br>
+                  &nbsp;&nbsp;• I80, I82 — DVT<br>
+                  &nbsp;&nbsp;• I48 — Atrial fibrillation<br><br>
+                  <b>เงื่อนไขที่ 2</b> — มี ICD-10 บ่งชี้ Bruise/Bleeding<br>
+                  &nbsp;&nbsp;• T45.5 — Adverse effect of anticoagulants<br>
+                  &nbsp;&nbsp;• L76 — Bruising<br>
+                  &nbsp;&nbsp;• R58 — Hemorrhage NEC<br>
+                  &nbsp;&nbsp;• D68 — Coagulation defect<br>
+                  &nbsp;&nbsp;• S00-S09 — Superficial injury
+                </span>
+              </td>
+        
+              <td style="background:#FFF3E0;padding:1rem;border-radius:8px;
+                         border-left:4px solid #F57C00;vertical-align:top;width:50%;">
+                <b style="color:#E65100;">📊 ตัวส่วน (Denominator)</b><br><br>
+                <span style="color:#37474F;font-size:0.88rem;line-height:1.8;">
+                  ผู้ป่วย ICU ทั้งหมดที่มี <b>Enoxaparin Indication</b><br>
+                  (มี ICD-10 ข้อใดข้อหนึ่งจากรายการเงื่อนไขที่ 1)<br><br>
+                  <b>ตัวอย่าง:</b><br>
+                  ผู้ป่วย ICU ทั้งหมด = 50 ราย<br>
+                  มี Enoxaparin Indication = 30 ราย<br>
+                  พบ Bruise + Indication = 3 ราย<br><br>
+                  <b style="color:#E65100;font-size:1.1rem;">
+                    อัตรา = 3/30 × 100 = 10%
+                  </b>
+                </span>
+              </td>
+            </tr>
+            </table>
+        
+            <div style="background:#FFEBEE;padding:1rem;border-radius:8px;
+                        border-left:4px solid #C62828;margin-top:1rem;">
+                <b style="color:#C62828;">⚠️ ข้อจำกัดสำคัญ — ต้องแจ้งเมื่อรายงาน</b>
+                <br><br>
+                <table style="width:100%;font-size:0.88rem;border-collapse:collapse;">
+                <tr style="background:#FFCDD2;">
+                    <th style="padding:0.5rem;text-align:left;">ข้อจำกัด</th>
+                    <th style="padding:0.5rem;text-align:left;">ผลกระทบ</th>
+                    <th style="padding:0.5rem;text-align:left;">ทิศทาง</th>
+                </tr>
+                <tr style="background:white;">
+                    <td style="padding:0.5rem;">ผู้ป่วยได้ Enoxaparin จริงแต่ไม่มี ICD-10 indication</td>
+                    <td style="padding:0.5rem;">ตัวส่วนน้อยกว่าจริง</td>
+                    <td style="padding:0.5rem;color:#C62828;">อัตราสูงเกินจริง ↑</td>
+                </tr>
+                <tr style="background:#FFEBEE;">
+                    <td style="padding:0.5rem;">Bruise เล็กน้อยไม่ได้ลง ICD-10</td>
+                    <td style="padding:0.5rem;">ตัวเศษน้อยกว่าจริง</td>
+                    <td style="padding:0.5rem;color:#1976D2;">อัตราต่ำกว่าจริง ↓</td>
+                </tr>
+                <tr style="background:white;">
+                    <td style="padding:0.5rem;">Coder ลง T45.5 ไม่ครบ</td>
+                    <td style="padding:0.5rem;">ตัวเศษน้อยกว่าจริง</td>
+                    <td style="padding:0.5rem;color:#1976D2;">อัตราต่ำกว่าจริง ↓</td>
+                </tr>
+                </table>
+            </div>
+        
+            <div style="background:#E8F5E9;padding:0.8rem 1rem;border-radius:8px;
+                        border-left:4px solid #4CAF50;margin-top:1rem;">
+                <b style="color:#2E7D32;">💡 วิธีรายงานที่แนะนำ</b><br>
+                <span style="color:#37474F;font-size:0.88rem;">
+                "อัตรา Bruise/Hematoma จาก Enoxaparin = <b>X%</b>
+                <br>
+                (ประมาณการจาก ICD-10 เท่านั้น — ไม่ใช่ข้อมูล ADR จริง
+                อาจต่ำกว่าความเป็นจริง เนื่องจากไม่มีการบันทึก ADR อย่างเป็นระบบ
+                ในช่วงเวลาดังกล่าว)"
+                </span>
+            </div>
+        
+            </div>
+            """, unsafe_allow_html=True)
+
         
         # ── กลุ่ม 1: ผู้ป่วยที่น่าจะได้ Enoxaparin ──
         ENOX_INDICATION_CODES = [
