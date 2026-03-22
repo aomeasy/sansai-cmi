@@ -1946,6 +1946,142 @@ def show_reports():
         else:
             st.info("ℹ️ ไม่มีข้อมูล ACS ในช่วงเวลาที่เลือก")
 
+        # ── ข้อมูลดิบ Stroke แยก Ward ──────────────────────────────
+        st.markdown("---")
+        st.markdown("#### 📋 ข้อมูลดิบ Stroke แยกตาม Ward")
+        
+        if 'pdx' in df_sa.columns:
+            # สร้าง flag ประเภท Stroke
+            df_stroke_raw = df_sa.copy()
+            df_stroke_raw['Stroke_Type'] = None
+            df_stroke_raw.loc[df_stroke_raw['pdx'].apply(
+                lambda x: starts_with_any(x, ISCHEMIC_CODES)), 'Stroke_Type'] = '🔵 Ischemic'
+            df_stroke_raw.loc[df_stroke_raw['pdx'].apply(
+                lambda x: starts_with_any(x, HEMORRHAGIC_CODES)), 'Stroke_Type'] = '🔴 Hemorrhagic'
+        
+            # กรองเฉพาะ Stroke
+            df_stroke_raw = df_stroke_raw[df_stroke_raw['Stroke_Type'].notna()].copy()
+            df_stroke_raw['ward_group'] = df_stroke_raw['ward_name'].apply(get_ward_group5) \
+                                          if 'ward_name' in df_stroke_raw.columns else None
+            df_stroke_raw['เสียชีวิต'] = df_stroke_raw['discharge_status'].str.contains(
+                'ตาย', na=False).map({True: '💀 ใช่', False: '—'})
+        
+            # แปลง month_year
+            if 'month_year' in df_stroke_raw.columns:
+                df_stroke_raw['month_year'] = pd.to_datetime(
+                    df_stroke_raw['month_year'], errors='coerce'
+                ).dt.strftime('%b %Y')
+        
+            # แปลงวันที่
+            for date_col in ['admit_date', 'discharge_date']:
+                if date_col in df_stroke_raw.columns:
+                    df_stroke_raw[date_col] = pd.to_datetime(
+                        df_stroke_raw[date_col], errors='coerce'
+                    ).dt.strftime('%d/%m/%Y')
+        
+            # คอลัมน์ที่แสดง
+            show_cols_stroke = ['month_year', 'hn', 'an', 'age', 'sex',
+                                'Stroke_Type', 'pdx',
+                                'admit_date', 'discharge_date', 'length_of_stay',
+                                'discharge_status', 'เสียชีวิต', 'ward_name', 'adjrw']
+            show_cols_stroke = [c for c in show_cols_stroke if c in df_stroke_raw.columns]
+        
+            # column_config
+            stroke_col_config = {
+                "month_year":       st.column_config.TextColumn("เดือน"),
+                "hn":               st.column_config.TextColumn("HN"),
+                "an":               st.column_config.TextColumn("AN"),
+                "age":              st.column_config.NumberColumn("อายุ", format="%d ปี"),
+                "Stroke_Type":      st.column_config.TextColumn("ประเภท Stroke"),
+                "pdx":              st.column_config.TextColumn("ICD-10"),
+                "admit_date":       st.column_config.TextColumn("วันที่ admit"),
+                "discharge_date":   st.column_config.TextColumn("วันที่จำหน่าย"),
+                "length_of_stay":   st.column_config.NumberColumn("LOS", format="%d วัน"),
+                "adjrw":            st.column_config.NumberColumn("adjRW", format="%.2f"),
+                "เสียชีวิต":        st.column_config.TextColumn("เสียชีวิต"),
+            }
+        
+            # แสดงแยก Ward
+            ward_list_stroke = ['ER', 'MB2', 'MB4', 'MB5', 'VIP', 'ICU']
+            for ward in ward_list_stroke:
+                ward_df_s = df_stroke_raw[df_stroke_raw['ward_group'] == ward]
+                if ward_df_s.empty:
+                    continue
+        
+                n_total_s = len(ward_df_s)
+                n_isc     = (ward_df_s['Stroke_Type'] == '🔵 Ischemic').sum()
+                n_hem     = (ward_df_s['Stroke_Type'] == '🔴 Hemorrhagic').sum()
+                n_death_s = ward_df_s['discharge_status'].str.contains('ตาย', na=False).sum()
+        
+                with st.expander(
+                    f"🏥 {ward} — รวม {n_total_s} ราย | "
+                    f"Ischemic {n_isc} · Hemorrhagic {n_hem} | "
+                    f"💀 เสียชีวิต {n_death_s} ราย",
+                    expanded=False
+                ):
+                    # KPI
+                    ks1, ks2, ks3, ks4 = st.columns(4)
+                    ks1.metric("👥 ทั้งหมด",       f"{n_total_s} ราย")
+                    ks2.metric("🔵 Ischemic",      f"{n_isc} ราย",
+                               f"{n_isc/n_total_s*100:.1f}%" if n_total_s else "0%")
+                    ks3.metric("🔴 Hemorrhagic",   f"{n_hem} ราย",
+                               f"{n_hem/n_total_s*100:.1f}%" if n_total_s else "0%")
+                    ks4.metric("💀 เสียชีวิต",     f"{n_death_s} ราย",
+                               f"{n_death_s/n_total_s*100:.1f}%" if n_total_s else "0%",
+                               delta_color="inverse")
+        
+                    st.markdown("**รายชื่อผู้ป่วย:**")
+                    st.dataframe(
+                        ward_df_s[show_cols_stroke].sort_values(
+                            'Stroke_Type'
+                        ).reset_index(drop=True),
+                        use_container_width=True,
+                        hide_index=True,
+                        column_config=stroke_col_config
+                    )
+        
+                    csv_stroke_ward = ward_df_s[show_cols_stroke].to_csv(
+                        index=False, encoding='utf-8-sig'
+                    ).encode('utf-8-sig')
+                    st.download_button(
+                        f"📥 ดาวน์โหลด {ward} CSV",
+                        csv_stroke_ward,
+                        f"stroke_{ward}_{pd.Timestamp.now().strftime('%Y%m%d')}.csv",
+                        "text/csv",
+                        key=f'dl_stroke_ward_{ward}'
+                    )
+        
+            # ── expander รวมทุก Ward ──
+            with st.expander(
+                f"🔷 ทุก Ward รวม — {len(df_stroke_raw)} ราย | "
+                f"💀 เสียชีวิต "
+                f"{df_stroke_raw['discharge_status'].str.contains('ตาย', na=False).sum()} ราย",
+                expanded=False
+            ):
+                df_stroke_display = df_stroke_raw.sort_values(
+                    ['ward_group', 'Stroke_Type']
+                )[show_cols_stroke].reset_index(drop=True)
+        
+                st.dataframe(
+                    df_stroke_display,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config=stroke_col_config
+                )
+        
+                csv_stroke_all = df_stroke_display.to_csv(
+                    index=False, encoding='utf-8-sig'
+                ).encode('utf-8-sig')
+                st.download_button(
+                    "📥 ดาวน์โหลดทั้งหมด CSV",
+                    csv_stroke_all,
+                    f"stroke_all_{pd.Timestamp.now().strftime('%Y%m%d')}.csv",
+                    "text/csv",
+                    key='dl_stroke_all'
+                )
+        
+        else:
+            st.info("ไม่พบคอลัมน์ pdx")
 
 
         # ── ข้อมูลดิบแยก Ward ──────────────────────────────────────
