@@ -2074,8 +2074,8 @@ def show_reports():
                 )
         else:
             st.info("ไม่พบคอลัมน์ pdx")
-
--- ค้นหา Bruise/Hematoma จาก dx columns โดยตรง
+ 
+        # ── ค้นหา Bruise/Hematoma จาก dx columns โดยตรง ──
 
         st.markdown("---")
         st.markdown("#### 🩸 ประมาณการ Bruise/Hematoma จาก Enoxaparin (ICU)")
