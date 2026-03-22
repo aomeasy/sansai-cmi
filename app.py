@@ -1328,16 +1328,20 @@ def show_reports():
             'I22.8',         # Subsequent STEMI, other site
             'I22.9',         # Subsequent STEMI, unspecified
         ]
-    
+     
         NSTEMI_CODES = [
             'I21.4',         # NSTEMI
-            'I21.9',         # Acute MI, unspecified (มักถูกใช้แทน NSTEMI)
+            'I21.9',         # Acute MI, unspecified
             'I22.2',         # Subsequent NSTEMI
-            'I20.0',         # Unstable angina (บางสถาบันรวมใน ACS)
+        ]
+        
+        UA_CODES = [
+            'I20.0',         # Unstable angina
             'I24.0',         # Coronary thrombosis not resulting in MI
             'I24.8',         # Other forms of acute ischaemic heart disease
             'I24.9',         # Acute ischaemic heart disease, unspecified
         ]
+        
     
         # Ward ที่สนใจ (เพิ่ม ER)
         TARGET_WARDS_STROKE_ACS = {
@@ -1449,13 +1453,68 @@ def show_reports():
             })
     
             return pd.DataFrame(rows)
-    
+
+
+
+        def build_matrix_3(df_src, codes_a, codes_b, codes_c, label_a, label_b, label_c):
+            """สร้าง summary matrix 3 ประเภท × N ward"""
+            if 'pdx' not in df_src.columns:
+                return pd.DataFrame()
+        
+            df_src = df_src.copy()
+            df_src['ward_group'] = df_src['ward_name'].apply(get_ward_group5) \
+                                   if 'ward_name' in df_src.columns else None
+            df_src['is_a'] = df_src['pdx'].apply(lambda x: starts_with_any(x, codes_a))
+            df_src['is_b'] = df_src['pdx'].apply(lambda x: starts_with_any(x, codes_b))
+            df_src['is_c'] = df_src['pdx'].apply(lambda x: starts_with_any(x, codes_c))
+            df_src['is_any'] = df_src['is_a'] | df_src['is_b'] | df_src['is_c']
+        
+            rows = []
+            for ward in WARD_ORDER_5:
+                sub   = df_src[(df_src['ward_group'] == ward) & df_src['is_any']]
+                sub_a = sub[sub['is_a']]
+                sub_b = sub[sub['is_b']]
+                sub_c = sub[sub['is_c']]
+                rows.append({
+                    'Ward': ward,
+                    f'{label_a}_n':     len(sub_a),
+                    f'{label_a}_death': int(sub_a['is_death'].sum()),
+                    f'{label_b}_n':     len(sub_b),
+                    f'{label_b}_death': int(sub_b['is_death'].sum()),
+                    f'{label_c}_n':     len(sub_c),
+                    f'{label_c}_death': int(sub_c['is_death'].sum()),
+                    'Total_n':          len(sub),
+                    'Total_death':      int(sub['is_death'].sum()),
+                })
+        
+            # Total row
+            df_any = df_src[df_src['is_any']]
+            rows.append({
+                'Ward': '🔷 Total',
+                f'{label_a}_n':     int(df_src['is_a'].sum()),
+                f'{label_a}_death': int(df_src.loc[df_src['is_a'], 'is_death'].sum()),
+                f'{label_b}_n':     int(df_src['is_b'].sum()),
+                f'{label_b}_death': int(df_src.loc[df_src['is_b'], 'is_death'].sum()),
+                f'{label_c}_n':     int(df_src['is_c'].sum()),
+                f'{label_c}_death': int(df_src.loc[df_src['is_c'], 'is_death'].sum()),
+                'Total_n':          len(df_any),
+                'Total_death':      int(df_any['is_death'].sum()),
+            })
+            return pd.DataFrame(rows)
+        
         # ── Render HTML Table (reusable) ───────────────────────────
         def render_two_type_table(df_m, label_a, label_b,
                                    color_a, color_b, icon_a, icon_b):
             """สร้าง HTML table แบบ 2-type matrix"""
             if df_m.empty:
                 return "<p style='color:#757575;'>ไม่พบข้อมูล</p>"
+
+        def render_three_type_table(df_m, label_a, label_b, label_c,
+                                     color_a, color_b, color_c,
+                                     icon_a, icon_b, icon_c):
+            """สร้าง HTML table แบบ 3-type matrix"""
+            if df_m.empty:
+                return "<p style='color:#757575;'>ไม่พบข้อมูล</p>"                                       
     
             def death_badge(n):
                 if n == 0:
@@ -1715,29 +1774,25 @@ def show_reports():
         else:
             st.info("ℹ️ ไม่มีข้อมูล Stroke ในช่วงเวลาที่เลือก")
     
-        st.markdown("---")
-    
-        # ════════════════════════════════════════════════════════════
-        # SECTION B : ACS
-        # ════════════════════════════════════════════════════════════
+        st.markdown("---") 
+
+
+ 
         st.markdown("""
         <div style="background:linear-gradient(135deg,#BF360C,#E64A19);
                     padding:1rem 1.5rem;border-radius:10px;margin:1rem 0;">
             <h3 style="color:white;margin:0;font-size:1.2rem;">
-                ❤️ ACS — STEMI vs NSTEMI
+                ❤️ ACS — STEMI / NSTEMI / Unstable Angina
             </h3>
         </div>
         """, unsafe_allow_html=True)
-    
-        # คำอธิบาย ICD-10 ACS 
+        
         with st.expander("📖 นิยามและรหัส ICD-10 — ACS", expanded=False):
             st.markdown("""
-            <table style="width:100%;border-collapse:separate;border-spacing:8px;
-                          padding:0.5rem 0;">
+            <table style="width:100%;border-collapse:separate;border-spacing:8px;padding:0.5rem 0;">
             <tr>
-
               <td style="background:#FBE9E7;padding:1rem;border-radius:8px;
-                         border-left:4px solid #BF360C;vertical-align:top;width:50%;">
+                         border-left:4px solid #BF360C;vertical-align:top;width:33%;">
                 <b style="color:#BF360C;font-size:1rem;">🔴 STEMI</b><br><br>
                 <span style="color:#37474F;font-size:0.85rem;line-height:1.8;">
                   <b>นิยาม:</b> ST-Elevation Myocardial Infarction<br>
@@ -1751,135 +1806,126 @@ def show_reports():
                   I22.1 – Subsequent inferior STEMI<br>
                   I22.8 – Subsequent STEMI, other<br>
                   I22.9 – Subsequent STEMI, unspecified<br><br>
-                  <b>Door-to-balloon:</b> เป้าหมาย &lt; 90 นาที<br>
-                  <b>Mortality:</b> ~5-10% (in-hospital)
+                  <b>Door-to-balloon:</b> &lt; 90 นาที<br>
+                  <b>Mortality:</b> ~5-10%
                 </span>
               </td>
-
               <td style="background:#FFF8E1;padding:1rem;border-radius:8px;
-                         border-left:4px solid #F9A825;vertical-align:top;width:50%;">
-                <b style="color:#F57F17;font-size:1rem;">🟡 NSTEMI / UA</b><br><br>
+                         border-left:4px solid #F9A825;vertical-align:top;width:33%;">
+                <b style="color:#F57F17;font-size:1rem;">🟡 NSTEMI</b><br><br>
                 <span style="color:#37474F;font-size:0.85rem;line-height:1.8;">
-                  <b>นิยาม:</b> Non-ST-Elevation MI และ Unstable Angina<br>
-                  หลอดเลือดอุดตันบางส่วน — <b>ฉุกเฉินสูง</b><br><br>
+                  <b>นิยาม:</b> Non-ST-Elevation Myocardial Infarction<br>
+                  มีการตายของกล้ามเนื้อหัวใจ แต่ไม่มี ST elevation<br><br>
                   <b>รหัส ICD-10:</b><br>
                   I21.4 – NSTEMI (specific)<br>
                   I21.9 – Acute MI, unspecified<br>
-                  I22.2 – Subsequent NSTEMI<br>
+                  I22.2 – Subsequent NSTEMI<br><br>
+                  <b>เป้าหมาย:</b> Early invasive &lt; 24-72 ชม.<br>
+                  <b>Mortality:</b> ~3-5%<br><br>
+                  <b>หมายเหตุ:</b> I21.9 ใช้เมื่อยังไม่ระบุประเภท
+                </span>
+              </td>
+              <td style="background:#E8F5E9;padding:1rem;border-radius:8px;
+                         border-left:4px solid #388E3C;vertical-align:top;width:33%;">
+                <b style="color:#2E7D32;font-size:1rem;">🟢 Unstable Angina (UA)</b><br><br>
+                <span style="color:#37474F;font-size:0.85rem;line-height:1.8;">
+                  <b>นิยาม:</b> เจ็บหน้าอกไม่คงที่ ยังไม่มีการตายของกล้ามเนื้อหัวใจ<br>
+                  (Troponin ไม่สูง)<br><br>
+                  <b>รหัส ICD-10:</b><br>
                   I20.0 – Unstable angina<br>
                   I24.0 – Coronary thrombosis (no MI)<br>
                   I24.8 – Other acute ischaemic HD<br>
                   I24.9 – Acute ischaemic HD, unspecified<br><br>
-                  <b>เป้าหมาย:</b> Early invasive strategy &lt; 24-72 ชม.<br>
-                  <b>Mortality:</b> ~3-5% (in-hospital)
+                  <b>เป้าหมาย:</b> Risk stratify + Medical therapy<br>
+                  <b>Mortality:</b> ~1-3%
                 </span>
               </td>
-
             </tr>
             </table>
             <div style="margin-top:0.8rem;padding:0.6rem 1rem;
                         background:rgba(33,33,33,0.05);border-radius:6px;
                         border-left:3px solid #FF8F00;">
               <span style="color:#E65100;font-size:0.85rem;">
-                ⚠️ <b>หมายเหตุ:</b> I21.9 (Acute MI unspecified) ถูกนับใน NSTEMI/UA
-                เนื่องจากมักใช้เมื่อยังไม่ได้ระบุประเภทชัดเจน —
-                ควรตรวจสอบกับ Cardiology team
+                ⚠️ <b>ความแตกต่างสำคัญ NSTEMI vs UA:</b>
+                NSTEMI มี Troponin สูง (มีการตายของกล้ามเนื้อ) —
+                UA Troponin ปกติ — การแยกต้องใช้ Lab ร่วมด้วย
               </span>
             </div>
             """, unsafe_allow_html=True)
-    
-        # สร้างและแสดง ACS Matrix
-        df_acs = build_matrix(
+        
+        # สร้าง ACS Matrix 3 ประเภท
+        df_acs = build_matrix_3(
             df_sa,
-            STEMI_CODES,  NSTEMI_CODES,
-            'STEMI',       'NSTEMI'
+            STEMI_CODES, NSTEMI_CODES, UA_CODES,
+            'STEMI', 'NSTEMI', 'UA'
         )
-    
-        # KPI ACS
+        
+        # KPI ACS — 6 metrics
         if not df_acs.empty:
             total_row_a = df_acs[df_acs['Ward'] == '🔷 Total'].iloc[0] \
-                          if len(df_acs[df_acs['Ward'] == '🔷 Total']) > 0 \
-                          else None
+                          if len(df_acs[df_acs['Ward'] == '🔷 Total']) > 0 else None
             if total_row_a is not None:
-                ka1, ka2, ka3, ka4, ka5 = st.columns(5)
-                tot_a   = int(total_row_a['Total_n'])
-                stemi_n = int(total_row_a['STEMI_n'])
-                nstemi_n= int(total_row_a['NSTEMI_n'])
-                stemi_d = int(total_row_a['STEMI_death'])
-                nstemi_d= int(total_row_a['NSTEMI_death'])
-    
-                ka1.metric(
-                    "❤️ ACS ทั้งหมด",
-                    f"{tot_a} ราย",
-                    help="จำนวนผู้ป่วย ACS (STEMI + NSTEMI/UA) ทั้งหมด"
-                )
-                ka2.metric(
-                    "🔴 STEMI",
-                    f"{stemi_n} ราย",
-                    f"{stemi_n/tot_a*100:.1f}%" if tot_a else "0%",
-                    help="STEMI: I21.0-I21.3, I22.0-I22.9"
-                )
-                ka3.metric(
-                    "🟡 NSTEMI/UA",
-                    f"{nstemi_n} ราย",
-                    f"{nstemi_n/tot_a*100:.1f}%" if tot_a else "0%",
-                    help="NSTEMI: I21.4, I21.9, I20.0, I24.x"
-                )
-                ka4.metric(
-                    "💀 เสียชีวิต STEMI",
-                    f"{stemi_d} ราย",
-                    f"{stemi_d/stemi_n*100:.1f}%" if stemi_n else "0%",
-                    delta_color="inverse",
-                    help="อัตราเสียชีวิตใน STEMI"
-                )
-                ka5.metric(
-                    "💀 เสียชีวิต NSTEMI",
-                    f"{nstemi_d} ราย",
-                    f"{nstemi_d/nstemi_n*100:.1f}%" if nstemi_n else "0%",
-                    delta_color="inverse",
-                    help="อัตราเสียชีวิตใน NSTEMI/UA"
-                )
-    
-    
-
-        html_acs = render_two_type_table(
-            df_acs, 'STEMI', 'NSTEMI',
-            '#BF360C', '#F9A825', '🔴', '🟡'
+                tot_a    = int(total_row_a['Total_n'])
+                stemi_n  = int(total_row_a['STEMI_n'])
+                nstemi_n = int(total_row_a['NSTEMI_n'])
+                ua_n     = int(total_row_a['UA_n'])
+                stemi_d  = int(total_row_a['STEMI_death'])
+                nstemi_d = int(total_row_a['NSTEMI_death'])
+                ua_d     = int(total_row_a['UA_death'])
+        
+                ka1, ka2, ka3, ka4, ka5, ka6, ka7 = st.columns(7)
+                ka1.metric("❤️ ACS ทั้งหมด", f"{tot_a} ราย",
+                           help="STEMI + NSTEMI + UA")
+                ka2.metric("🔴 STEMI", f"{stemi_n} ราย",
+                           f"{stemi_n/tot_a*100:.1f}%" if tot_a else "0%",
+                           help="I21.0-I21.3, I22.0-I22.9")
+                ka3.metric("🟡 NSTEMI", f"{nstemi_n} ราย",
+                           f"{nstemi_n/tot_a*100:.1f}%" if tot_a else "0%",
+                           help="I21.4, I21.9, I22.2")
+                ka4.metric("🟢 UA", f"{ua_n} ราย",
+                           f"{ua_n/tot_a*100:.1f}%" if tot_a else "0%",
+                           help="I20.0, I24.0, I24.8, I24.9")
+                ka5.metric("💀 ตาย STEMI", f"{stemi_d} ราย",
+                           f"{stemi_d/stemi_n*100:.1f}%" if stemi_n else "0%",
+                           delta_color="inverse")
+                ka6.metric("💀 ตาย NSTEMI", f"{nstemi_d} ราย",
+                           f"{nstemi_d/nstemi_n*100:.1f}%" if nstemi_n else "0%",
+                           delta_color="inverse")
+                ka7.metric("💀 ตาย UA", f"{ua_d} ราย",
+                           f"{ua_d/ua_n*100:.1f}%" if ua_n else "0%",
+                           delta_color="inverse")
+        
+        # แสดงตาราง
+        html_acs = render_three_type_table(
+            df_acs, 'STEMI', 'NSTEMI', 'UA',
+            '#BF360C', '#F9A825', '#388E3C',
+            '🔴', '🟡', '🟢'
         )
         components.html(
             f"<div style='font-family:sans-serif;font-size:14px;'>{html_acs}</div>",
-            height=300,
+            height=320,
             scrolling=False
-        )        
-    
-        # Download ACS
+        )
+        
+        # Download
         if not df_acs.empty:
-            csv_a = df_acs.to_csv(
-                index=False, encoding='utf-8-sig'
-            ).encode('utf-8-sig')
+            csv_a = df_acs.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
             st.download_button(
-                "📥 ดาวน์โหลด ACS CSV",
-                csv_a,
+                "📥 ดาวน์โหลด ACS CSV", csv_a,
                 f"acs_summary_{pd.Timestamp.now().strftime('%Y%m%d')}.csv",
                 "text/csv", key='dl_acs'
             )
-    
-        # ── ACS Stacked Bar ────────────────────────────────────────
+        
+        # Stacked Bar — 3 ประเภท
         acs_chart_rows = []
         if not df_acs.empty:
             for _, row in df_acs.iterrows():
                 if 'Total' not in str(row['Ward']):
-                    acs_chart_rows.append({
-                        'Ward': row['Ward'],
-                        'ประเภท': 'STEMI',
-                        'จำนวน': row['STEMI_n']
-                    })
-                    acs_chart_rows.append({
-                        'Ward': row['Ward'],
-                        'ประเภท': 'NSTEMI',
-                        'จำนวน': row['NSTEMI_n']
-                    })
-    
+                    for lbl in ['STEMI', 'NSTEMI', 'UA']:
+                        acs_chart_rows.append({
+                            'Ward': row['Ward'], 'ประเภท': lbl, 'จำนวน': row[f'{lbl}_n']
+                        })
+        
         df_acs_chart = pd.DataFrame(acs_chart_rows)
         if not df_acs_chart.empty and df_acs_chart['จำนวน'].sum() > 0:
             ch_acs = alt.Chart(df_acs_chart).mark_bar(
@@ -1887,11 +1933,10 @@ def show_reports():
             ).encode(
                 x=alt.X('Ward:N', title='หอผู้ป่วย', sort=WARD_ORDER_5),
                 y=alt.Y('จำนวน:Q', title='จำนวนราย', stack=True),
-                color=alt.Color(
-                    'ประเภท:N',
+                color=alt.Color('ประเภท:N',
                     scale=alt.Scale(
-                        domain=['STEMI', 'NSTEMI'],
-                        range=['#BF360C', '#F9A825']
+                        domain=['STEMI', 'NSTEMI', 'UA'],
+                        range=['#BF360C', '#F9A825', '#388E3C']
                     ),
                     legend=alt.Legend(title='ประเภท ACS')
                 ),
@@ -1900,7 +1945,6 @@ def show_reports():
             st.altair_chart(ch_acs, use_container_width=True)
         else:
             st.info("ℹ️ ไม่มีข้อมูล ACS ในช่วงเวลาที่เลือก")
-    
         # ── คำแนะนำ Quality Indicators ────────────────────────────
         st.markdown("---")
         st.markdown("""
