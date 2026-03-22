@@ -1152,6 +1152,159 @@ def show_reports():
                 ).properties(height=280)
                 st.altair_chart(ch_p2, use_container_width=True)
 
+
+
+            # ── ข้อมูลดิบ Pneumonia แยก Ward ──────────────────────────
+            st.markdown("---")
+            st.markdown("#### 📋 ข้อมูลดิบ Pneumonia แยกตาม Ward")
+            
+            if 'pdx' in df_pn.columns:
+                df_pneu_raw = df_pn.copy()
+                
+                # ประเภทปอดบวม
+                df_pneu_raw['Pneumonia_Type'] = df_pneu_raw.apply(classify_pneumonia_type, axis=1)
+                df_pneu_raw['Pneumonia_Type'] = df_pneu_raw['Pneumonia_Type'].map({
+                    'cap': '🏘️ CAP',
+                    'hap': '🏥 HAP',
+                    'vap': '💨 VAP',
+                    'other': '❓ Other'
+                })
+                df_pneu_raw['ward_group'] = df_pneu_raw['ward_name'].apply(get_ward_group) \
+                                            if 'ward_name' in df_pneu_raw.columns else None
+                df_pneu_raw['เสียชีวิต'] = df_pneu_raw['discharge_status'].str.contains(
+                    'ตาย', na=False).map({True: '💀 ใช่', False: '—'})
+                df_pneu_raw['On Vent'] = df_pneu_raw['on_vent'].map(
+                    {True: '✅ ใช่', False: '—'}) if 'on_vent' in df_pneu_raw.columns else '—'
+            
+                # แปลง month_year
+                if 'month_year' in df_pneu_raw.columns:
+                    df_pneu_raw['month_year'] = pd.to_datetime(
+                        df_pneu_raw['month_year'], errors='coerce'
+                    ).dt.strftime('%b %Y')
+            
+                # แปลงวันที่
+                for date_col in ['admit_date', 'discharge_date']:
+                    if date_col in df_pneu_raw.columns:
+                        df_pneu_raw[date_col] = pd.to_datetime(
+                            df_pneu_raw[date_col], errors='coerce'
+                        ).dt.strftime('%d/%m/%Y')
+            
+                # คอลัมน์ที่แสดง
+                show_cols_pn = ['month_year', 'hn', 'an', 'age', 'sex',
+                                'Pneumonia_Type', 'pdx',
+                                'admit_date', 'discharge_date', 'length_of_stay',
+                                'discharge_status', 'เสียชีวิต', 'On Vent',
+                                'ward_name', 'adjrw']
+                show_cols_pn = [c for c in show_cols_pn if c in df_pneu_raw.columns]
+            
+                # column_config
+                pn_col_config = {
+                    "month_year":      st.column_config.TextColumn("เดือน"),
+                    "hn":              st.column_config.TextColumn("HN"),
+                    "an":              st.column_config.TextColumn("AN"),
+                    "age":             st.column_config.NumberColumn("อายุ", format="%d ปี"),
+                    "Pneumonia_Type":  st.column_config.TextColumn("ประเภท"),
+                    "pdx":             st.column_config.TextColumn("ICD-10"),
+                    "admit_date":      st.column_config.TextColumn("วันที่ admit"),
+                    "discharge_date":  st.column_config.TextColumn("วันที่จำหน่าย"),
+                    "length_of_stay":  st.column_config.NumberColumn("LOS", format="%d วัน"),
+                    "adjrw":           st.column_config.NumberColumn("adjRW", format="%.2f"),
+                    "เสียชีวิต":       st.column_config.TextColumn("เสียชีวิต"),
+                    "On Vent":         st.column_config.TextColumn("On Ventilator"),
+                }
+            
+                # แสดงแยก Ward
+                ward_list_pn = ['MB2', 'MB4', 'MB5', 'VIP', 'ICU']
+                for ward in ward_list_pn:
+                    ward_df_pn = df_pneu_raw[df_pneu_raw['ward_group'] == ward]
+                    if ward_df_pn.empty:
+                        continue
+            
+                    n_total_pn = len(ward_df_pn)
+                    n_cap      = (ward_df_pn['Pneumonia_Type'] == '🏘️ CAP').sum()
+                    n_hap      = (ward_df_pn['Pneumonia_Type'] == '🏥 HAP').sum()
+                    n_vap      = (ward_df_pn['Pneumonia_Type'] == '💨 VAP').sum()
+                    n_vent_pn  = (ward_df_pn['On Vent'] == '✅ ใช่').sum() \
+                                 if 'On Vent' in ward_df_pn.columns else 0
+                    n_death_pn = ward_df_pn['discharge_status'].str.contains(
+                        'ตาย', na=False).sum()
+            
+                    with st.expander(
+                        f"🏥 {ward} — รวม {n_total_pn} ราย | "
+                        f"CAP {n_cap} · HAP {n_hap} · VAP {n_vap} | "
+                        f"💨 On Vent {n_vent_pn} | "
+                        f"💀 เสียชีวิต {n_death_pn} ราย",
+                        expanded=False
+                    ):
+                        # KPI
+                        kp1, kp2, kp3, kp4, kp5, kp6 = st.columns(6)
+                        kp1.metric("👥 ทั้งหมด",    f"{n_total_pn} ราย")
+                        kp2.metric("🏘️ CAP",        f"{n_cap} ราย",
+                                   f"{n_cap/n_total_pn*100:.1f}%" if n_total_pn else "0%")
+                        kp3.metric("🏥 HAP",        f"{n_hap} ราย",
+                                   f"{n_hap/n_total_pn*100:.1f}%" if n_total_pn else "0%")
+                        kp4.metric("💨 VAP",        f"{n_vap} ราย",
+                                   f"{n_vap/n_total_pn*100:.1f}%" if n_total_pn else "0%")
+                        kp5.metric("🫁 On Vent",    f"{n_vent_pn} ราย",
+                                   f"{n_vent_pn/n_total_pn*100:.1f}%" if n_total_pn else "0%")
+                        kp6.metric("💀 เสียชีวิต", f"{n_death_pn} ราย",
+                                   f"{n_death_pn/n_total_pn*100:.1f}%" if n_total_pn else "0%",
+                                   delta_color="inverse")
+            
+                        st.markdown("**รายชื่อผู้ป่วย:**")
+                        st.dataframe(
+                            ward_df_pn[show_cols_pn].sort_values(
+                                'Pneumonia_Type'
+                            ).reset_index(drop=True),
+                            use_container_width=True,
+                            hide_index=True,
+                            column_config=pn_col_config
+                        )
+            
+                        csv_pn_ward = ward_df_pn[show_cols_pn].to_csv(
+                            index=False, encoding='utf-8-sig'
+                        ).encode('utf-8-sig')
+                        st.download_button(
+                            f"📥 ดาวน์โหลด {ward} CSV",
+                            csv_pn_ward,
+                            f"pneumonia_{ward}_{pd.Timestamp.now().strftime('%Y%m%d')}.csv",
+                            "text/csv",
+                            key=f'dl_pn_ward_{ward}'
+                        )
+            
+                # ── expander รวมทุก Ward ──
+                with st.expander(
+                    f"🔷 ทุก Ward รวม — {len(df_pneu_raw)} ราย | "
+                    f"💀 เสียชีวิต "
+                    f"{df_pneu_raw['discharge_status'].str.contains('ตาย', na=False).sum()} ราย",
+                    expanded=False
+                ):
+                    df_pn_display = df_pneu_raw.sort_values(
+                        ['ward_group', 'Pneumonia_Type']
+                    )[show_cols_pn].reset_index(drop=True)
+            
+                    st.dataframe(
+                        df_pn_display,
+                        use_container_width=True,
+                        hide_index=True,
+                        column_config=pn_col_config
+                    )
+            
+                    csv_pn_all = df_pn_display.to_csv(
+                        index=False, encoding='utf-8-sig'
+                    ).encode('utf-8-sig')
+                    st.download_button(
+                        "📥 ดาวน์โหลดทั้งหมด CSV",
+                        csv_pn_all,
+                        f"pneumonia_all_{pd.Timestamp.now().strftime('%Y%m%d')}.csv",
+                        "text/csv",
+                        key='dl_pn_all'
+                    )
+            
+            else:
+                st.info("ไม่พบคอลัมน์ pdx")
+
+            
             # ── รายละเอียดผู้ป่วย ──
             st.markdown("---")
             with st.expander("📋 รายการผู้ป่วยปอดบวมทั้งหมด", expanded=False):
