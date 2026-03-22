@@ -883,22 +883,42 @@ def show_reports():
               </span>
             </div>
             """, unsafe_allow_html=True)
-            
-            # ── Helper functions (เฉพาะ section นี้) ─────────────────────
+         
+
+
+
             def classify_pneumonia_type(row):
-                """จำแนกประเภทปอดบวม: cap / hap / vap / other"""
                 pdx_val = str(row.get('pdx', '') or '').strip().upper()
+                los     = row.get('length_of_stay', 0) or 0
+                on_vent = row.get('on_vent', False)
+                ward    = str(row.get('ward_name', '') or '').upper()
             
                 # VAP ก่อน (highest priority)
+                # — ลง code J95.85 โดยตรง
                 if any(pdx_val.startswith(c.upper()) for c in VAP_CODES):
                     return 'vap'
             
+                # — ประมาณ VAP: ปอดบวม + ICU + ventilator + LOS > 2 วัน
+                is_pneumonia_code = any(
+                    pdx_val.startswith(c.upper()) for c in CAP_CODES
+                )
+                is_icu = 'ICU' in ward
+                if is_pneumonia_code and is_icu and on_vent and los > 2:
+                    return 'vap'
+            
                 # HAP
+                # — ลง code J95.0, J22 โดยตรง
                 if any(pdx_val.startswith(c.upper()) for c in HAP_CODES):
                     return 'hap'
             
+                # — ประมาณ HAP: ปอดบวม + LOS > 2 วัน + ไม่ใช่ Flu + ไม่มี ventilator
+                FLU_CODES = ['J10', 'J11']
+                is_flu = any(pdx_val.startswith(c.upper()) for c in FLU_CODES)
+                if is_pneumonia_code and not is_flu and not on_vent and los > 2:
+                    return 'hap'
+            
                 # CAP
-                if any(pdx_val.startswith(c.upper()) for c in CAP_CODES):
+                if is_pneumonia_code:
                     return 'cap'
             
                 return 'other'
