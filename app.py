@@ -1969,7 +1969,13 @@ def show_reports():
                                        if 'ward_name' in df_acs_raw.columns else None
             df_acs_raw['เสียชีวิต'] = df_acs_raw['discharge_status'].str.contains(
                 'ตาย', na=False).map({True: '💀 ใช่', False: '—'})
-        
+
+                # ✅ วางตรงนี้ — ต่อจากบรรทัด เสียชีวิต
+            if 'month_year' in df_acs_raw.columns:
+                df_acs_raw['month_year'] = pd.to_datetime(
+                    df_acs_raw['month_year'], errors='coerce'
+                ).dt.strftime('%b %Y')
+                
             # คอลัมน์ที่แสดง
            
             show_cols = ['month_year', 'hn', 'an', 'age', 'sex', 'ACS_Type', 'pdx',
