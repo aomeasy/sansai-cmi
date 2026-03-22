@@ -2043,8 +2043,11 @@ def show_reports():
                 expanded=False
             ):
                 st.dataframe(
+
+              
+
                     df_acs_raw[show_cols].sort_values(
-                        ['ward_group', 'ACS_Type']
+                        [c for c in ['ACS_Type'] if c in show_cols]
                     ).reset_index(drop=True),
                     use_container_width=True,
                     hide_index=True,
