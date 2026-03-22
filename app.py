@@ -2003,7 +2003,7 @@ def show_reports():
                             if date_col in ward_df.columns:
                                 ward_df[date_col] = pd.to_datetime(
                                     ward_df[date_col], errors='coerce'
-                                )
+                                ).dt.strftime('%d/%m/%Y')
             
                         col_s1, col_s2, col_s3, col_s4, col_s5 = st.columns(5)
                         col_s1.metric("👥 ทั้งหมด",  f"{n_total} ราย")
@@ -2026,8 +2026,8 @@ def show_reports():
                                 "age":            st.column_config.NumberColumn("อายุ", format="%d ปี"),
                                 "ACS_Type":       st.column_config.TextColumn("ประเภท ACS"),
                                 "pdx":            st.column_config.TextColumn("ICD-10"),
-                                "admit_date":     st.column_config.DatetimeColumn("วันที่ admit", format="DD/MM/YYYY"),
-                                "discharge_date": st.column_config.DatetimeColumn("วันที่จำหน่าย", format="DD/MM/YYYY"),
+                                "admit_date":     st.column_config.TextColumn("วันที่ admit"),
+                                "discharge_date": st.column_config.TextColumn("วันที่จำหน่าย"),
                                 "length_of_stay": st.column_config.NumberColumn("LOS", format="%d วัน"),
                                 "adjrw":          st.column_config.NumberColumn("adjRW", format="%.2f"),
                                 "เสียชีวิต":      st.column_config.TextColumn("เสียชีวิต"),
@@ -2058,7 +2058,7 @@ def show_reports():
                         if date_col in df_acs_display.columns:
                             df_acs_display[date_col] = pd.to_datetime(
                                 df_acs_display[date_col], errors='coerce'
-                            )
+                            ).dt.strftime('%d/%m/%Y')
             
                     df_display = df_acs_display.sort_values('ACS_Type')
                     df_display = df_display[show_cols].reset_index(drop=True)
@@ -2073,8 +2073,8 @@ def show_reports():
                             "age":            st.column_config.NumberColumn("อายุ", format="%d ปี"),
                             "ACS_Type":       st.column_config.TextColumn("ประเภท ACS"),
                             "pdx":            st.column_config.TextColumn("ICD-10"),
-                            "admit_date":     st.column_config.DatetimeColumn("วันที่ admit", format="DD/MM/YYYY"),
-                            "discharge_date": st.column_config.DatetimeColumn("วันที่จำหน่าย", format="DD/MM/YYYY"),
+                            "admit_date":     st.column_config.TextColumn("วันที่ admit"),
+                            "discharge_date": st.column_config.TextColumn("วันที่จำหน่าย"),
                             "length_of_stay": st.column_config.NumberColumn("LOS", format="%d วัน"),
                             "adjrw":          st.column_config.NumberColumn("adjRW", format="%.2f"),
                             "เสียชีวิต":      st.column_config.TextColumn("เสียชีวิต"),
