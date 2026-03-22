@@ -2075,6 +2075,172 @@ def show_reports():
         else:
             st.info("ไม่พบคอลัมน์ pdx")
 
+-- ค้นหา Bruise/Hematoma จาก dx columns โดยตรง
+
+        st.markdown("---")
+        st.markdown("#### 🩸 ประมาณการ Bruise/Hematoma จาก Enoxaparin (ICU)")
+        
+        # ── กลุ่ม 1: ผู้ป่วยที่น่าจะได้ Enoxaparin ──
+        ENOX_INDICATION_CODES = [
+            # ACS
+            'I21', 'I22',           # MI
+            'I20.0',                # Unstable angina
+            'I24',                  # Acute ischaemic HD
+            # VTE
+            'I26',                  # Pulmonary embolism
+            'I80', 'I82',           # DVT
+            # AF
+            'I48',
+        ]
+        
+        # ── กลุ่ม 2: รหัส Bruise/Hematoma/Bleeding ──
+        BRUISE_CODES = [
+            'T45.5',                # Adverse effect of anticoagulants
+            'T45.51',
+            'T45.515',
+            'L76',                  # Bruising
+            'S00', 'S09',           # Superficial injury
+            'M79.3',                # Panniculitis (injection site)
+            'D68',                  # Coagulation defect
+            'R58',                  # Hemorrhage NEC
+            'T14.0',                # Superficial injury unspecified
+        ]
+        
+        if 'pdx' in df_sa.columns:
+            # ── Filter เฉพาะ ICU ──
+            df_icu = df_sa[
+                df_sa['ward_name'].str.contains('ICU|icu', na=False)
+            ].copy()
+        
+            all_dx_cols = ['pdx'] + [f'dx{i}' for i in range(11)]
+            all_dx_cols = [c for c in all_dx_cols if c in df_icu.columns]
+        
+            # หาผู้ป่วยที่มี indication สำหรับ enoxaparin
+            def has_enox_indication(row):
+                for col in all_dx_cols:
+                    val = str(row.get(col, '') or '')
+                    if any(val.startswith(c) for c in ENOX_INDICATION_CODES):
+                        return True
+                return False
+        
+            # หาผู้ป่วยที่มี bruise/hematoma/bleeding
+            def has_bruise(row):
+                for col in all_dx_cols:
+                    val = str(row.get(col, '') or '')
+                    if any(val.startswith(c) for c in BRUISE_CODES):
+                        return True
+                return False
+        
+            df_icu['enox_indication'] = df_icu.apply(has_enox_indication, axis=1)
+            df_icu['has_bruise']      = df_icu.apply(has_bruise, axis=1)
+            df_icu['both']            = df_icu['enox_indication'] & df_icu['has_bruise']
+        
+            n_icu_total  = len(df_icu)
+            n_enox       = df_icu['enox_indication'].sum()
+            n_bruise     = df_icu['has_bruise'].sum()
+            n_both       = df_icu['both'].sum()
+            rate         = (n_both / n_enox * 100) if n_enox else 0
+        
+            # ── KPI ──
+            kb1, kb2, kb3, kb4 = st.columns(4)
+            kb1.metric("🏥 ผู้ป่วย ICU ทั้งหมด", f"{n_icu_total} ราย")
+            kb2.metric("💉 มี Indication Enoxaparin", f"{n_enox} ราย",
+                       f"{n_enox/n_icu_total*100:.1f}%" if n_icu_total else "0%")
+            kb3.metric("🩸 พบ Bruise/Hematoma/Bleeding", f"{n_bruise} ราย")
+            kb4.metric("⚠️ Enoxaparin + Bruise (ประมาณการ)", f"{n_both} ราย",
+                       f"อัตรา {rate:.1f}%",
+                       delta_color="inverse")
+        
+            # ── คำเตือน ──
+            st.markdown(f"""
+            <div style="background:#FFF3E0;padding:1rem;border-radius:8px;
+                        border-left:4px solid #FF9800;margin:1rem 0;">
+                <b style="color:#E65100;">⚠️ ข้อจำกัดของการประมาณการนี้</b><br>
+                <span style="color:#37474F;font-size:0.9rem;">
+                • ใช้ <b>ICD-10 secondary diagnosis</b> เป็นตัวแทน
+                  ไม่ใช่ข้อมูล ADR จริง<br>
+                • ผู้ป่วยที่ได้ Enoxaparin จริงอาจมากกว่า/น้อยกว่าที่ประมาณ<br>
+                • Bruise ที่ไม่ได้ลง code จะไม่ถูกนับ<br>
+                • <b>ควรใช้เป็นข้อมูลเบื้องต้นเท่านั้น</b>
+                  และเริ่มเก็บข้อมูลจริงตั้งแต่เดือนนี้
+                </span>
+            </div>
+            """, unsafe_allow_html=True)
+        
+            st.markdown("---")
+        
+            # ── ตารางรายเดือน ──
+            st.markdown("#### 📅 แนวโน้มรายเดือน")
+        
+            if 'month_sort' in df_icu.columns:
+                monthly_rows = []
+                for period, grp in df_icu.groupby('month_sort'):
+                    ml   = grp['month_label'].iloc[0] if 'month_label' in grp.columns else str(period)
+                    n_e  = grp['enox_indication'].sum()
+                    n_b  = grp['both'].sum()
+                    r    = (n_b / n_e * 100) if n_e else 0
+                    monthly_rows.append({
+                        'เดือน':                    ml,
+                        'ผู้ป่วย ICU':              len(grp),
+                        'Enoxaparin Indication':    int(n_e),
+                        'Bruise/Hematoma (ประมาณ)': int(n_b),
+                        'อัตรา (%)':               round(r, 1),
+                    })
+        
+                df_monthly_bruise = pd.DataFrame(monthly_rows)
+                st.dataframe(df_monthly_bruise, use_container_width=True, hide_index=True)
+        
+                # กราฟ
+                if not df_monthly_bruise.empty:
+                    ch_bruise = alt.Chart(df_monthly_bruise).mark_line(
+                        point=True, strokeWidth=2, color='#E53935'
+                    ).encode(
+                        x=alt.X('เดือน:N', title='เดือน'),
+                        y=alt.Y('อัตรา (%):Q', title='อัตรา (%)',
+                                scale=alt.Scale(zero=True)),
+                        tooltip=['เดือน', 'Enoxaparin Indication',
+                                 'Bruise/Hematoma (ประมาณ)', 'อัตรา (%)']
+                    ).properties(height=250,
+                                 title='อัตรา Bruise/Hematoma (ประมาณการ) รายเดือน')
+                    st.altair_chart(ch_bruise, use_container_width=True)
+        
+            # ── รายชื่อผู้ป่วย ──
+            st.markdown("---")
+            with st.expander("📋 รายชื่อผู้ป่วย ICU ที่มี Enoxaparin Indication + Bruise/Hematoma",
+                             expanded=False):
+                if df_icu['both'].any():
+                    show_b = ['hn', 'an', 'age', 'sex', 'pdx'] + \
+                             [f'dx{i}' for i in range(5)] + \
+                             ['admit_date', 'discharge_date',
+                              'length_of_stay', 'discharge_status', 'adjrw']
+                    show_b = [c for c in show_b if c in df_icu.columns]
+        
+                    st.dataframe(
+                        df_icu[df_icu['both']][show_b].reset_index(drop=True),
+                        use_container_width=True,
+                        hide_index=True
+                    )
+        
+                    csv_b = df_icu[df_icu['both']][show_b].to_csv(
+                        index=False, encoding='utf-8-sig'
+                    ).encode('utf-8-sig')
+                    st.download_button(
+                        "📥 ดาวน์โหลด CSV",
+                        csv_b,
+                        f"enox_bruise_icu_{pd.Timestamp.now().strftime('%Y%m%d')}.csv",
+                        "text/csv",
+                        key='dl_enox_bruise'
+                    )
+                else:
+                    st.info("ℹ️ ไม่พบผู้ป่วยที่มีทั้ง Enoxaparin Indication และ Bruise/Hematoma")
+        
+        else:
+            st.info("ไม่พบคอลัมน์ pdx")
+
+
+
+
+
         
         # ── คำแนะนำ Quality Indicators ────────────────────────────
         st.markdown("---")
