@@ -1945,6 +1945,134 @@ def show_reports():
             st.altair_chart(ch_acs, use_container_width=True)
         else:
             st.info("ℹ️ ไม่มีข้อมูล ACS ในช่วงเวลาที่เลือก")
+
+
+
+        # ── ข้อมูลดิบแยก Ward ──────────────────────────────────────
+        st.markdown("---")
+        st.markdown("#### 📋 ข้อมูลดิบ ACS แยกตาม Ward")
+        
+        if 'pdx' in df_sa.columns:
+            # สร้าง flag ประเภท ACS
+            df_acs_raw = df_sa.copy()
+            df_acs_raw['ACS_Type'] = None
+            df_acs_raw.loc[df_acs_raw['pdx'].apply(
+                lambda x: starts_with_any(x, STEMI_CODES)), 'ACS_Type'] = '🔴 STEMI'
+            df_acs_raw.loc[df_acs_raw['pdx'].apply(
+                lambda x: starts_with_any(x, NSTEMI_CODES)), 'ACS_Type'] = '🟡 NSTEMI'
+            df_acs_raw.loc[df_acs_raw['pdx'].apply(
+                lambda x: starts_with_any(x, UA_CODES)), 'ACS_Type'] = '🟢 UA'
+        
+            # กรองเฉพาะ ACS
+            df_acs_raw = df_acs_raw[df_acs_raw['ACS_Type'].notna()].copy()
+            df_acs_raw['ward_group'] = df_acs_raw['ward_name'].apply(get_ward_group5) \
+                                       if 'ward_name' in df_acs_raw.columns else None
+            df_acs_raw['เสียชีวิต'] = df_acs_raw['discharge_status'].str.contains(
+                'ตาย', na=False).map({True: '💀 ใช่', False: '—'})
+        
+            # คอลัมน์ที่แสดง
+            show_cols = ['hn', 'an', 'age', 'sex', 'ACS_Type', 'pdx',
+                         'admit_date', 'discharge_date', 'length_of_stay',
+                         'discharge_status', 'เสียชีวิต', 'ward_name', 'adjrw']
+            show_cols = [c for c in show_cols if c in df_acs_raw.columns]
+        
+            # แสดงแยก ward
+            ward_list = ['ER', 'MB2', 'MB4', 'MB5', 'VIP', 'ICU']
+            for ward in ward_list:
+                ward_df = df_acs_raw[df_acs_raw['ward_group'] == ward]
+                if ward_df.empty:
+                    continue
+        
+                n_total = len(ward_df)
+                n_stemi  = (ward_df['ACS_Type'] == '🔴 STEMI').sum()
+                n_nstemi = (ward_df['ACS_Type'] == '🟡 NSTEMI').sum()
+                n_ua     = (ward_df['ACS_Type'] == '🟢 UA').sum()
+                n_death  = ward_df['discharge_status'].str.contains('ตาย', na=False).sum()
+        
+                with st.expander(
+                    f"🏥 {ward} — รวม {n_total} ราย | "
+                    f"STEMI {n_stemi} · NSTEMI {n_nstemi} · UA {n_ua} | "
+                    f"💀 เสียชีวิต {n_death} ราย",
+                    expanded=False
+                ):
+                    # Summary mini-table
+                    col_s1, col_s2, col_s3, col_s4, col_s5 = st.columns(5)
+                    col_s1.metric("👥 ทั้งหมด",  f"{n_total} ราย")
+                    col_s2.metric("🔴 STEMI",    f"{n_stemi} ราย")
+                    col_s3.metric("🟡 NSTEMI",   f"{n_nstemi} ราย")
+                    col_s4.metric("🟢 UA",       f"{n_ua} ราย")
+                    col_s5.metric("💀 เสียชีวิต",
+                                  f"{n_death} ราย",
+                                  f"{n_death/n_total*100:.1f}%" if n_total else "0%",
+                                  delta_color="inverse")
+        
+                    st.markdown("**รายชื่อผู้ป่วย:**")
+                    st.dataframe(
+                        ward_df[show_cols].sort_values('ACS_Type').reset_index(drop=True),
+                        use_container_width=True,
+                        hide_index=True,
+                        column_config={
+                            "hn":             st.column_config.TextColumn("HN"),
+                            "an":             st.column_config.TextColumn("AN"),
+                            "age":            st.column_config.NumberColumn("อายุ", format="%d ปี"),
+                            "ACS_Type":       st.column_config.TextColumn("ประเภท ACS"),
+                            "pdx":            st.column_config.TextColumn("ICD-10"),
+                            "length_of_stay": st.column_config.NumberColumn("LOS", format="%d วัน"),
+                            "adjrw":          st.column_config.NumberColumn("adjRW", format="%.2f"),
+                            "เสียชีวิต":      st.column_config.TextColumn("เสียชีวิต"),
+                        }
+                    )
+        
+                    # Download รายวอร์ด
+                    csv_ward = ward_df[show_cols].to_csv(
+                        index=False, encoding='utf-8-sig'
+                    ).encode('utf-8-sig')
+                    st.download_button(
+                        f"📥 ดาวน์โหลด {ward} CSV",
+                        csv_ward,
+                        f"acs_{ward}_{pd.Timestamp.now().strftime('%Y%m%d')}.csv",
+                        "text/csv",
+                        key=f'dl_acs_ward_{ward}'
+                    )
+        
+            # ── expander รวมทุก Ward ──────────────────────────────
+            with st.expander(
+                f"🔷 ทุก Ward รวม — {len(df_acs_raw)} ราย | "
+                f"💀 เสียชีวิต "
+                f"{df_acs_raw['discharge_status'].str.contains('ตาย', na=False).sum()} ราย",
+                expanded=False
+            ):
+                st.dataframe(
+                    df_acs_raw[show_cols].sort_values(
+                        ['ward_group', 'ACS_Type']
+                    ).reset_index(drop=True),
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "hn":             st.column_config.TextColumn("HN"),
+                        "an":             st.column_config.TextColumn("AN"),
+                        "age":            st.column_config.NumberColumn("อายุ", format="%d ปี"),
+                        "ACS_Type":       st.column_config.TextColumn("ประเภท ACS"),
+                        "pdx":            st.column_config.TextColumn("ICD-10"),
+                        "length_of_stay": st.column_config.NumberColumn("LOS", format="%d วัน"),
+                        "adjrw":          st.column_config.NumberColumn("adjRW", format="%.2f"),
+                        "เสียชีวิต":      st.column_config.TextColumn("เสียชีวิต"),
+                    }
+                )
+                csv_all = df_acs_raw[show_cols].to_csv(
+                    index=False, encoding='utf-8-sig'
+                ).encode('utf-8-sig')
+                st.download_button(
+                    "📥 ดาวน์โหลดทั้งหมด CSV",
+                    csv_all,
+                    f"acs_all_{pd.Timestamp.now().strftime('%Y%m%d')}.csv",
+                    "text/csv",
+                    key='dl_acs_all'
+                )
+        else:
+            st.info("ไม่พบคอลัมน์ pdx")
+
+        
         # ── คำแนะนำ Quality Indicators ────────────────────────────
         st.markdown("---")
         st.markdown("""
