@@ -1335,6 +1335,39 @@ def show_reports():
         </div>
         """, unsafe_allow_html=True)
 
+        
+        with tab3:
+            st.markdown("""
+            <div style="background:linear-gradient(135deg,#37474F,#546E7A);
+                        padding:1.2rem 2rem;border-radius:12px;margin-bottom:1.2rem;">
+                <h2 style="color:white;margin:0;font-size:1.5rem;">
+                    💨 VAP Analysis
+                </h2>
+            </div>
+            """, unsafe_allow_html=True)
+        
+            # ✅ debug วางตรงนี้
+            all_dx_cols_debug = ['pdx'] + [f'dx{i}' for i in range(11)]
+            all_dx_cols_debug = [c for c in all_dx_cols_debug if c in df_all.columns]
+        
+            j95_found = []
+            for col in all_dx_cols_debug:
+                mask = df_all[col].astype(str).str.startswith('J95')
+                found = df_all[mask][['hn', 'an', 'ward_name', col]].copy()
+                found['found_in_col'] = col
+                found = found.rename(columns={col: 'code'})
+                j95_found.append(found)
+        
+            if j95_found:
+                df_j95 = pd.concat(j95_found, ignore_index=True)
+                df_j95 = df_j95[df_j95['code'] != 'nan']
+                st.write(f"พบ J95.x ทั้งหมด {len(df_j95)} รายการ")
+                st.write(df_j95['code'].value_counts())
+                st.dataframe(df_j95, use_container_width=True)
+            else:
+                st.warning("ไม่พบ J95.x เลยในทุก column")
+
+        
         # หา VAP โดยตรง (J95.851)
         all_dx = ['pdx'] + [f'dx{i}' for i in range(11)]
         vap_code_mask = pd.Series([False]*len(df_all), index=df_all.index)
