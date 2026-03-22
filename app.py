@@ -1971,9 +1971,11 @@ def show_reports():
                 'ตาย', na=False).map({True: '💀 ใช่', False: '—'})
         
             # คอลัมน์ที่แสดง
-            show_cols = ['hn', 'an', 'age', 'sex', 'ACS_Type', 'pdx',
+           
+            show_cols = ['month_year', 'hn', 'an', 'age', 'sex', 'ACS_Type', 'pdx',
                          'admit_date', 'discharge_date', 'length_of_stay',
                          'discharge_status', 'เสียชีวิต', 'ward_name', 'adjrw']
+            
             show_cols = [c for c in show_cols if c in df_acs_raw.columns]
         
             # แสดงแยก ward
@@ -2021,6 +2023,7 @@ def show_reports():
                             use_container_width=True,
                             hide_index=True,
                             column_config={
+                                "month_year":     st.column_config.TextColumn("เดือน"),
                                 "hn":             st.column_config.TextColumn("HN"),
                                 "an":             st.column_config.TextColumn("AN"),
                                 "age":            st.column_config.NumberColumn("อายุ", format="%d ปี"),
