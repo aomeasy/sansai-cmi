@@ -819,9 +819,7 @@ def show_reports():
                 'VIP':  ['VIP', 'vip'],
                 'ICU':  ['ICU', 'icu'],
             }
-            
-            # ── อธิบาย ICD-10 ──────────────────────────────────────────────
-            
+             
             st.markdown("""
             <table style="width:100%;border-collapse:separate;border-spacing:12px;">
             <tr>
@@ -840,7 +838,10 @@ def show_reports():
                   J15 – Bacterial pneumonia NEC<br>
                   J16 – Pneumonia (other organisms)<br>
                   J17 – Pneumonia in diseases<br>
-                  J18 – Pneumonia, unspecified
+                  J18 – Pneumonia, unspecified<br><br>
+                  <b>Logic การจำแนก:</b><br>
+                  ✅ มีรหัส J10-J18 ใน pdx<br>
+                  ✅ ไม่มีเงื่อนไข HAP/VAP
                 </span>
               </td>
             
@@ -853,8 +854,14 @@ def show_reports():
                   <b>รหัส ICD-10:</b><br>
                   J95.0 – Tracheostomy complication w/ infection<br>
                   J22 – Unspecified acute lower respiratory infection<br><br>
+                  <b>Logic การจำแนก (ถ้าไม่มี J95.0/J22):</b><br>
+                  ✅ มีรหัส J10-J18 ใน pdx<br>
+                  ✅ LOS > 2 วัน<br>
+                  ✅ ไม่ใช่ไข้หวัดใหญ่ (ไม่ใช่ J10/J11)<br>
+                  ✅ ไม่มี Ventilator (OP 96.7x)<br><br>
                   <b>หมายเหตุ:</b><br>
-                  โรงพยาบาลบางแห่งยังใช้ J18.x ควร cross-check กับ IC team
+                  โรงพยาบาลบางแห่งยังใช้ J18.x<br>
+                  ควร cross-check กับ IC team
                 </span>
               </td>
             
@@ -867,24 +874,33 @@ def show_reports():
                   <b>รหัส ICD-10:</b><br>
                   J95.851 – VAP (specific code)<br>
                   J95.85 – VAP (broader)<br><br>
+                  <b>Logic การจำแนก (ถ้าไม่มี J95.85):</b><br>
+                  ✅ มีรหัส J10-J18 ใน pdx<br>
+                  ✅ อยู่ใน ICU<br>
+                  ✅ มี Ventilator (OP 96.7x)<br>
+                  ✅ LOS > 2 วัน<br><br>
                   <b>เงื่อนไขเพิ่มเติม:</b><br>
-                  ปอดบวม J10-J18 + OP 96.71/96.72<br>
                   ควร cross-check: IC records + สมุด VAP
                 </span>
               </td>
             </tr>
             </table>
-            <div style="margin-top:0.8rem;padding:0.6rem 1rem;background:rgba(255,152,0,0.1);
+            
+            <div style="margin-top:0.8rem;padding:0.8rem 1rem;background:rgba(255,152,0,0.1);
                         border-radius:6px;border-left:3px solid #FF9800;">
               <span style="color:#E65100;font-size:0.85rem;">
-                ⚠️ <b>ข้อจำกัด:</b> การจำแนก CAP/HAP ในรายงานนี้ใช้เฉพาะ <b>รหัส pdx</b>
-                ไม่ได้นับวันที่ admit vs onset จริง
-                ควรใช้ <b>ร่วมกับการ review clinical records</b> โดยทีม IC
+                ⚠️ <b>ข้อจำกัด:</b> การจำแนก CAP/HAP/VAP ในรายงานนี้ใช้ <b>รหัส pdx เป็นหลัก</b>
+                และใช้ <b>Logic เสริม</b> (LOS + Ward + Ventilator)
+                กรณีที่ไม่มีรหัส J95.0/J95.85<br>
+                ควรใช้ <b>ร่วมกับการ review clinical records</b> โดยทีม IC<br><br>
+                🔵 <b>CAP</b> = J10-J18 (ไม่มีเงื่อนไข HAP/VAP)<br>
+                🟠 <b>HAP (ประมาณ)</b> = J10-J18 + LOS > 2 วัน + ไม่มี Ventilator + ไม่ใช่ Flu<br>
+                🔴 <b>VAP (ประมาณ)</b> = J10-J18 + ICU + Ventilator + LOS > 2 วัน
               </span>
             </div>
             """, unsafe_allow_html=True)
-         
 
+             
 
 
             def classify_pneumonia_type(row):
