@@ -2046,12 +2046,12 @@ def show_reports():
                         )
             
                 # ── expander รวมทุก Ward ──────────────────────────────
-                with st.expander(
-                    f"🔷 ทุก Ward รวม — {len(df_acs_raw)} ราย | "
-                    f"💀 เสียชีวิต "
-                    f"{df_acs_raw['discharge_status'].str.contains('ตาย', na=False).sum()} ราย",
-                    expanded=False
-                ):
+            with st.expander(
+                f"🔷 ทุก Ward รวม — {len(df_acs_raw)} ราย | "
+                f"💀 เสียชีวิต "
+                f"{df_acs_raw['discharge_status'].str.contains('ตาย', na=False).sum()} ราย",
+                expanded=False
+            ):
                     # ✅ วางตรงนี้ด้วย — แปลงวันที่ก่อนแสดงผล
                     df_acs_display = df_acs_raw.copy()
                     for date_col in ['admit_date', 'discharge_date']:
