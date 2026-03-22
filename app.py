@@ -1978,37 +1978,93 @@ def show_reports():
         
             # แสดงแยก ward
             ward_list = ['ER', 'MB2', 'MB4', 'MB5', 'VIP', 'ICU']
+ 
+
             for ward in ward_list:
-                ward_df = df_acs_raw[df_acs_raw['ward_group'] == ward]
-                if ward_df.empty:
-                    continue
-        
-                n_total = len(ward_df)
-                n_stemi  = (ward_df['ACS_Type'] == '🔴 STEMI').sum()
-                n_nstemi = (ward_df['ACS_Type'] == '🟡 NSTEMI').sum()
-                n_ua     = (ward_df['ACS_Type'] == '🟢 UA').sum()
-                n_death  = ward_df['discharge_status'].str.contains('ตาย', na=False).sum()
-        
+                    ward_df = df_acs_raw[df_acs_raw['ward_group'] == ward]
+                    if ward_df.empty:
+                        continue
+            
+                    n_total  = len(ward_df)
+                    n_stemi  = (ward_df['ACS_Type'] == '🔴 STEMI').sum()
+                    n_nstemi = (ward_df['ACS_Type'] == '🟡 NSTEMI').sum()
+                    n_ua     = (ward_df['ACS_Type'] == '🟢 UA').sum()
+                    n_death  = ward_df['discharge_status'].str.contains('ตาย', na=False).sum()
+            
+                    with st.expander(
+                        f"🏥 {ward} — รวม {n_total} ราย | "
+                        f"STEMI {n_stemi} · NSTEMI {n_nstemi} · UA {n_ua} | "
+                        f"💀 เสียชีวิต {n_death} ราย",
+                        expanded=False
+                    ):
+                        # ✅ วางตรงนี้ — แปลงวันที่ก่อนแสดงผล
+                        ward_df = ward_df.copy()
+                        for date_col in ['admit_date', 'discharge_date']:
+                            if date_col in ward_df.columns:
+                                ward_df[date_col] = pd.to_datetime(
+                                    ward_df[date_col], errors='coerce'
+                                )
+            
+                        col_s1, col_s2, col_s3, col_s4, col_s5 = st.columns(5)
+                        col_s1.metric("👥 ทั้งหมด",  f"{n_total} ราย")
+                        col_s2.metric("🔴 STEMI",    f"{n_stemi} ราย")
+                        col_s3.metric("🟡 NSTEMI",   f"{n_nstemi} ราย")
+                        col_s4.metric("🟢 UA",       f"{n_ua} ราย")
+                        col_s5.metric("💀 เสียชีวิต",
+                                      f"{n_death} ราย",
+                                      f"{n_death/n_total*100:.1f}%" if n_total else "0%",
+                                      delta_color="inverse")
+            
+                        st.markdown("**รายชื่อผู้ป่วย:**")
+                        st.dataframe(
+                            ward_df[show_cols].sort_values('ACS_Type').reset_index(drop=True),
+                            use_container_width=True,
+                            hide_index=True,
+                            column_config={
+                                "hn":             st.column_config.TextColumn("HN"),
+                                "an":             st.column_config.TextColumn("AN"),
+                                "age":            st.column_config.NumberColumn("อายุ", format="%d ปี"),
+                                "ACS_Type":       st.column_config.TextColumn("ประเภท ACS"),
+                                "pdx":            st.column_config.TextColumn("ICD-10"),
+                                "admit_date":     st.column_config.DatetimeColumn("วันที่ admit", format="DD/MM/YYYY"),
+                                "discharge_date": st.column_config.DatetimeColumn("วันที่จำหน่าย", format="DD/MM/YYYY"),
+                                "length_of_stay": st.column_config.NumberColumn("LOS", format="%d วัน"),
+                                "adjrw":          st.column_config.NumberColumn("adjRW", format="%.2f"),
+                                "เสียชีวิต":      st.column_config.TextColumn("เสียชีวิต"),
+                            }
+                        )
+            
+                        csv_ward = ward_df[show_cols].to_csv(
+                            index=False, encoding='utf-8-sig'
+                        ).encode('utf-8-sig')
+                        st.download_button(
+                            f"📥 ดาวน์โหลด {ward} CSV",
+                            csv_ward,
+                            f"acs_{ward}_{pd.Timestamp.now().strftime('%Y%m%d')}.csv",
+                            "text/csv",
+                            key=f'dl_acs_ward_{ward}'
+                        )
+            
+                # ── expander รวมทุก Ward ──────────────────────────────
                 with st.expander(
-                    f"🏥 {ward} — รวม {n_total} ราย | "
-                    f"STEMI {n_stemi} · NSTEMI {n_nstemi} · UA {n_ua} | "
-                    f"💀 เสียชีวิต {n_death} ราย",
+                    f"🔷 ทุก Ward รวม — {len(df_acs_raw)} ราย | "
+                    f"💀 เสียชีวิต "
+                    f"{df_acs_raw['discharge_status'].str.contains('ตาย', na=False).sum()} ราย",
                     expanded=False
                 ):
-                    # Summary mini-table
-                    col_s1, col_s2, col_s3, col_s4, col_s5 = st.columns(5)
-                    col_s1.metric("👥 ทั้งหมด",  f"{n_total} ราย")
-                    col_s2.metric("🔴 STEMI",    f"{n_stemi} ราย")
-                    col_s3.metric("🟡 NSTEMI",   f"{n_nstemi} ราย")
-                    col_s4.metric("🟢 UA",       f"{n_ua} ราย")
-                    col_s5.metric("💀 เสียชีวิต",
-                                  f"{n_death} ราย",
-                                  f"{n_death/n_total*100:.1f}%" if n_total else "0%",
-                                  delta_color="inverse")
-        
-                    st.markdown("**รายชื่อผู้ป่วย:**")
+                    # ✅ วางตรงนี้ด้วย — แปลงวันที่ก่อนแสดงผล
+                    df_acs_display = df_acs_raw.copy()
+                    for date_col in ['admit_date', 'discharge_date']:
+                        if date_col in df_acs_display.columns:
+                            df_acs_display[date_col] = pd.to_datetime(
+                                df_acs_display[date_col], errors='coerce'
+                            )
+            
+                    df_display = df_acs_display.sort_values('ACS_Type')
+                    df_display = df_display[show_cols].reset_index(drop=True)
+            
                     st.dataframe(
-                        ward_df[show_cols].sort_values('ACS_Type').reset_index(drop=True),
+                        df_display,
                         use_container_width=True,
                         hide_index=True,
                         column_config={
@@ -2017,61 +2073,26 @@ def show_reports():
                             "age":            st.column_config.NumberColumn("อายุ", format="%d ปี"),
                             "ACS_Type":       st.column_config.TextColumn("ประเภท ACS"),
                             "pdx":            st.column_config.TextColumn("ICD-10"),
+                            "admit_date":     st.column_config.DatetimeColumn("วันที่ admit", format="DD/MM/YYYY"),
+                            "discharge_date": st.column_config.DatetimeColumn("วันที่จำหน่าย", format="DD/MM/YYYY"),
                             "length_of_stay": st.column_config.NumberColumn("LOS", format="%d วัน"),
                             "adjrw":          st.column_config.NumberColumn("adjRW", format="%.2f"),
                             "เสียชีวิต":      st.column_config.TextColumn("เสียชีวิต"),
                         }
                     )
-        
-                    # Download รายวอร์ด
-                    csv_ward = ward_df[show_cols].to_csv(
+            
+                    csv_all = df_acs_display[show_cols].to_csv(
                         index=False, encoding='utf-8-sig'
                     ).encode('utf-8-sig')
                     st.download_button(
-                        f"📥 ดาวน์โหลด {ward} CSV",
-                        csv_ward,
-                        f"acs_{ward}_{pd.Timestamp.now().strftime('%Y%m%d')}.csv",
+                        "📥 ดาวน์โหลดทั้งหมด CSV",
+                        csv_all,
+                        f"acs_all_{pd.Timestamp.now().strftime('%Y%m%d')}.csv",
                         "text/csv",
-                        key=f'dl_acs_ward_{ward}'
+                        key='dl_acs_all'
                     )
+
         
-            # ── expander รวมทุก Ward ──────────────────────────────
-            with st.expander(
-                f"🔷 ทุก Ward รวม — {len(df_acs_raw)} ราย | "
-                f"💀 เสียชีวิต "
-                f"{df_acs_raw['discharge_status'].str.contains('ตาย', na=False).sum()} ราย",
-                expanded=False
-            ):
-                st.dataframe(
-
-              
-
-                    df_acs_raw[show_cols].sort_values(
-                        [c for c in ['ACS_Type'] if c in show_cols]
-                    ).reset_index(drop=True),
-                    use_container_width=True,
-                    hide_index=True,
-                    column_config={
-                        "hn":             st.column_config.TextColumn("HN"),
-                        "an":             st.column_config.TextColumn("AN"),
-                        "age":            st.column_config.NumberColumn("อายุ", format="%d ปี"),
-                        "ACS_Type":       st.column_config.TextColumn("ประเภท ACS"),
-                        "pdx":            st.column_config.TextColumn("ICD-10"),
-                        "length_of_stay": st.column_config.NumberColumn("LOS", format="%d วัน"),
-                        "adjrw":          st.column_config.NumberColumn("adjRW", format="%.2f"),
-                        "เสียชีวิต":      st.column_config.TextColumn("เสียชีวิต"),
-                    }
-                )
-                csv_all = df_acs_raw[show_cols].to_csv(
-                    index=False, encoding='utf-8-sig'
-                ).encode('utf-8-sig')
-                st.download_button(
-                    "📥 ดาวน์โหลดทั้งหมด CSV",
-                    csv_all,
-                    f"acs_all_{pd.Timestamp.now().strftime('%Y%m%d')}.csv",
-                    "text/csv",
-                    key='dl_acs_all'
-                )
         else:
             st.info("ไม่พบคอลัมน์ pdx")
  
