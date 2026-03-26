@@ -810,14 +810,22 @@ def show_reports():
             HAP_CODES = ['J95.0', 'J22']
             # VAP: Ventilator-Associated Pneumonia
             VAP_CODES = ['J95.851', 'J95.85']
-            
-            # Ward ที่สนใจ
+             
+
             TARGET_WARDS_KEYWORDS = {
-                'MB2':  ['MB2', 'mb2'],
-                'MB4':  ['MB4', 'mb4'],
-                'MB5':  ['MB5', 'mb5'],
-                'VIP':  ['VIP', 'พิเศษ'],
+                'MB2':  ['MB2_หอผู้ป่วยในชายตึกแสงเดือน'],
+                'MB4':  ['MB4_หอผู้ป่วย SP'],
+                'MB5':  ['MB5_หอผู้ป่วยในหญิงตึกแสงเดือน'],
+                'VIP':  ['MB6_ห้องพิเศษตึกแสงเดือน', 'MB7_ห้องพิเศษตึกแสงเดือน',
+                         'F6_ห้องพิเศษตึก 7 ชั้น', 'F7_ห้องพิเศษตึก 7 ชั้น'],
                 'ICU':  ['หอผู้ป่วยหนัก ICU'],
+                'PICU': ['PICU'],
+                'NICU': ['หอผู้ป่วยใน NICU'],
+                'LR':   ['LR_ห้องคลอด'],
+                'F1':   ['F1_หอผู้ป่วยในชายตึกสายลม'],
+                'F2':   ['F2_หอผู้ป่วยในหญิงตึกสายลม'],
+                'Peds': ['หอผู้ป่วยกุมารเวชกรรม'],
+                'LW':   ['หอผู้ป่วยหลังคลอดและนรีเวชกรรม'],
             }
              
             st.markdown("""
@@ -938,14 +946,13 @@ def show_reports():
                     return 'cap'
             
                 return 'other'
-             
-
+           
             def get_ward_group(ward_name):
                 if pd.isna(ward_name):
                     return None
                 s = str(ward_name).strip()
                 for key, keywords in TARGET_WARDS_KEYWORDS.items():
-                    if any(s == kw for kw in keywords):
+                    if s in keywords:
                         return key
                 return None
             
@@ -960,7 +967,8 @@ def show_reports():
                                    else pd.Series([False] * len(df_pn2))
             
             # ── สร้างตาราง Summary Matrix ──────────────────────────────────
-            WARD_ORDER = ['MB2', 'MB4', 'MB5', 'VIP', 'ICU']
+            
+            WARD_ORDER = ['F1', 'F2', 'MB2', 'MB4', 'MB5', 'VIP', 'LR', 'LW', 'Peds', 'PICU', 'NICU', 'ICU']
             TYPES      = ['cap', 'hap', 'vap']
             TYPE_LABEL = {'cap': 'CAP', 'hap': 'HAP', 'vap': 'VAP'}
             TYPE_COLOR = {'cap': '#1976D2', 'hap': '#F57C00', 'vap': '#D32F2F'}
@@ -1560,17 +1568,24 @@ def show_reports():
             'I24.9',         # Acute ischaemic heart disease, unspecified
         ]
         
-    
-        # Ward ที่สนใจ (เพิ่ม ER)
         TARGET_WARDS_STROKE_ACS = {
-            'ER':  ['ER', 'er', 'ห้องฉุกเฉิน', 'emergency', 'ฉุกเฉิน', 'er ', ' er'],
-            'MB2': ['MB2', 'mb2'],
-            'MB4': ['MB4', 'mb4'],
-            'MB5': ['MB5', 'mb5'],
-            'VIP': ['VIP', 'พิเศษ'],
-            'ICU': ['หอผู้ป่วยหนัก ICU'],
+            'MB2':  ['MB2_หอผู้ป่วยในชายตึกแสงเดือน'],
+            'MB4':  ['MB4_หอผู้ป่วย SP'],
+            'MB5':  ['MB5_หอผู้ป่วยในหญิงตึกแสงเดือน'],
+            'VIP':  ['MB6_ห้องพิเศษตึกแสงเดือน', 'MB7_ห้องพิเศษตึกแสงเดือน',
+                     'F6_ห้องพิเศษตึก 7 ชั้น', 'F7_ห้องพิเศษตึก 7 ชั้น'],
+            'ICU':  ['หอผู้ป่วยหนัก ICU'],
+            'PICU': ['PICU'],
+            'NICU': ['หอผู้ป่วยใน NICU'],
+            'LR':   ['LR_ห้องคลอด'],
+            'F1':   ['F1_หอผู้ป่วยในชายตึกสายลม'],
+            'F2':   ['F2_หอผู้ป่วยในหญิงตึกสายลม'],
+            'Peds': ['หอผู้ป่วยกุมารเวชกรรม'],
+            'LW':   ['หอผู้ป่วยหลังคลอดและนรีเวชกรรม'],
         }
-        WARD_ORDER_5 = ['ER', 'MB2', 'MB4', 'MB5', 'VIP', 'ICU']
+        
+        WARD_ORDER_5 = ['F1', 'F2', 'MB2', 'MB4', 'MB5', 'VIP', 'LR', 'LW', 'Peds', 'PICU', 'NICU', 'ICU']
+        
     
         # ── Filter เดือน (ใช้ df_all ทั้งหมด ไม่ผ่าน df_pneumonia) ──
         months_avail5 = sorted(
@@ -1608,9 +1623,7 @@ def show_reports():
                 return False
             s = str(code_str).strip().upper()
             return any(s.startswith(c.upper()) for c in code_list)
-     
-
-
+      
         def get_ward_group5(ward_name):
             if pd.isna(ward_name):
                 return None
@@ -1619,7 +1632,8 @@ def show_reports():
                 if s in keywords:
                     return key
             return None
-            
+
+        
         def build_matrix(df_src, type_a_codes, type_b_codes,
                          label_a, label_b):
             """
