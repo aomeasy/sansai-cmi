@@ -1195,14 +1195,7 @@ def show_reports():
 
             # ── ข้อมูลดิบ Pneumonia แยก Ward ──────────────────────────
             st.markdown("---")
-            st.markdown("#### 📋 ข้อมูลดิบ Pneumonia แยกตาม Ward")
-             
-                df_pneu_raw['ward_group'] = df_pneu_raw['ward_name'].apply(get_ward_group) \
-                                            if 'ward_name' in df_pneu_raw.columns else None
-                df_pneu_raw['เสียชีวิต'] = df_pneu_raw['discharge_status'].str.contains(
-                    'ตาย', na=False).map({True: '💀 ใช่', False: '—'})
-                df_pneu_raw['On Vent'] = df_pneu_raw['on_vent'].map(
-                    {True: '✅ ใช่', False: '—'}) if 'on_vent' in df_pneu_raw.columns else '—'
+            st.markdown("#### 📋 ข้อมูลดิบ Pneumonia แยกตาม Ward") 
             
                 # แปลง month_year
                 if 'month_year' in df_pneu_raw.columns:
