@@ -1196,21 +1196,7 @@ def show_reports():
             # ── ข้อมูลดิบ Pneumonia แยก Ward ──────────────────────────
             st.markdown("---")
             st.markdown("#### 📋 ข้อมูลดิบ Pneumonia แยกตาม Ward")
-            
-            if 'pdx' in df_pn.columns:
-                df_pneu_raw = df_pn.copy()
-                
-                # ประเภทปอดบวม
-                df_pneu_raw['Pneumonia_Type'] = df_pneu_raw.apply(classify_pneumonia_type, axis=1)
-                df_pneu_raw['Pneumonia_Type'] = df_pneu_raw['Pneumonia_Type'].map({
-                    'cap': '🏘️ CAP',
-                    'hap': '🏥 HAP',
-                    'vap': '💨 VAP',
-                    'other': '❓ Other'
-                })
-                # debug — ลบออกหลังตรวจสอบแล้ว
-                st.write("ประเภทที่พบ:", df_pneu_raw['Pneumonia_Type'].value_counts())
-                st.write("ICD-10 ที่พบ:", df_pneu_raw['pdx'].value_counts().head(20))
+             
                 df_pneu_raw['ward_group'] = df_pneu_raw['ward_name'].apply(get_ward_group) \
                                             if 'ward_name' in df_pneu_raw.columns else None
                 df_pneu_raw['เสียชีวิต'] = df_pneu_raw['discharge_status'].str.contains(
