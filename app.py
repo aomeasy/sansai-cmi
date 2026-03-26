@@ -816,8 +816,8 @@ def show_reports():
                 'MB2':  ['MB2', 'mb2'],
                 'MB4':  ['MB4', 'mb4'],
                 'MB5':  ['MB5', 'mb5'],
-                'VIP':  ['VIP', 'vip'],
-                'ICU':  ['ICU', 'icu'],
+                'VIP':  ['VIP', 'พิเศษ'],
+                'ICU':  ['หอผู้ป่วยหนัก ICU'],
             }
              
             st.markdown("""
@@ -918,7 +918,7 @@ def show_reports():
                 is_pneumonia_code = any(
                     pdx_val.startswith(c.upper()) for c in CAP_CODES
                 )
-                is_icu = 'ICU' in ward
+                is_icu = ward == 'หอผู้ป่วยหนัก ICU'.upper()
                 if is_pneumonia_code and is_icu and on_vent and los > 2:
                     return 'vap'
             
@@ -938,14 +938,14 @@ def show_reports():
                     return 'cap'
             
                 return 'other'
-            
+             
+
             def get_ward_group(ward_name):
-                """จับ ward ที่สนใจ → key"""
                 if pd.isna(ward_name):
                     return None
                 s = str(ward_name).strip()
                 for key, keywords in TARGET_WARDS_KEYWORDS.items():
-                    if any(kw in s for kw in keywords):
+                    if any(s == kw for kw in keywords):
                         return key
                 return None
             
@@ -1577,8 +1577,8 @@ def show_reports():
             'MB2': ['MB2', 'mb2'],
             'MB4': ['MB4', 'mb4'],
             'MB5': ['MB5', 'mb5'],
-            'VIP': ['VIP', 'vip'],
-            'ICU': ['ICU', 'icu'],
+            'VIP': ['VIP', 'พิเศษ'],
+            'ICU': ['หอผู้ป่วยหนัก ICU'],
         }
         WARD_ORDER_5 = ['ER', 'MB2', 'MB4', 'MB5', 'VIP', 'ICU']
     
@@ -1618,16 +1618,18 @@ def show_reports():
                 return False
             s = str(code_str).strip().upper()
             return any(s.startswith(c.upper()) for c in code_list)
-    
+     
+
+
         def get_ward_group5(ward_name):
             if pd.isna(ward_name):
                 return None
             s = str(ward_name).strip()
             for key, keywords in TARGET_WARDS_STROKE_ACS.items():
-                if any(kw.lower() in s.lower() for kw in keywords):
+                if s in keywords:
                     return key
             return None
-    
+            
         def build_matrix(df_src, type_a_codes, type_b_codes,
                          label_a, label_b):
             """
@@ -2612,7 +2614,7 @@ def show_reports():
         if 'pdx' in df_sa.columns:
             # ── Filter เฉพาะ ICU ──
             df_icu = df_sa[
-                df_sa['ward_name'].str.contains('ICU|icu', na=False)
+                df_sa['ward_name'].str.strip() == 'หอผู้ป่วยหนัก ICU'
             ].copy()
         
             all_dx_cols = ['pdx'] + [f'dx{i}' for i in range(11)]
