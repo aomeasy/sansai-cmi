@@ -169,7 +169,27 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
  
+debug_keys = []
+if not df_pn2.empty:
+    TYPE_MAP = {"cap": "CAP", "hap": "HAP", "vap": "VAP"}
+    for _, grp in df_pn2.groupby("month_sort"):
+        ml = str(grp["month_label"].iloc[0]) if "month_label" in grp.columns else "NO_LABEL"
+        for ward_key in grp["ward_group"].dropna().unique():
+            for t_code, t_label in TYPE_MAP.items():
+                debug_keys.append(f"{ml}||{ward_key}||{t_label}||all")
 
+with st.expander("🔍 DEBUG: keys ใน hn_data (ลบออกหลัง fix)"):
+    st.write("### month_label ใน df_pn2:")
+    st.write(df_pn2["month_label"].unique().tolist())
+    st.write("### ward_group ใน df_pn2:")
+    st.write(df_pn2["ward_group"].dropna().unique().tolist())
+    st.write("### month_label ใน df_summary_matrix:")
+    st.write(df_summary_matrix["_month_label"].unique().tolist())
+    st.write("### Ward ใน df_summary_matrix:")
+    st.write(df_summary_matrix["Ward"].unique().tolist())
+    st.write("### ตัวอย่าง keys ที่สร้างจาก df_pn2:")
+    st.write(debug_keys[:10])
+    
 # ตั้งค่า Supabase
 SUPABASE_URL = "https://qwxnsusfydrhtfqdcsqn.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3eG5zdXNmeWRyaHRmcWRjc3FuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEwOTczNDcsImV4cCI6MjA4NjY3MzM0N30.1KiMRlJJ1jUpS7xfzocahJl3fH78m6CgM3Nm-UhhcRk"
@@ -985,27 +1005,30 @@ def show_reports():
                 return row
             
             all_table_rows = []
-            
-            # วนตามเดือน
+       
+
             for period, df_period in df_pn2.groupby('month_sort'):
                 month_label_str = df_period['month_label'].iloc[0] if 'month_label' in df_period.columns else str(period)
+                period_key_str  = str(period)   # ← เพิ่มบรรทัดนี้
                 first_row = True
             
                 for ward in WARD_ORDER:
                     ward_df = df_period[df_period['ward_group'] == ward]
                     r = build_summary_row(ward_df)
-                    r['Ward'] = ward
-                    r['_month_label'] = month_label_str if first_row else ""
-                    r['_is_total'] = False
+                    r['Ward']          = ward
+                    r['_month_label']  = month_label_str if first_row else ""
+                    r['_period_key']   = period_key_str   # ← เพิ่มบรรทัดนี้
+                    r['_is_total']     = False
                     all_table_rows.append(r)
                     first_row = False
             
-                # Total row ของเดือนนั้น
                 total_r = build_summary_row(df_period)
-                total_r['Ward'] = '🔷 Total'
+                total_r['Ward']         = '🔷 Total'
                 total_r['_month_label'] = ""
-                total_r['_is_total'] = True
+                total_r['_period_key']  = period_key_str  # ← เพิ่มบรรทัดนี้
+                total_r['_is_total']    = True
                 all_table_rows.append(total_r)
+            
             
             df_summary_matrix = pd.DataFrame(all_table_rows)
             
@@ -1013,43 +1036,52 @@ def show_reports():
             st.markdown("#### 📊 ตารางสรุป CAP / HAP / VAP แยกตาม Ward")
 
 
+
+
             def render_matrix_table_v2(df_m, df_source=None):
                 import json
             
                 TYPE_MAP   = {"cap": "CAP", "hap": "HAP", "vap": "VAP"}
-                TYPE_COLOR = {"CAP": "#1976D2", "HAP": "#F57C00", "VAP": "#D32F2F"}
             
-                # ── สร้าง HN lookup dict ──────────────────────────────────────
+                # ── สร้าง hn_data ─────────────────────────────────────────────
+                # ใช้ month_sort (Period) เป็น key แทน month_label เพื่อหลีกเลี่ยง format ต่างกัน
                 hn_data = {}
                 if df_source is not None and not df_source.empty:
-                    for _, grp in df_source.groupby("month_sort"):
-                        ml = str(grp["month_label"].iloc[0]) if "month_label" in grp.columns else ""
+                    for period, grp in df_source.groupby("month_sort"):
+                        # ใช้ str(period) เช่น "2025-06" เป็น key — stable ไม่ขึ้นกับ format
+                        period_key = str(period)
                         for ward_key in grp["ward_group"].dropna().unique():
-                            ward_df = grp[grp["ward_group"] == ward_key]
+                            ward_key = str(ward_key)
+                            ward_df  = grp[grp["ward_group"] == ward_key]
                             for t_code, t_label in TYPE_MAP.items():
                                 sub = ward_df[ward_df["pneu_type"] == t_code]
-                                hn_data[f"{ml}||{ward_key}||{t_label}||all"] = [
-                                    f"HN: {str(r.get('hn','?'))}  |  AN: {str(r.get('an','?'))}  |  อายุ {r.get('age','?')} ปี  |  ICD-10: {str(r.get('pdx','?'))}"
+                                hn_data[f"{period_key}||{ward_key}||{t_label}||all"] = [
+                                    f"HN: {str(r.get('hn','?'))}  |  AN: {str(r.get('an','?'))}  |  "
+                                    f"อายุ {r.get('age','?')} ปี  |  ICD-10: {str(r.get('pdx','?'))}"
                                     for _, r in sub.iterrows()
                                 ]
-                                hn_data[f"{ml}||{ward_key}||{t_label}||dead"] = [
-                                    f"HN: {str(r.get('hn','?'))}  |  AN: {str(r.get('an','?'))}  |  อายุ {r.get('age','?')} ปี  |  ICD-10: {str(r.get('pdx','?'))}"
+                                hn_data[f"{period_key}||{ward_key}||{t_label}||dead"] = [
+                                    f"HN: {str(r.get('hn','?'))}  |  AN: {str(r.get('an','?'))}  |  "
+                                    f"อายุ {r.get('age','?')} ปี  |  ICD-10: {str(r.get('pdx','?'))}"
                                     for _, r in sub[sub["is_death"]].iterrows()
                                 ]
-                            hn_data[f"{ml}||{ward_key}||Total||all"] = [
-                                f"HN: {str(r.get('hn','?'))}  |  AN: {str(r.get('an','?'))}  |  อายุ {r.get('age','?')} ปี  |  ICD-10: {str(r.get('pdx','?'))}"
+                            # Total
+                            hn_data[f"{period_key}||{ward_key}||Total||all"] = [
+                                f"HN: {str(r.get('hn','?'))}  |  AN: {str(r.get('an','?'))}  |  "
+                                f"อายุ {r.get('age','?')} ปี  |  ICD-10: {str(r.get('pdx','?'))}"
                                 for _, r in ward_df.iterrows()
                             ]
-                            hn_data[f"{ml}||{ward_key}||Total||dead"] = [
-                                f"HN: {str(r.get('hn','?'))}  |  AN: {str(r.get('an','?'))}  |  อายุ {r.get('age','?')} ปี  |  ICD-10: {str(r.get('pdx','?'))}"
+                            hn_data[f"{period_key}||{ward_key}||Total||dead"] = [
+                                f"HN: {str(r.get('hn','?'))}  |  AN: {str(r.get('an','?'))}  |  "
+                                f"อายุ {r.get('age','?')} ปี  |  ICD-10: {str(r.get('pdx','?'))}"
                                 for _, r in ward_df[ward_df["is_death"]].iterrows()
                             ]
             
                 hn_json = json.dumps(hn_data, ensure_ascii=False)
             
                 # ── helper td ─────────────────────────────────────────────────
-                def num_td(val, color, ml, wk, tlabel, flag="all"):
-                    key = f"{ml}||{wk}||{tlabel}||{flag}"
+                def num_td(val, color, period_key, wk, tlabel, flag="all"):
+                    key = f"{period_key}||{wk}||{tlabel}||{flag}"
                     if val == 0:
                         inner = f'<span style="color:#BDBDBD;">0</span>'
                     else:
@@ -1060,8 +1092,8 @@ def show_reports():
                         )
                     return f'<td style="text-align:center;padding:0.6rem 0.8rem;">{inner}</td>'
             
-                def death_td(val, ml, wk, tlabel):
-                    key = f"{ml}||{wk}||{tlabel}||dead"
+                def death_td(val, period_key, wk, tlabel):
+                    key = f"{period_key}||{wk}||{tlabel}||dead"
                     if val == 0:
                         badge = '<span style="color:#9E9E9E;">—</span>'
                     else:
@@ -1072,86 +1104,52 @@ def show_reports():
                         )
                     return f'<td style="text-align:center;padding:0.6rem 0.8rem;">{badge}</td>'
             
-                # ── rows ──────────────────────────────────────────────────────
+                # ── rows — ใช้ _period_key แทน _month_label ───────────────────
                 rows_html = ""
                 for i, row in df_m.iterrows():
-                    is_total = row.get("_is_total", False)
-                    ml       = row.get("_month_label", "")
-                    bg = "#EDE7F6" if is_total else ("white" if i % 2 == 0 else "#F5F5F5")
-                    fw = "700" if is_total else "400"
-                    ward     = str(row["Ward"])
-                    wk       = ward.replace("🔷 ", "")
+                    is_total   = row.get("_is_total", False)
+                    ml_display = row.get("_month_label", "")   # แสดงผลเท่านั้น
+                    period_key = str(row.get("_period_key", "")) # ← ใช้ค้นหา key
+                    bg  = "#EDE7F6" if is_total else ("white" if i % 2 == 0 else "#F5F5F5")
+                    fw  = "700" if is_total else "400"
+                    ward = str(row["Ward"])
+                    wk   = ward.replace("🔷 ", "")
             
                     rows_html += f"""
                     <tr style="background:{bg};font-weight:{fw};">
-                      <td style="padding:0.6rem 1rem;color:#E65100;font-weight:600;white-space:nowrap;">{ml}</td>
+                      <td style="padding:0.6rem 1rem;color:#E65100;font-weight:600;white-space:nowrap;">{ml_display}</td>
                       <td style="padding:0.6rem 1rem;font-weight:{fw};color:#1565C0;white-space:nowrap;">{ward}</td>
-                      {num_td(row['CAP_n'],   '#1976D2', ml, wk, 'CAP')}
-                      {death_td(row['CAP_death'],         ml, wk, 'CAP')}
-                      {num_td(row['HAP_n'],   '#F57C00', ml, wk, 'HAP')}
-                      {death_td(row['HAP_death'],         ml, wk, 'HAP')}
-                      {num_td(row['VAP_n'],   '#D32F2F', ml, wk, 'VAP')}
-                      {death_td(row['VAP_death'],         ml, wk, 'VAP')}
-                      {num_td(row['Total_n'], '#4CAF50', ml, wk, 'Total')}
-                      {death_td(row['Total_death'],       ml, wk, 'Total')}
+                      {num_td(row['CAP_n'],   '#1976D2', period_key, wk, 'CAP')}
+                      {death_td(row['CAP_death'],         period_key, wk, 'CAP')}
+                      {num_td(row['HAP_n'],   '#F57C00', period_key, wk, 'HAP')}
+                      {death_td(row['HAP_death'],         period_key, wk, 'HAP')}
+                      {num_td(row['VAP_n'],   '#D32F2F', period_key, wk, 'VAP')}
+                      {death_td(row['VAP_death'],         period_key, wk, 'VAP')}
+                      {num_td(row['Total_n'], '#4CAF50', period_key, wk, 'Total')}
+                      {death_td(row['Total_death'],       period_key, wk, 'Total')}
                     </tr>"""
             
-                # ── HTML ทั้งหมด — modal อยู่ใน iframe เดียวกัน ───────────────
+                # ── HTML + JS (เหมือนเดิม ไม่เปลี่ยน) ────────────────────────
                 return f"""<!DOCTYPE html>
-            <html>
-            <head>
-            <meta charset="utf-8">
+            <html><head><meta charset="utf-8">
             <style>
               body {{ margin:0; font-family:sans-serif; font-size:14px; }}
-            
-              /* ── Modal ── */
-              #overlay {{
-                display:none; position:fixed; inset:0;
-                background:rgba(0,0,0,0.5); z-index:9999;
-                align-items:center; justify-content:center;
-              }}
+              #overlay {{ display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center; }}
               #overlay.show {{ display:flex; }}
-              #modal {{
-                background:#fff; border-radius:14px; padding:1.5rem 2rem;
-                width:90%; max-width:560px; max-height:75vh; overflow-y:auto;
-                box-shadow:0 20px 60px rgba(0,0,0,0.3); position:relative;
-              }}
-              #modal-title {{
-                color:#1565C0; font-size:1rem; font-weight:700;
-                margin:0 2rem 1rem 0; line-height:1.4;
-              }}
+              #modal {{ background:#fff; border-radius:14px; padding:1.5rem 2rem; width:90%; max-width:560px; max-height:75vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.3); position:relative; }}
+              #modal-title {{ color:#1565C0; font-size:1rem; font-weight:700; margin:0 2rem 1rem 0; line-height:1.4; }}
               #modal-list {{ list-style:none; padding:0; margin:0; }}
-              #modal-list li {{
-                padding:0.5rem 0.8rem; margin-bottom:0.35rem;
-                border-radius:6px; background:#F5F9FC;
-                border-left:3px solid #1976D2;
-                font-family:monospace; font-size:0.85rem; color:#37474F;
-              }}
+              #modal-list li {{ padding:0.5rem 0.8rem; margin-bottom:0.35rem; border-radius:6px; background:#F5F9FC; border-left:3px solid #1976D2; font-family:monospace; font-size:0.85rem; color:#37474F; }}
               .empty-msg {{ color:#9E9E9E; font-style:italic; }}
-              #btn-close {{
-                position:absolute; top:0.8rem; right:1rem;
-                background:none; border:none; font-size:1.5rem;
-                cursor:pointer; color:#9E9E9E; line-height:1;
-              }}
+              #btn-close {{ position:absolute; top:0.8rem; right:1rem; background:none; border:none; font-size:1.5rem; cursor:pointer; color:#9E9E9E; }}
               #btn-close:hover {{ color:#1565C0; }}
-              #btn-copy {{
-                margin-top:1rem; padding:0.45rem 1.2rem;
-                background:#1565C0; color:#fff; border:none;
-                border-radius:8px; cursor:pointer; font-size:0.88rem; font-weight:600;
-              }}
-              #btn-copy:hover {{ background:#0D47A1; }}
-            
-              /* ── Table ── */
-              .wrap {{ overflow-x:auto; overflow-y:auto; max-height:460px;
-                       border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.08); }}
+              #btn-copy {{ margin-top:1rem; padding:0.45rem 1.2rem; background:#1565C0; color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:0.88rem; font-weight:600; }}
+              .wrap {{ overflow-x:auto; overflow-y:auto; max-height:460px; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.08); }}
               table {{ width:100%; border-collapse:collapse; min-width:900px; }}
               thead {{ position:sticky; top:0; z-index:10; }}
               .clickable:hover {{ opacity:0.75; }}
             </style>
-            </head>
-            <body>
-            
-            <!-- Modal -->
+            </head><body>
             <div id="overlay">
               <div id="modal">
                 <button id="btn-close">✕</button>
@@ -1160,8 +1158,6 @@ def show_reports():
                 <button id="btn-copy">📋 คัดลอก HN ทั้งหมด</button>
               </div>
             </div>
-            
-            <!-- ตาราง -->
             <div class="wrap">
             <table>
               <thead>
@@ -1187,59 +1183,34 @@ def show_reports():
               <tbody>{rows_html}</tbody>
             </table>
             </div>
-            
             <script>
               const HN = {hn_json};
-            
-              // ── event delegation — ผูก click ที่ body ครั้งเดียว ──────────
               document.body.addEventListener('click', function(e) {{
                 const el = e.target.closest('.clickable');
                 if (el) openModal(el.dataset.key);
               }});
-            
               function openModal(key) {{
                 const list  = HN[key] || [];
-                const parts = key.split('||');          // [month, ward, type, flag]
-                const month = parts[0] || '';
-                const ward  = parts[1] || '';
-                const type  = parts[2] || '';
+                const parts = key.split('||');
                 const flag  = parts[3] || 'all';
-                const label = flag === 'dead' ? ' (เสียชีวิต)' : '';
-            
                 document.getElementById('modal-title').textContent =
-                  month + '  ·  ' + ward + '  ·  ' + type + label + '  —  ' + list.length + ' ราย';
-            
+                  parts[1] + '  ·  ' + parts[2] + (flag === 'dead' ? ' (เสียชีวิต)' : '') + '  —  ' + list.length + ' ราย';
                 const ul = document.getElementById('modal-list');
-                if (list.length === 0) {{
-                  ul.innerHTML = '<li class="empty-msg">ไม่มีข้อมูล</li>';
-                }} else {{
-                  ul.innerHTML = list.map(h => '<li>' + h + '</li>').join('');
-                }}
+                ul.innerHTML = list.length === 0
+                  ? '<li class="empty-msg">ไม่มีข้อมูล</li>'
+                  : list.map(h => '<li>' + h + '</li>').join('');
                 document.getElementById('overlay').classList.add('show');
               }}
-            
-              document.getElementById('btn-close').onclick = closeModal;
-              document.getElementById('overlay').onclick = function(e) {{
-                if (e.target === this) closeModal();
-              }};
-              function closeModal() {{
-                document.getElementById('overlay').classList.remove('show');
-              }}
-            
-              document.getElementById('btn-copy').onclick = function() {{
-                const items = document.querySelectorAll('#modal-list li');
-                const text  = [...items].map(li => li.textContent).join('\\n');
-                navigator.clipboard.writeText(text).then(() => {{
-                  this.textContent = '✅ คัดลอกแล้ว!';
-                  setTimeout(() => this.textContent = '📋 คัดลอก HN ทั้งหมด', 2000);
-                }});
+              document.getElementById('btn-close').onclick = function() {{ document.getElementById('overlay').classList.remove('show'); }};
+              document.getElementById('overlay').onclick   = function(e) {{ if (e.target===this) document.getElementById('overlay').classList.remove('show'); }};
+              document.getElementById('btn-copy').onclick  = function() {{
+                const text = [...document.querySelectorAll('#modal-list li')].map(li=>li.textContent).join('\\n');
+                navigator.clipboard.writeText(text).then(()=>{{ this.textContent='✅ คัดลอกแล้ว!'; setTimeout(()=>this.textContent='📋 คัดลอก HN ทั้งหมด',2000); }});
               }};
             </script>
-            </body>
-            </html>"""
+            </body></html>"""
             
-
-            
+ 
             import streamlit.components.v1 as components
             html_content = render_matrix_table_v2(df_summary_matrix, df_pn2)
             components.html(
