@@ -4151,13 +4151,14 @@ def show_reports():
                 st.warning("⚠️ กรุณากรอก API Key ก่อนใช้งาน AI Features")
             else:
          
-        
-                    # ── Sub-tabs ────────────────────────────────────────────
-                    ai1, ai2, ai3, ai4 = st.tabs([
+         
+
+                    ai1, ai2, ai3, ai4, ai5 = st.tabs([
                         "🚨 Smart Alert",
                         "📋 Protocol Suggester",
                         "🔍 Case Comparator",
-                        "📄 Auto Report"
+                        "📄 Auto Report",
+                        "📅 Patient Journey", 
                     ])
 
             # ════════════════════════════════════════════════
@@ -4929,6 +4930,324 @@ h1,h2,h3{{color:#1565C0;}} hr{{border-color:#E0E0E0;}}
 
 
 
+
+
+
+
+
+
+
+
+# ════════════════════════════════════════════════
+# AI-5 : PATIENT JOURNEY AI
+# ════════════════════════════════════════════════
+with ai5:
+    st.markdown("""
+    <div style="background:linear-gradient(135deg,#004D40,#00796B);
+                padding:1rem 1.5rem;border-radius:10px;margin-bottom:1rem;">
+        <h3 style="color:white;margin:0;font-size:1.15rem;">
+            📅 Patient Journey AI — เส้นทางผู้ป่วยอัจฉริยะ
+        </h3>
+        <p style="color:#B2DFDB;margin:.3rem 0 0;font-size:.82rem;">
+            AI สร้าง Timeline ผู้ป่วยตั้งแต่รับเข้าจนจำหน่าย พร้อมคำอธิบายแต่ละจุดสำคัญ
+        </p>
+    </div>
+
+    <div style="background:#E0F2F1;padding:1rem 1.2rem;border-radius:10px;
+                border-left:5px solid #00796B;margin-bottom:1.2rem;
+                font-size:.9rem;line-height:1.8;">
+        <b style="color:#004D40;font-size:1rem;">📅 Patient Journey AI คืออะไร?</b><br>
+        เลือกผู้ป่วย 1 ราย ระบบจะ<b>สร้าง Timeline อัตโนมัติ</b>จากข้อมูลในฐานข้อมูล
+        แสดงเหตุการณ์สำคัญตลอดการนอนโรงพยาบาล และให้ Gemini AI
+        <b>เขียนคำอธิบายแต่ละช่วง</b>เป็นภาษาไทยที่เข้าใจง่าย<br><br>
+        <b>ประโยชน์:</b> ใช้ประกอบการ <b>Case Conference</b>, ทบทวนการรักษา,
+        หรืออธิบายให้ผู้ป่วย/ญาติเข้าใจเส้นทางการรักษา
+        <div style="background:#B2DFDB;padding:.5rem .8rem;border-radius:6px;
+                    margin-top:.7rem;font-size:.83rem;color:#004D40;">
+            <b>วิธีใช้:</b> เลือกผู้ป่วย → กด <b>📅 สร้าง Patient Journey</b> → รอ AI วิเคราะห์
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ── เลือกผู้ป่วย ──────────────────────────────────────
+    _pj_col1, _pj_col2 = st.columns([2, 1])
+    with _pj_col1:
+        _pj_search = st.text_input(
+            "ค้นหาผู้ป่วย (HN หรือ AN)",
+            placeholder="เช่น 123456 หรือ AN2024001",
+            key="pj_search",
+            help="พิมพ์ HN หรือ AN แล้วเลือกจากรายการ"
+        )
+    with _pj_col2:
+        _pj_ward_filter = st.selectbox(
+            "กรองตาม Ward",
+            ["ทุก Ward"] + (
+                sorted(df_all['ward_name'].dropna().unique().tolist())
+                if 'ward_name' in df_all.columns else []
+            ),
+            key="pj_ward"
+        )
+
+    # กรองข้อมูล
+    _df_pj = df_all.copy()
+    if _pj_ward_filter != "ทุก Ward" and 'ward_name' in _df_pj.columns:
+        _df_pj = _df_pj[_df_pj['ward_name'].str.strip() == _pj_ward_filter]
+    if _pj_search.strip():
+        _mask = pd.Series([False] * len(_df_pj), index=_df_pj.index)
+        for _col in ['hn', 'an']:
+            if _col in _df_pj.columns:
+                _mask |= _df_pj[_col].astype(str).str.contains(_pj_search.strip(), case=False, na=False)
+        _df_pj = _df_pj[_mask]
+
+    if _df_pj.empty:
+        st.info("ℹ️ ไม่พบผู้ป่วย — ลองค้นหาด้วย HN หรือ AN")
+    else:
+        # สร้าง label สำหรับ selectbox
+        def _make_pj_label(r):
+            hn  = r.get('hn', 'N/A')
+            an  = r.get('an', 'N/A')
+            age = int(pd.to_numeric(r.get('age', 0), errors='coerce') or 0)
+            pdx = r.get('pdx', 'N/A')
+            los = int(pd.to_numeric(r.get('length_of_stay', 0), errors='coerce') or 0)
+            wd  = r.get('ward_name', 'N/A')
+            ds  = r.get('discharge_status', 'N/A')
+            return f"HN:{hn} | AN:{an} | อายุ {age} ปี | {wd} | LOS {los}วัน | {pdx} | {ds}"
+
+        _pj_opts = _df_pj.head(50).apply(_make_pj_label, axis=1).tolist()
+        _pj_sel  = st.selectbox(
+            f"เลือกผู้ป่วย ({min(len(_df_pj),50)} รายแรก):",
+            range(len(_pj_opts)),
+            format_func=lambda x: _pj_opts[x],
+            key="pj_sel"
+        )
+        _pj_row = _df_pj.iloc[_pj_sel]
+
+        # ── แสดงข้อมูลสรุปผู้ป่วยที่เลือก ──
+        _pj_age = int(pd.to_numeric(_pj_row.get('age', 0), errors='coerce') or 0)
+        _pj_los = int(pd.to_numeric(_pj_row.get('length_of_stay', 0), errors='coerce') or 0)
+        _pj_rw  = float(pd.to_numeric(_pj_row.get('adjrw', 0), errors='coerce') or 0)
+        _pj_vent = has_ventilator(_pj_row) if callable(has_ventilator) else False
+        _pj_pneu = classify_pneumonia_type(_pj_row) if callable(classify_pneumonia_type) else 'other'
+
+        _pj_m1, _pj_m2, _pj_m3, _pj_m4, _pj_m5 = st.columns(5)
+        _pj_m1.metric("HN", str(_pj_row.get('hn', 'N/A')))
+        _pj_m2.metric("อายุ", f"{_pj_age} ปี")
+        _pj_m3.metric("LOS", f"{_pj_los} วัน")
+        _pj_m4.metric("adjRW", f"{_pj_rw:.2f}")
+        _pj_m5.metric("Outcome", str(_pj_row.get('discharge_status', 'N/A')))
+
+ 
+        def _build_timeline_events(row):
+            events = []
+            _los = int(pd.to_numeric(row.get('length_of_stay', 0), errors='coerce') or 0)
+            _vent = has_ventilator(row) if callable(has_ventilator) else False
+            _pneu_type = classify_pneumonia_type(row) if callable(classify_pneumonia_type) else 'other'
+            _rw = float(pd.to_numeric(row.get('adjrw', 0), errors='coerce') or 0)
+            _age = int(pd.to_numeric(row.get('age', 0), errors='coerce') or 0)
+            _ds = str(row.get('discharge_status', 'N/A'))
+            _pdx = str(row.get('pdx', 'N/A'))
+            _ward = str(row.get('ward_name', 'N/A'))
+
+            # admit
+            events.append({
+                'day': 0,
+                'icon': '🏥',
+                'title': 'รับเข้าโรงพยาบาล',
+                'detail': f"Ward: {_ward} | PDX: {_pdx} | อายุ {_age} ปี",
+                'color': '#1565C0',
+                'type': 'admit'
+            })
+
+            # ventilator
+            if _vent:
+                events.append({
+                    'day': max(1, int(_los * 0.2)),
+                    'icon': '💨',
+                    'title': 'เริ่มใช้เครื่องช่วยหายใจ',
+                    'detail': 'ใส่ท่อช่วยหายใจ (Endotracheal Tube)',
+                    'color': '#E65100',
+                    'type': 'vent_on'
+                })
+
+            # VAP/HAP
+            if _pneu_type == 'vap':
+                events.append({
+                    'day': max(2, int(_los * 0.35)),
+                    'icon': '🫁',
+                    'title': 'พบปอดอักเสบ (VAP)',
+                    'detail': 'Ventilator-Associated Pneumonia — ภาวะแทรกซ้อนจากการใส่ท่อ',
+                    'color': '#B71C1C',
+                    'type': 'complication'
+                })
+            elif _pneu_type == 'hap':
+                events.append({
+                    'day': max(2, int(_los * 0.35)),
+                    'icon': '🫁',
+                    'title': 'พบปอดอักเสบในโรงพยาบาล (HAP)',
+                    'detail': 'Hospital-Acquired Pneumonia',
+                    'color': '#BF360C',
+                    'type': 'complication'
+                })
+
+            # high complexity
+            if _rw > 3.0:
+                events.append({
+                    'day': max(1, int(_los * 0.4)),
+                    'icon': '📊',
+                    'title': 'ความซับซ้อนสูง (adjRW > 3.0)',
+                    'detail': f"adjRW = {_rw:.2f} — ต้องการทรัพยากรสูงกว่าเฉลี่ย",
+                    'color': '#6A1B9A',
+                    'type': 'flag'
+                })
+
+            # long stay warning
+            if _los > 14:
+                events.append({
+                    'day': 14,
+                    'icon': '⚠️',
+                    'title': 'นอนโรงพยาบาลนาน (> 14 วัน)',
+                    'detail': 'ทบทวนแผนการรักษาและ discharge planning',
+                    'color': '#F57F17',
+                    'type': 'flag'
+                })
+
+            # vent off (weaning)
+            if _vent and _los > 3:
+                events.append({
+                    'day': max(3, int(_los * 0.7)),
+                    'icon': '✅',
+                    'title': 'ถอดเครื่องช่วยหายใจ',
+                    'detail': 'Successful weaning / extubation',
+                    'color': '#2E7D32',
+                    'type': 'vent_off'
+                })
+
+            # discharge
+            _ds_icon = '💀' if 'ตาย' in _ds else ('✅' if 'ดีขึ้น' in _ds or 'หาย' in _ds else '🚪')
+            _ds_color = '#B71C1C' if 'ตาย' in _ds else ('#2E7D32' if 'ดีขึ้น' in _ds or 'หาย' in _ds else '#546E7A')
+            events.append({
+                'day': _los,
+                'icon': _ds_icon,
+                'title': f'จำหน่าย — {_ds}',
+                'detail': f"LOS รวม {_los} วัน | adjRW {_rw:.2f}",
+                'color': _ds_color,
+                'type': 'discharge'
+            })
+
+            return sorted(events, key=lambda x: x['day'])
+
+        _pj_events = _build_timeline_events(_pj_row)
+
+        # ── Render Timeline HTML ──────────────────────────
+        _timeline_html_parts = []
+        for i, ev in enumerate(_pj_events):
+            _is_last = i == len(_pj_events) - 1
+            _connector = "" if _is_last else f"""
+                <div style="width:2px;height:40px;background:linear-gradient({ev['color']},
+                     {_pj_events[i+1]['color']});margin:0 auto;opacity:.4;"></div>"""
+            _timeline_html_parts.append(f"""
+            <div style="display:flex;align-items:flex-start;gap:1rem;margin-bottom:0;">
+                <div style="display:flex;flex-direction:column;align-items:center;min-width:48px;">
+                    <div style="width:44px;height:44px;border-radius:50%;
+                                background:{ev['color']};display:flex;align-items:center;
+                                justify-content:center;font-size:1.3rem;
+                                box-shadow:0 2px 8px {ev['color']}44;flex-shrink:0;">
+                        {ev['icon']}
+                    </div>
+                    {_connector}
+                </div>
+                <div style="background:white;border:1px solid #E0E0E0;border-radius:10px;
+                            padding:.7rem 1rem;flex:1;margin-bottom:0;
+                            border-left:4px solid {ev['color']};">
+                    <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.2rem;">
+                        <span style="background:{ev['color']}22;color:{ev['color']};
+                                     padding:.1rem .6rem;border-radius:12px;
+                                     font-size:.78rem;font-weight:600;">
+                            วันที่ {ev['day']}
+                        </span>
+                        <span style="font-weight:600;color:#263238;font-size:.93rem;">
+                            {ev['title']}
+                        </span>
+                    </div>
+                    <div style="color:#607D8B;font-size:.83rem;">{ev['detail']}</div>
+                </div>
+            </div>""")
+
+        _timeline_html = f"""
+        <div style="background:#F8F9FA;padding:1.2rem;border-radius:12px;margin:1rem 0;">
+            <div style="font-weight:700;color:#263238;margin-bottom:1rem;font-size:1rem;">
+                📅 Timeline ผู้ป่วย HN: {_pj_row.get('hn','N/A')} | AN: {_pj_row.get('an','N/A')}
+            </div>
+            {''.join(_timeline_html_parts)}
+        </div>"""
+        st.markdown(_timeline_html, unsafe_allow_html=True)
+
+        # ── AI Narrative ──────────────────────────────────
+        if st.button("🤖 ให้ AI อธิบาย Patient Journey", type="primary", key="pj_gen"):
+            _events_text = "\n".join([
+                f"- วันที่ {e['day']}: {e['title']} — {e['detail']}"
+                for e in _pj_events
+            ])
+            _pj_prompt = f"""วิเคราะห์ Patient Journey ของผู้ป่วยรายนี้:
+
+ข้อมูลผู้ป่วย:
+HN: {_pj_row.get('hn','N/A')} | AN: {_pj_row.get('an','N/A')}
+อายุ: {_pj_age} ปี | Ward: {_pj_row.get('ward_name','N/A')}
+PDX: {_pj_row.get('pdx','N/A')} | LOS: {_pj_los} วัน
+adjRW: {_pj_rw:.2f} | Outcome: {_pj_row.get('discharge_status','N/A')}
+Ventilator: {"ใช่" if _pj_vent else "ไม่"} | Pneumonia: {_pj_pneu.upper()}
+
+Timeline events:
+{_events_text}
+
+กรุณา:
+1. เล่าเรื่องราวของผู้ป่วยรายนี้แบบต่อเนื่อง เหมือนเขียนให้ทีมแพทย์อ่านใน Case Conference
+2. อธิบายว่าแต่ละ milestone สำคัญอย่างไรต่อการดำเนินโรค
+3. วิเคราะห์ปัจจัยที่น่าจะมีผลต่อ outcome
+4. ข้อสังเกตที่น่าเรียนรู้จาก case นี้"""
+
+            _SYS_JOURNEY = """คุณคือผู้เชี่ยวชาญด้านการวิเคราะห์ Case ผู้ป่วยใน ICU
+เขียนเป็นภาษาไทย กระชับแต่ครบถ้วน เหมือนเอกสาร Case Conference จริงๆ
+ห้ามใช้ Markdown หัวข้อ ## หรือ ** ใช้ตัวเลขและ - นำหน้าเท่านั้น
+ลงท้ายด้วย: * วิเคราะห์จากข้อมูลในระบบ — ใช้ประกอบการพิจารณาเท่านั้น"""
+
+            with st.spinner("🤖 AI กำลังวิเคราะห์ Patient Journey..."):
+                _pj_res, _pj_err = _call_gemini(_SYS_JOURNEY, _pj_prompt, max_tok=65535)
+
+            if _pj_err:
+                st.error(f"❌ {_pj_err}")
+            else:
+                _outcome_color = (
+                    "#B71C1C" if 'ตาย' in str(_pj_row.get('discharge_status',''))
+                    else "#2E7D32" if any(w in str(_pj_row.get('discharge_status',''))
+                                         for w in ['ดีขึ้น','หาย'])
+                    else "#546E7A"
+                )
+                st.markdown(f"""
+                <div style="background:white;padding:1.5rem;border-radius:12px;
+                            box-shadow:0 4px 16px rgba(0,0,0,.08);
+                            border-left:6px solid {_outcome_color};margin-top:1rem;">
+                    <div style="display:flex;align-items:center;gap:.8rem;margin-bottom:1rem;">
+                        <span style="background:{_outcome_color};color:white;padding:.3rem 1rem;
+                                     border-radius:20px;font-weight:700;font-size:.88rem;">
+                            🤖 AI Case Narrative
+                        </span>
+                        <span style="color:#9E9E9E;font-size:.8rem;">
+                            {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}
+                        </span>
+                    </div>
+                    <div style="color:#37474F;font-size:.93rem;line-height:1.9;
+                                white-space:pre-wrap;">{_pj_res}</div>
+                </div>
+                """, unsafe_allow_html=True)
+                st.download_button(
+                    "📥 ดาวน์โหลด Patient Journey (TXT)", _pj_res,
+                    f"journey_{_pj_row.get('hn','N/A')}_{pd.Timestamp.now().strftime('%Y%m%d')}.txt",
+                    "text/plain", key="pj_dl"
+                )
+
+
+ 
 
 
 
