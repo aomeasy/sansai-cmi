@@ -169,26 +169,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
  
-debug_keys = []
-if not df_pn2.empty:
-    TYPE_MAP = {"cap": "CAP", "hap": "HAP", "vap": "VAP"}
-    for _, grp in df_pn2.groupby("month_sort"):
-        ml = str(grp["month_label"].iloc[0]) if "month_label" in grp.columns else "NO_LABEL"
-        for ward_key in grp["ward_group"].dropna().unique():
-            for t_code, t_label in TYPE_MAP.items():
-                debug_keys.append(f"{ml}||{ward_key}||{t_label}||all")
-
-with st.expander("🔍 DEBUG: keys ใน hn_data (ลบออกหลัง fix)"):
-    st.write("### month_label ใน df_pn2:")
-    st.write(df_pn2["month_label"].unique().tolist())
-    st.write("### ward_group ใน df_pn2:")
-    st.write(df_pn2["ward_group"].dropna().unique().tolist())
-    st.write("### month_label ใน df_summary_matrix:")
-    st.write(df_summary_matrix["_month_label"].unique().tolist())
-    st.write("### Ward ใน df_summary_matrix:")
-    st.write(df_summary_matrix["Ward"].unique().tolist())
-    st.write("### ตัวอย่าง keys ที่สร้างจาก df_pn2:")
-    st.write(debug_keys[:10])
+ 
     
 # ตั้งค่า Supabase
 SUPABASE_URL = "https://qwxnsusfydrhtfqdcsqn.supabase.co"
@@ -1215,18 +1196,12 @@ def show_reports():
             components.html(html_content, height=560, scrolling=False)
             
  
-            import streamlit.components.v1 as components
-            html_content = render_matrix_table_v2(df_summary_matrix, df_pn2)
-            components.html(
-                f"<div style='font-family:sans-serif;font-size:14px;'>{html_content}</div>",
-                height=520,
-                scrolling=True
-            )
+   
   
              
             # ── Download ────────────────────────────────────────────────────
             csv_matrix = df_summary_matrix.drop(
-                columns=['_month_label', '_is_total'], errors='ignore'
+                columns=['_month_label', '_is_total','_period_key'], errors='ignore'
             ).to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
             st.download_button(
                 "📥 ดาวน์โหลดตาราง CSV",
