@@ -519,16 +519,16 @@ def show_reports():
     except ImportError:
         st.error("❌ ไม่สามารถโหลด Altair library กรุณาติดตั้ง: pip install altair")
         return
-        
-    tab1, tab2, tab4, tab5, tab6 = st.tabs([
+  
+    
+    tab1, tab2, tab4, tab5, tab6, tab7 = st.tabs([
         "🏥 Dashboard ภาพรวม",
         "🫁 ปอดบวม (Pneumonia)",
         "🧠 Stroke & ACS",
         "🔬 เชิงลึก",
-        "🚨 ICU Risk Score"
+        "🚨 ICU Risk Score",
+        "🤖 AI Gen Report"
     ])
-    
-
     # ════════════════════════════════════════════════════
     # TAB 1 : DASHBOARD ภาพรวม
     # ════════════════════════════════════════════════════
