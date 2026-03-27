@@ -4112,54 +4112,54 @@ def show_reports():
         else:
             # ── gemini caller ──────────────────────────────────────
             def _call_gemini(sys_prompt, user_msg, max_tok=1200):
-            models = [
-                "gemini-2.0-flash",
-                "gemini-2.5-flash",
-                "gemini-2.0-flash-lite",
-            ]
-            full_prompt = f"{sys_prompt}\n\n---\n\n{user_msg}"
-            for model in models:
-                try:
-                    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={_ai_key}"
-                    r = requests.post(
-                        url,
-                        headers={"Content-Type": "application/json"},
-                        json={
-                            "contents": [{"role": "user", "parts": [{"text": full_prompt}]}],
-                            "generationConfig": {"maxOutputTokens": max_tok, "temperature": 0.3}
-                        },
-                        timeout=60
-                    )
-                    if r.status_code == 200:
-                        data = r.json()
-                        text = data["candidates"][0]["content"]["parts"][0]["text"]
-                        return text, None
-                    elif r.status_code == 429:
-                        continue
-                    else:
-                        try:
-                            err_msg = r.json().get("error", {}).get("message", r.text[:300])
-                        except Exception:
-                            err_msg = r.text[:300]
-                        return None, f"API Error {r.status_code}: {err_msg}"
-                except requests.exceptions.Timeout:
-                    return None, "⏱️ Request timeout — ลองใหม่อีกครั้ง"
-                except Exception as e:
-                    return None, f"❌ {str(e)}"
-            return None, "❌ ทุก model quota หมดแล้ว"
-    
-        if not _ai_key:
-            st.warning("⚠️ กรุณากรอก API Key ก่อนใช้งาน AI Features")
-        else:
-     
-    
-                # ── Sub-tabs ────────────────────────────────────────────
-                ai1, ai2, ai3, ai4 = st.tabs([
-                    "🚨 Smart Alert",
-                    "📋 Protocol Suggester",
-                    "🔍 Case Comparator",
-                    "📄 Auto Report"
-                ])
+                models = [
+                    "gemini-2.0-flash",
+                    "gemini-2.5-flash",
+                    "gemini-2.0-flash-lite",
+                ]
+                full_prompt = f"{sys_prompt}\n\n---\n\n{user_msg}"
+                for model in models:
+                    try:
+                        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={_ai_key}"
+                        r = requests.post(
+                            url,
+                            headers={"Content-Type": "application/json"},
+                            json={
+                                "contents": [{"role": "user", "parts": [{"text": full_prompt}]}],
+                                "generationConfig": {"maxOutputTokens": max_tok, "temperature": 0.3}
+                            },
+                            timeout=60
+                        )
+                        if r.status_code == 200:
+                            data = r.json()
+                            text = data["candidates"][0]["content"]["parts"][0]["text"]
+                            return text, None
+                        elif r.status_code == 429:
+                            continue
+                        else:
+                            try:
+                                err_msg = r.json().get("error", {}).get("message", r.text[:300])
+                            except Exception:
+                                err_msg = r.text[:300]
+                            return None, f"API Error {r.status_code}: {err_msg}"
+                    except requests.exceptions.Timeout:
+                        return None, "⏱️ Request timeout — ลองใหม่อีกครั้ง"
+                    except Exception as e:
+                        return None, f"❌ {str(e)}"
+                return None, "❌ ทุก model quota หมดแล้ว"
+        
+            if not _ai_key:
+                st.warning("⚠️ กรุณากรอก API Key ก่อนใช้งาน AI Features")
+            else:
+         
+        
+                    # ── Sub-tabs ────────────────────────────────────────────
+                    ai1, ai2, ai3, ai4 = st.tabs([
+                        "🚨 Smart Alert",
+                        "📋 Protocol Suggester",
+                        "🔍 Case Comparator",
+                        "📄 Auto Report"
+                    ])
 
             # ════════════════════════════════════════════════
             # AI-1 : SMART ALERT
