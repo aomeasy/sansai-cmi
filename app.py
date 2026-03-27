@@ -4126,7 +4126,7 @@ def show_reports():
                             headers={"Content-Type": "application/json"},
                             json={
                                 "contents": [{"role": "user", "parts": [{"text": full_prompt}]}],
-                                "generationConfig": {"maxOutputTokens": max_tok, "temperature": 0.3}
+                                "generationConfig": {"maxOutputTokens": max_tok, "temperature": 0.3, "candidateCount": 1}
                             },
                             timeout=60
                         )
@@ -4360,7 +4360,7 @@ NPV            : {_npv:.1f}%
 4. สัญญาณเตือนที่ต้องรายงานแพทย์ทันที"""
 
                     with st.spinner("🤖 Gemini กำลังวิเคราะห์..."):
-                        _res, _err = _call_gemini(_SYS_ICU, _user_msg, max_tok=2048)
+                        _res, _err = _call_gemini(_SYS_ICU, _user_msg, max_tok=65535)
 
                     if _err:
                         st.error(f"❌ {_err}")
