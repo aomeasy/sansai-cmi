@@ -510,15 +510,15 @@ def show_reports():
     except ImportError:
         st.error("❌ ไม่สามารถโหลด Altair library กรุณาติดตั้ง: pip install altair")
         return
-       
-    tab1, tab2, tab4, tab5, tab6, tab7 = st.tabs([
-    "🏥 Dashboard ภาพรวม",
-    "🫁 ปอดบวม (Pneumonia)",
-    "🧠 Stroke & ACS",
-    "🔬 เชิงลึก",
-    "🚨 ICU Risk Score",
-    "🤖 AI Gen Report"
+        
+    tab1, tab2, tab4, tab5, tab6 = st.tabs([
+        "🏥 Dashboard ภาพรวม",
+        "🫁 ปอดบวม (Pneumonia)",
+        "🧠 Stroke & ACS",
+        "🔬 เชิงลึก",
+        "🚨 ICU Risk Score"
     ])
+    
 
     # ════════════════════════════════════════════════════
     # TAB 1 : DASHBOARD ภาพรวม
@@ -3966,7 +3966,745 @@ def show_reports():
 
 
 
+# ════════════════════════════════════════════════════
+    # TAB 7 : AI GEN REPORT
+    # ════════════════════════════════════════════════════
+    with tab7:
+        # ── System Prompts ─────────────────────────────────────────
+        _SYS_ICU = """คุณคือผู้ช่วยแพทย์ผู้เชี่ยวชาญด้าน ICU (หอผู้ป่วยหนัก) ที่มีความเชี่ยวชาญใน:
+- การแปลผล Risk Score และตัวชี้วัดทางสถิติทางการแพทย์
+- ปอดอักเสบจากการใช้เครื่องช่วยหายใจ (VAP) และปอดอักเสบในโรงพยาบาล (HAP)
+- การดูแลผู้ป่วยวิกฤต และ ICU Protocol ของโรงพยาบาลในประเทศไทย
+หน้าที่หลักของคุณ:
+รับข้อมูล Risk Score ของผู้ป่วย ICU แล้วสรุปเป็นภาษาไทยที่ชัดเจน กระชับ และนำไปใช้ได้จริงสำหรับแพทย์และพยาบาลที่ดูแลผู้ป่วย
+กฎการตอบ:
+1. ตอบเป็นภาษาไทยเสมอ ยกเว้นคำศัพท์เฉพาะทางการแพทย์ที่ไม่มีคำแปลที่ดีกว่า
+2. สรุปกระชับ 3-5 ประโยค ไม่ยาวเกินไป
+3. ระบุปัจจัยเสี่ยงสำคัญที่ควรติดตามเป็นอันดับแรก
+4. แนะนำ action ที่ควรทำ อย่างน้อย 1-2 ข้อ
+5. ไม่วินิจฉัยโรค ไม่สั่งการรักษา — เป็นเพียงการสรุปข้อมูลเพื่อสนับสนุนการตัดสินใจ
+6. ลงท้ายด้วยข้อความ: "* ข้อมูลนี้จากระบบ retrospective — ใช้เป็น reference ประกอบการตัดสินใจเท่านั้น"
+7. ห้ามเพิ่มข้อมูลที่ไม่มีใน input เด็ดขาด"""
 
+        _SYS_PROTOCOL = """คุณคือผู้เชี่ยวชาญด้าน ICU Protocol และ Evidence-Based Nursing ในโรงพยาบาลไทย
+หน้าที่: แนะนำ Protocol, Bundle และ Checklist ที่เหมาะสมตาม Risk Factors ของผู้ป่วย ICU
+กฎ:
+1. ตอบเป็นภาษาไทย ใช้ภาษาที่พยาบาลและแพทย์เข้าใจง่าย
+2. จัดเป็นหมวดหมู่ชัดเจน มี ☐ checkbox สำหรับ bundle
+3. ระบุ priority: [ด่วน] [ภายใน 24 ชม.] [ติดตาม]
+4. อ้างอิงแนวทาง evidence-based (ไม่ต้องใส่ citation เต็ม)
+5. ไม่สั่งการรักษา — เป็นการแนะนำ protocol สำหรับพิจารณา
+6. ลงท้ายด้วย: "* ปรึกษาแพทย์ผู้ดูแลก่อนดำเนินการทุกครั้ง" """
+
+        _SYS_CASE = """คุณคือผู้เชี่ยวชาญด้าน Clinical Outcome Analysis ใน ICU โรงพยาบาลไทย
+หน้าที่: วิเคราะห์ Historical Cases แล้วสรุป pattern, outcomes และข้อเสนอแนะในเชิงคลินิก
+กฎ:
+1. ตอบเป็นภาษาไทย กระชับ ได้ใจความ
+2. เปรียบเทียบ outcome ระหว่างกลุ่ม (มีปัจจัยเสี่ยง vs ไม่มี)
+3. ระบุ pattern ที่น่าสังเกต (mortality สูงในกลุ่มใด, LOS ยาวในสถานการณ์ใด)
+4. เสนอ implication สำหรับการดูแลผู้ป่วยกลุ่มเดียวกันในอนาคต
+5. ลงท้ายด้วย: "* ข้อมูลจาก historical cases — ใช้เป็น reference ประกอบการตัดสินใจเท่านั้น" """
+
+        _SYS_REPORT = """คุณคือผู้เชี่ยวชาญด้านการเขียนรายงานทางการแพทย์สำหรับโรงพยาบาลสันทราย จังหวัดเชียงใหม่
+หน้าที่: สร้างรายงานสรุปประจำเดือน/ไตรมาส สำหรับ IPD ที่อ่านง่าย นำเสนอต่อผู้บริหารได้
+โครงสร้างรายงาน:
+1. บทสรุปผู้บริหาร (Executive Summary) — 3-5 ประโยค
+2. ผลการดำเนินงานหลัก — KPI ที่สำคัญพร้อมตีความ
+3. จุดเด่นและความสำเร็จ
+4. ประเด็นที่ต้องติดตาม / พื้นที่ปรับปรุง
+5. ข้อเสนอแนะเชิงปฏิบัติ
+กฎ:
+1. ตอบเป็นภาษาไทย เป็นทางการแต่ไม่ซับซ้อน
+2. ตีความตัวเลขให้มีความหมาย ไม่ใช่แค่รายงานตัวเลข
+3. ระบุ trend: ดีขึ้น ↑ / แย่ลง ↓ / คงที่ →
+4. ลงท้ายด้วย: "* รายงานนี้สร้างโดย AI — กรุณาตรวจสอบความถูกต้องก่อนนำเสนอ" """
+
+        # ── Header ─────────────────────────────────────────────────
+        st.markdown("""
+        <div style="background:linear-gradient(135deg,#263238,#1565C0,#4A148C);
+                    padding:1.2rem 2rem;border-radius:12px;margin-bottom:1.2rem;">
+            <h2 style="color:white;margin:0;font-size:1.5rem;">
+                🤖 AI Gen Report — ระบบรายงานอัจฉริยะ
+            </h2>
+            <p style="color:#B3E5FC;margin:.3rem 0 0;font-size:.9rem;">
+                Powered by Claude AI · Smart Alert · Protocol Suggester · Case Comparator · Auto Report
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # ── API Key Section ─────────────────────────────────────────
+        with st.expander(
+            "🔑 ตั้งค่า Anthropic API Key" + (" ✅" if st.session_state.get('_ai_key') else " ⚠️"),
+            expanded=not bool(st.session_state.get('_ai_key'))
+        ):
+            st.markdown("""
+            <div style="background:#E3F2FD;padding:.8rem 1rem;border-radius:8px;
+                        border-left:4px solid #1976D2;margin-bottom:1rem;font-size:.9rem;">
+                <b style="color:#1565C0;">วิธีขอ API Key:</b>
+                ไปที่
+                <a href="https://console.anthropic.com" target="_blank"
+                   style="color:#1976D2;">console.anthropic.com</a>
+                → API Keys → Create Key
+                <br>
+                <span style="color:#546E7A;">
+                  API Key จะถูกเก็บเฉพาะใน session นี้ ไม่มีการบันทึกถาวร
+                </span>
+            </div>
+            """, unsafe_allow_html=True)
+
+            _key_input = st.text_input(
+                "Anthropic API Key",
+                type="password",
+                placeholder="sk-ant-api03-...",
+                key="_api_key_field"
+            )
+            _c1, _c2 = st.columns([1, 4])
+            with _c1:
+                if st.button("✅ บันทึก", key="_save_key"):
+                    if _key_input and (_key_input.startswith("sk-ant-") or _key_input.startswith("sk-")):
+                        st.session_state['_ai_key'] = _key_input
+                        st.success("บันทึกแล้ว")
+                        st.rerun()
+                    else:
+                        st.error("รูปแบบ API Key ไม่ถูกต้อง")
+            with _c2:
+                if st.session_state.get('_ai_key'):
+                    if st.button("🗑️ ลบ API Key", key="_del_key"):
+                        del st.session_state['_ai_key']
+                        st.rerun()
+
+        _ai_key = st.session_state.get('_ai_key', '')
+        if not _ai_key:
+            st.warning("⚠️ กรุณากรอก API Key ก่อนใช้งาน AI Features")
+        else:
+            # ── Claude caller ──────────────────────────────────────
+            def _call_claude(sys_prompt, user_msg, max_tok=1200):
+                try:
+                    r = requests.post(
+                        "https://api.anthropic.com/v1/messages",
+                        headers={
+                            "x-api-key": _ai_key,
+                            "anthropic-version": "2023-06-01",
+                            "content-type": "application/json"
+                        },
+                        json={
+                            "model": "claude-sonnet-4-20250514",
+                            "max_tokens": max_tok,
+                            "system": sys_prompt,
+                            "messages": [{"role": "user", "content": user_msg}]
+                        },
+                        timeout=60
+                    )
+                    if r.status_code == 200:
+                        return r.json()["content"][0]["text"], None
+                    else:
+                        try:
+                            err_msg = r.json().get("error", {}).get("message", r.text[:300])
+                        except Exception:
+                            err_msg = r.text[:300]
+                        return None, f"API Error {r.status_code}: {err_msg}"
+                except requests.exceptions.Timeout:
+                    return None, "⏱️ Request timeout — ลองใหม่อีกครั้ง"
+                except Exception as e:
+                    return None, f"❌ {str(e)}"
+
+            # ── Sub-tabs ────────────────────────────────────────────
+            ai1, ai2, ai3, ai4 = st.tabs([
+                "🚨 Smart Alert",
+                "📋 Protocol Suggester",
+                "🔍 Case Comparator",
+                "📄 Auto Report"
+            ])
+
+            # ════════════════════════════════════════════════
+            # AI-1 : SMART ALERT
+            # ════════════════════════════════════════════════
+            with ai1:
+                st.markdown("""
+                <div style="background:linear-gradient(135deg,#B71C1C,#4A148C);
+                            padding:1rem 1.5rem;border-radius:10px;margin-bottom:1rem;">
+                    <h3 style="color:white;margin:0;font-size:1.15rem;">
+                        🚨 Smart Alert — สรุปความเสี่ยงผู้ป่วย ICU
+                    </h3>
+                    <p style="color:#FFCDD2;margin:.3rem 0 0;font-size:.82rem;">
+                        แปล Risk Score + Sensitivity/PPV เป็นภาษาที่พยาบาลเข้าใจทันที
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+
+                # ── เตรียม ICU data (re-calculate local scope) ──────
+                _df_icu = df_all[
+                    df_all.get('ward_name', pd.Series(dtype=str))
+                    .str.strip().eq('หอผู้ป่วยหนัก ICU')
+                ].copy() if 'ward_name' in df_all.columns else pd.DataFrame()
+
+                _input_mode = st.radio(
+                    "วิธีกรอกข้อมูล:",
+                    ["📋 เลือกจากข้อมูลในระบบ", "✏️ กรอกเอง"],
+                    horizontal=True, key="sa_mode"
+                )
+
+                _pd = {}  # patient dict
+
+                if _input_mode == "📋 เลือกจากข้อมูลในระบบ" and not _df_icu.empty:
+                    _df_icu['age']   = pd.to_numeric(_df_icu['age'],   errors='coerce').fillna(0)
+                    _df_icu['adjrw'] = pd.to_numeric(_df_icu['adjrw'], errors='coerce').fillna(0)
+                    _df_icu['_los']  = pd.to_numeric(_df_icu.get('length_of_stay', 0), errors='coerce').fillna(0)
+                    _df_icu['_vent'] = _df_icu.apply(has_ventilator, axis=1)
+                    _df_icu['_pneu'] = _df_icu.apply(classify_pneumonia_type, axis=1) \
+                                       if 'pdx' in _df_icu.columns else 'other'
+                    _df_icu['_sc'] = (
+                        (_df_icu['_pneu'] == 'vap').astype(int) * 3 +
+                        (_df_icu['_pneu'] == 'hap').astype(int) * 2 +
+                        _df_icu['_vent'].astype(int) * 2 +
+                        (_df_icu['adjrw'] > 3.0).astype(int) * 2 +
+                        (_df_icu['age'] >= 65).astype(int) +
+                        (_df_icu['_los'] > 7).astype(int)
+                    )
+                    _df_icu['_rl'] = _df_icu['_sc'].apply(
+                        lambda s: 'High' if s >= 5 else ('Medium' if s >= 3 else 'Low'))
+                    _df_icu_s = _df_icu.sort_values('_sc', ascending=False)
+
+                    _opts = _df_icu_s.apply(
+                        lambda r: (
+                            f"AN:{r.get('an','?')} | "
+                            f"{r.get('_rl','?')} | "
+                            f"Score:{int(r.get('_sc',0))}/11 | "
+                            f"อายุ {int(r.get('age',0))} ปี | "
+                            f"LOS {int(r.get('_los',0))} วัน | "
+                            f"{r.get('_pneu','').upper()}"
+                        ), axis=1
+                    ).tolist()
+
+                    _sel = st.selectbox("เลือกผู้ป่วย (เรียงตาม Risk Score สูง→ต่ำ):",
+                                        range(len(_opts)),
+                                        format_func=lambda x: _opts[x],
+                                        key="sa_sel")
+                    if _sel is not None:
+                        _r = _df_icu_s.iloc[_sel]
+                        _pd = {
+                            'risk_level': _r.get('_rl', 'Low'),
+                            'total_score': int(_r.get('_sc', 0)),
+                            'age': int(_r.get('age', 0)),
+                            'los': int(_r.get('_los', 0)),
+                            'adjrw': float(_r.get('adjrw', 0)),
+                            'has_vap': _r.get('_pneu') == 'vap',
+                            'has_hap': _r.get('_pneu') == 'hap',
+                            'on_vent': bool(_r.get('_vent', False)),
+                            'high_rw': float(_r.get('adjrw', 0)) > 3.0,
+                            'elderly': int(_r.get('age', 0)) >= 65,
+                            'long_los': int(_r.get('_los', 0)) > 7,
+                            'pdx': str(_r.get('pdx', 'N/A')),
+                        }
+                else:
+                    st.markdown("#### กรอกข้อมูลผู้ป่วย")
+                    _c1, _c2, _c3 = st.columns(3)
+                    with _c1:
+                        _m_rl  = st.selectbox("Risk Level", ["High","Medium","Low"], key="sa_rl")
+                        _m_sc  = st.number_input("คะแนนรวม (0–11)", 0, 11, 7, key="sa_sc")
+                        _m_age = st.number_input("อายุ (ปี)", 0, 120, 68, key="sa_age")
+                    with _c2:
+                        _m_los = st.number_input("LOS (วัน)", 0, 365, 9, key="sa_los")
+                        _m_rw  = st.number_input("adjRW", 0.0, 50.0, 3.5, 0.1, key="sa_rw")
+                        _m_pdx = st.text_input("PDX (ICD-10)", "J95.851", key="sa_pdx")
+                    with _c3:
+                        _m_vap  = st.checkbox("VAP (+3)", key="sa_vap")
+                        _m_hap  = st.checkbox("HAP (+2)", key="sa_hap")
+                        _m_vent = st.checkbox("On Ventilator (+2)", key="sa_vent")
+                        _m_hrw  = st.checkbox("adjRW > 3.0 (+2)", value=_m_rw > 3.0, key="sa_hrw")
+                        _m_eld  = st.checkbox("อายุ ≥ 65 ปี (+1)", value=_m_age >= 65, key="sa_eld")
+                        _m_llos = st.checkbox("LOS > 7 วัน (+1)", value=_m_los > 7, key="sa_llos")
+                    _pd = {
+                        'risk_level': _m_rl, 'total_score': _m_sc,
+                        'age': _m_age, 'los': _m_los, 'adjrw': _m_rw,
+                        'has_vap': _m_vap, 'has_hap': _m_hap, 'on_vent': _m_vent,
+                        'high_rw': _m_hrw, 'elderly': _m_eld, 'long_los': _m_llos,
+                        'pdx': _m_pdx,
+                    }
+
+                # ── Scoring metrics ─────────────────────────────────
+                st.markdown("#### ค่าความแม่นของระบบ (กรอกจาก Tab ICU Risk Score)")
+                _mc1,_mc2,_mc3,_mc4,_mc5 = st.columns(5)
+                _auroc = _mc1.number_input("AUROC",        0.0,1.0, 0.750,0.001,format="%.3f",key="sa_auroc")
+                _sens  = _mc2.number_input("Sensitivity%", 0.0,100.0,70.0,0.1,key="sa_sens")
+                _spec  = _mc3.number_input("Specificity%", 0.0,100.0,80.0,0.1,key="sa_spec")
+                _ppv   = _mc4.number_input("PPV%",         0.0,100.0,62.0,0.1,key="sa_ppv")
+                _npv   = _mc5.number_input("NPV%",         0.0,100.0,93.0,0.1,key="sa_npv")
+
+                if _pd and st.button("🤖 สร้าง Smart Alert", type="primary", key="sa_gen"):
+                    _user_msg = f"""สรุป ICU Risk Score ของผู้ป่วยรายนี้:
+--- ข้อมูลผู้ป่วย ---
+Risk Level     : {_pd.get('risk_level','?')}
+คะแนนรวม      : {_pd.get('total_score',0)} / 11 คะแนน
+อายุ           : {_pd.get('age',0)} ปี
+ระยะเวลานอน   : {_pd.get('los',0)} วัน (LOS)
+adjRW          : {_pd.get('adjrw',0):.2f}
+รหัสโรค PDX   : {_pd.get('pdx','N/A')}
+--- ปัจจัยที่ได้คะแนน ---
+VAP (ปอดอักเสบจากท่อช่วยหายใจ) : {"ใช่ +3" if _pd.get('has_vap') else "ไม่ใช่"}
+HAP (ปอดอักเสบในโรงพยาบาล)     : {"ใช่ +2" if _pd.get('has_hap') else "ไม่ใช่"}
+ใช้เครื่องช่วยหายใจ (On Vent)   : {"ใช่ +2" if _pd.get('on_vent') else "ไม่ใช่"}
+adjRW > 3.0                      : {"ใช่ +2" if _pd.get('high_rw') else "ไม่ใช่"}
+อายุ ≥ 65 ปี                     : {"ใช่ +1" if _pd.get('elderly') else "ไม่ใช่"}
+LOS > 7 วัน                      : {"ใช่ +1" if _pd.get('long_los') else "ไม่ใช่"}
+--- ประสิทธิภาพของระบบ Scoring ---
+AUROC          : {_auroc:.3f}
+Sensitivity    : {_sens:.1f}%
+Specificity    : {_spec:.1f}%
+PPV            : {_ppv:.1f}%
+NPV            : {_npv:.1f}%
+--- สิ่งที่ต้องการ ---
+สรุปสถานะความเสี่ยงของผู้ป่วยรายนี้ ระบุปัจจัยสำคัญ และแนะนำสิ่งที่ควรติดตามหรือดำเนินการ"""
+
+                    with st.spinner("🤖 Claude กำลังวิเคราะห์..."):
+                        _res, _err = _call_claude(_SYS_ICU, _user_msg, max_tok=900)
+
+                    if _err:
+                        st.error(f"❌ {_err}")
+                    else:
+                        _rc = {"High":"#D32F2F","Medium":"#F57C00","Low":"#2E7D32"}.get(
+                            _pd.get('risk_level','Low'), '#546E7A')
+                        st.markdown(f"""
+                        <div style="background:white;padding:1.5rem;border-radius:12px;
+                                    box-shadow:0 4px 16px rgba(0,0,0,.1);
+                                    border-left:6px solid {_rc};margin-top:1rem;">
+                            <div style="display:flex;align-items:center;gap:.8rem;margin-bottom:1rem;">
+                                <span style="background:{_rc};color:white;padding:.3rem 1rem;
+                                             border-radius:20px;font-weight:700;font-size:.9rem;">
+                                    {_pd.get('risk_level','?')} Risk · {_pd.get('total_score',0)}/11
+                                </span>
+                                <span style="color:#9E9E9E;font-size:.82rem;">
+                                    🤖 AI Analysis · {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}
+                                </span>
+                            </div>
+                            <div style="color:#37474F;font-size:.95rem;line-height:1.9;white-space:pre-wrap;">{_res}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        st.download_button(
+                            "📥 ดาวน์โหลด Alert (TXT)", _res,
+                            f"smart_alert_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.txt",
+                            "text/plain", key="sa_dl"
+                        )
+
+            # ════════════════════════════════════════════════
+            # AI-2 : PROTOCOL SUGGESTER
+            # ════════════════════════════════════════════════
+            with ai2:
+                st.markdown("""
+                <div style="background:linear-gradient(135deg,#1B5E20,#2E7D32);
+                            padding:1rem 1.5rem;border-radius:10px;margin-bottom:1rem;">
+                    <h3 style="color:white;margin:0;font-size:1.15rem;">
+                        📋 Protocol Suggester — VAP Bundle & Weaning Protocol
+                    </h3>
+                    <p style="color:#C8E6C9;margin:.3rem 0 0;font-size:.82rem;">
+                        แนะนำ checklist ตาม combination ของ risk factors
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+
+                _pt_types = st.multiselect(
+                    "Protocol ที่ต้องการ:",
+                    ["VAP Bundle", "Weaning Protocol (SBT)",
+                     "Sepsis Bundle", "Antibiotic Stewardship",
+                     "DVT/PE Prophylaxis", "Nutrition Protocol"],
+                    default=["VAP Bundle", "Weaning Protocol (SBT)"],
+                    key="pt_types"
+                )
+
+                st.markdown("#### Risk Factors ของผู้ป่วย")
+                _pc1, _pc2, _pc3 = st.columns(3)
+                with _pc1:
+                    _p_age  = st.number_input("อายุ", 0, 120, 68, key="pt_age")
+                    _p_los  = st.number_input("LOS (วัน)", 0, 365, 8, key="pt_los")
+                    _p_rw   = st.number_input("adjRW", 0.0, 50.0, 3.2, 0.1, key="pt_rw")
+                with _pc2:
+                    _p_vap  = st.checkbox("🔴 VAP", key="pt_vap")
+                    _p_hap  = st.checkbox("🟠 HAP", key="pt_hap")
+                    _p_vent = st.checkbox("💨 On Ventilator", True, key="pt_vent")
+                    _p_sep  = st.checkbox("⚠️ Sepsis/Septic Shock", key="pt_sep")
+                with _pc3:
+                    _p_dvt  = st.checkbox("🩸 DVT Risk", key="pt_dvt")
+                    _p_dm   = st.checkbox("🍬 Diabetes", key="pt_dm")
+                    _p_ckd  = st.checkbox("🫘 CKD/Renal impairment", key="pt_ckd")
+                    _p_note = st.text_area("หมายเหตุเพิ่มเติม", "", height=70, key="pt_note")
+
+                if _pt_types and st.button("📋 สร้าง Protocol คำแนะนำ",
+                                           type="primary", key="pt_gen"):
+                    _facts = []
+                    if _p_vap:  _facts.append("VAP")
+                    if _p_hap:  _facts.append("HAP")
+                    if _p_vent: _facts.append("On Mechanical Ventilation")
+                    if _p_sep:  _facts.append("Sepsis/Septic Shock")
+                    if _p_dvt:  _facts.append("DVT Risk")
+                    if _p_dm:   _facts.append("Diabetes")
+                    if _p_ckd:  _facts.append("CKD/Renal impairment")
+                    if _p_age >= 65: _facts.append(f"ผู้สูงอายุ {_p_age} ปี")
+                    if _p_los > 7:   _facts.append(f"LOS ยาว {_p_los} วัน")
+                    if _p_rw > 3:    _facts.append(f"adjRW สูง {_p_rw:.1f}")
+
+                    _pt_msg = f"""ผู้ป่วย ICU มีข้อมูลดังนี้:
+อายุ: {_p_age} ปี | LOS: {_p_los} วัน | adjRW: {_p_rw:.2f}
+Risk Factors: {', '.join(_facts) if _facts else 'ไม่มีปัจจัยพิเศษ'}
+หมายเหตุ: {_p_note or 'ไม่มี'}
+Protocol ที่ต้องการ: {', '.join(_pt_types)}
+
+กรุณาสร้าง checklist พร้อม priority [ด่วน] [ภายใน 24 ชม.] [ติดตาม]
+และระบุ rationale สั้นๆ ว่าทำไมต้องทำแต่ละข้อ"""
+
+                    with st.spinner("🤖 กำลังสร้าง Protocol..."):
+                        _res, _err = _call_claude(_SYS_PROTOCOL, _pt_msg, max_tok=1400)
+
+                    if _err:
+                        st.error(f"❌ {_err}")
+                    else:
+                        st.markdown("""
+                        <div style="background:#E8F5E9;padding:.6rem 1rem;border-radius:8px;
+                                    border-left:4px solid #4CAF50;margin-bottom:1rem;">
+                            <b style="color:#2E7D32;">✅ Protocol Recommendations</b>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        st.markdown(_res)
+                        st.download_button(
+                            "📥 ดาวน์โหลด Protocol (TXT)", _res,
+                            f"protocol_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.txt",
+                            "text/plain", key="pt_dl"
+                        )
+
+            # ════════════════════════════════════════════════
+            # AI-3 : CASE COMPARATOR
+            # ════════════════════════════════════════════════
+            with ai3:
+                st.markdown("""
+                <div style="background:linear-gradient(135deg,#4A148C,#7B1FA2);
+                            padding:1rem 1.5rem;border-radius:10px;margin-bottom:1rem;">
+                    <h3 style="color:white;margin:0;font-size:1.15rem;">
+                        🔍 Case Comparator — เปรียบเทียบ Historical Cases
+                    </h3>
+                    <p style="color:#E1BEE7;margin:.3rem 0 0;font-size:.82rem;">
+                        ค้นหา cases คล้ายกันในอดีต แล้วให้ Claude สรุป outcome และ pattern
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+
+                st.markdown("#### กำหนด Profile ผู้ป่วยที่ต้องการค้นหา")
+                _cc1, _cc2, _cc3 = st.columns(3)
+                with _cc1:
+                    _c_pdx     = st.text_input("รหัสโรค PDX prefix (เช่น J95)", "J95", key="cc_pdx")
+                    _c_age_min = st.number_input("อายุขั้นต่ำ", 0, 120, 55, key="cc_amin")
+                    _c_age_max = st.number_input("อายุขั้นสูง", 0, 120, 85, key="cc_amax")
+                with _cc2:
+                    _c_ward = st.selectbox("Ward", ["หอผู้ป่วยหนัก ICU", "ทุก Ward"], key="cc_ward")
+                    _c_pneu = st.selectbox("Pneumonia Type",
+                                           ["ทั้งหมด", "VAP", "HAP", "CAP"], key="cc_pneu")
+                    _c_n    = st.number_input("จำนวน cases สูงสุด", 5, 100, 30, key="cc_n")
+                with _cc3:
+                    _c_lmin = st.number_input("LOS ขั้นต่ำ (วัน)", 0, 365, 0, key="cc_lmin")
+                    _c_lmax = st.number_input("LOS ขั้นสูง (วัน)", 0, 365, 60, key="cc_lmax")
+
+                if st.button("🔍 ค้นหา Cases", type="primary", key="cc_search"):
+                    _df_c = df_all.copy()
+
+                    if 'age' in _df_c.columns:
+                        _df_c['age'] = pd.to_numeric(_df_c['age'], errors='coerce')
+                        _df_c = _df_c[(_df_c['age'] >= _c_age_min) & (_df_c['age'] <= _c_age_max)]
+
+                    if _c_ward != "ทุก Ward" and 'ward_name' in _df_c.columns:
+                        _df_c = _df_c[_df_c['ward_name'].str.strip() == _c_ward]
+
+                    if 'length_of_stay' in _df_c.columns:
+                        _df_c['length_of_stay'] = pd.to_numeric(_df_c['length_of_stay'], errors='coerce')
+                        _df_c = _df_c[(_df_c['length_of_stay'] >= _c_lmin) &
+                                      (_df_c['length_of_stay'] <= _c_lmax)]
+
+                    if _c_pdx and 'pdx' in _df_c.columns:
+                        _df_c = _df_c[_df_c['pdx'].astype(str).str.upper()
+                                      .str.startswith(_c_pdx.strip().upper())]
+
+                    if _c_pneu != "ทั้งหมด" and 'pdx' in _df_c.columns:
+                        _df_c['_cp'] = _df_c.apply(classify_pneumonia_type, axis=1)
+                        _df_c = _df_c[_df_c['_cp'] == _c_pneu.lower()]
+
+                    _df_c = _df_c.head(int(_c_n))
+
+                    if _df_c.empty:
+                        st.warning("⚠️ ไม่พบผู้ป่วยที่ตรงตามเงื่อนไข")
+                    else:
+                        st.success(f"✅ พบ {len(_df_c)} cases")
+                        _show_cc = [c for c in ['hn','an','age','pdx','length_of_stay',
+                                                  'discharge_status','adjrw','ward_name']
+                                    if c in _df_c.columns]
+                        st.dataframe(_df_c[_show_cc].reset_index(drop=True),
+                                     use_container_width=True, hide_index=True)
+
+                        # สรุปสถิติ
+                        _nc  = len(_df_c)
+                        _nd  = _df_c['discharge_status'].str.contains('ตาย', na=False).sum() \
+                               if 'discharge_status' in _df_c.columns else 0
+                        _ni  = _df_c['discharge_status'].str.contains('ดีขึ้น', na=False).sum() \
+                               if 'discharge_status' in _df_c.columns else 0
+                        _aa  = _df_c['age'].mean() if 'age' in _df_c.columns else 0
+                        _al  = _df_c['length_of_stay'].mean() if 'length_of_stay' in _df_c.columns else 0
+                        _ar  = _df_c['adjrw'].mean() if 'adjrw' in _df_c.columns else 0
+                        _st  = _df_c['discharge_status'].value_counts().to_dict() \
+                               if 'discharge_status' in _df_c.columns else {}
+                        _pdxt= _df_c['pdx'].value_counts().head(5).to_dict() \
+                               if 'pdx' in _df_c.columns else {}
+
+                        st.session_state['_cc_summary'] = {
+                            'n': _nc, 'deaths': int(_nd), 'improve': int(_ni),
+                            'avg_age': round(_aa,1), 'avg_los': round(_al,1),
+                            'avg_rw': round(_ar,2), 'death_rate': round(_nd/_nc*100,1) if _nc else 0,
+                            'status_dist': ', '.join(f"{k}({v})" for k,v in _st.items()),
+                            'pdx_dist': ', '.join(f"{k}({v})" for k,v in _pdxt.items()),
+                            'criteria': f"PDX:{_c_pdx} | Ward:{_c_ward} | อายุ:{_c_age_min}-{_c_age_max} | LOS:{_c_lmin}-{_c_lmax}",
+                        }
+
+                if st.session_state.get('_cc_summary'):
+                    _s = st.session_state['_cc_summary']
+                    st.markdown("---")
+                    _kk1,_kk2,_kk3,_kk4 = st.columns(4)
+                    _kk1.metric("Cases",    f"{_s['n']} ราย")
+                    _kk2.metric("Mortality", f"{_s['deaths']} ราย ({_s['death_rate']}%)")
+                    _kk3.metric("Avg LOS",  f"{_s['avg_los']} วัน")
+                    _kk4.metric("Avg adjRW",f"{_s['avg_rw']}")
+
+                    if st.button("🤖 ให้ Claude วิเคราะห์ Cases", key="cc_analyze"):
+                        _cc_msg = f"""วิเคราะห์ Historical Cases ดังนี้:
+--- เงื่อนไขการค้นหา ---
+{_s['criteria']}
+
+--- สถิติ cases ที่พบ ---
+จำนวน: {_s['n']} ราย | อายุเฉลี่ย: {_s['avg_age']} ปี
+LOS เฉลี่ย: {_s['avg_los']} วัน | adjRW เฉลี่ย: {_s['avg_rw']}
+Mortality Rate: {_s['death_rate']}% ({_s['deaths']} ราย)
+จำหน่ายดีขึ้น: {_s['improve']} ราย
+Discharge Status: {_s['status_dist']}
+Top PDX codes: {_s['pdx_dist']}
+
+--- สิ่งที่ต้องการ ---
+1. Pattern ที่พบในกลุ่มนี้
+2. เปรียบเทียบ outcome ที่น่าสังเกต
+3. ข้อเสนอแนะสำหรับการดูแลผู้ป่วยกลุ่มเดียวกันในอนาคต"""
+
+                        with st.spinner("🤖 Claude กำลังวิเคราะห์..."):
+                            _res, _err = _call_claude(_SYS_CASE, _cc_msg, max_tok=1100)
+
+                        if _err:
+                            st.error(f"❌ {_err}")
+                        else:
+                            st.markdown("""
+                            <div style="background:#F3E5F5;padding:.6rem 1rem;border-radius:8px;
+                                        border-left:4px solid #7B1FA2;margin-bottom:1rem;">
+                                <b style="color:#4A148C;">🤖 AI Case Analysis</b>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            st.markdown(_res)
+                            st.download_button(
+                                "📥 ดาวน์โหลด Analysis (TXT)", _res,
+                                f"case_analysis_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.txt",
+                                "text/plain", key="cc_dl"
+                            )
+
+            # ════════════════════════════════════════════════
+            # AI-4 : AUTO REPORT GENERATOR
+            # ════════════════════════════════════════════════
+            with ai4:
+                st.markdown("""
+                <div style="background:linear-gradient(135deg,#E65100,#BF360C);
+                            padding:1rem 1.5rem;border-radius:10px;margin-bottom:1rem;">
+                    <h3 style="color:white;margin:0;font-size:1.15rem;">
+                        📄 Auto Report Generator — รายงานรายเดือน + Trend Analysis
+                    </h3>
+                    <p style="color:#FFF3E0;margin:.3rem 0 0;font-size:.82rem;">
+                        สร้างรายงานสรุปพร้อม Executive Summary อัตโนมัติ
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+
+                if 'month_sort' not in df_all.columns:
+                    st.warning("⚠️ ไม่มีข้อมูลสำหรับสร้างรายงาน")
+                else:
+                    _mths_r = sorted(df_all['month_sort'].dropna().unique())
+                    _mths_l = [str(m) for m in _mths_r]
+
+                    _rscope = st.radio(
+                        "ขอบเขตรายงาน:",
+                        ["📅 เดือนเดียว", "📆 หลายเดือน (Trend)"],
+                        horizontal=True, key="rp_scope"
+                    )
+
+                    if _rscope == "📅 เดือนเดียว":
+                        _rm = st.selectbox("เลือกเดือน:", _mths_l,
+                                           index=len(_mths_l)-1, key="rp_month")
+                        _df_r = df_all[df_all['month_sort'] == _rm].copy()
+                        _rperiod = _rm
+                    else:
+                        _rc1, _rc2 = st.columns(2)
+                        with _rc1:
+                            _rs = st.selectbox("เริ่มต้น", _mths_l, index=0, key="rp_start")
+                        with _rc2:
+                            _re = st.selectbox("สิ้นสุด",  _mths_l, index=len(_mths_l)-1, key="rp_end")
+                        _df_r   = df_all[(df_all['month_sort'] >= _rs) &
+                                         (df_all['month_sort'] <= _re)].copy()
+                        _rperiod = f"{_rs} ถึง {_re}"
+
+                    _rtypes = st.multiselect(
+                        "หัวข้อที่รวมในรายงาน:",
+                        ["📊 ภาพรวม IPD", "🫁 ปอดบวม",
+                         "🚨 ICU", "💀 Mortality & Outcome",
+                         "🛏 LOS & Outlier", "💰 CMI & Revenue"],
+                        default=["📊 ภาพรวม IPD", "💀 Mortality & Outcome",
+                                 "🚨 ICU", "🛏 LOS & Outlier"],
+                        key="rp_types"
+                    )
+
+                    # คำนวณ stats
+                    def _calc(df):
+                        _s = {}
+                        _s['n'] = len(df)
+                        _s['cmi'] = round(df['adjrw'].mean(), 3) if 'adjrw' in df.columns else 0
+                        _s['rw']  = round(df['adjrw'].sum(), 1)  if 'adjrw' in df.columns else 0
+                        _s['los'] = round(df['length_of_stay'].mean(), 1) \
+                                    if 'length_of_stay' in df.columns else 0
+                        if 'discharge_status' in df.columns:
+                            _s['death']   = df['discharge_status'].str.contains('ตาย', na=False).sum()
+                            _s['improve'] = df['discharge_status'].str.contains('ดีขึ้น', na=False).sum()
+                        else:
+                            _s['death'] = _s['improve'] = 0
+                        _s['drate'] = round(_s['death']/_s['n']*100,2) if _s['n'] else 0
+                        _s['irate'] = round(_s['improve']/_s['n']*100,1) if _s['n'] else 0
+                        if 'length_of_stay' in df.columns:
+                            _s['long30'] = (df['length_of_stay'] > 30).sum()
+                        else:
+                            _s['long30'] = 0
+                        _PCODES = ['J10','J11','J12','J13','J14','J15','J16','J17','J18',
+                                   'J85.0','J85.1','J95.0','J95.85','J22']
+                        if 'pdx' in df.columns:
+                            _s['pneu'] = df['pdx'].apply(
+                                lambda x: any(str(x).startswith(c) for c in _PCODES)
+                                if pd.notna(x) else False).sum()
+                            _s['top5'] = ', '.join(
+                                f"{k}({v})" for k,v in
+                                df['pdx'].value_counts().head(5).items())
+                        else:
+                            _s['pneu'] = 0; _s['top5'] = 'N/A'
+                        if 'ward_name' in df.columns:
+                            _im = df['ward_name'].str.strip().eq('หอผู้ป่วยหนัก ICU')
+                            _s['icu_n'] = int(_im.sum())
+                            _s['icu_d'] = int(df.loc[_im,'discharge_status']
+                                              .str.contains('ตาย',na=False).sum()) \
+                                          if _s['icu_n'] else 0
+                            _s['icu_dr'] = round(_s['icu_d']/_s['icu_n']*100,1) \
+                                           if _s['icu_n'] else 0
+                            _s['icu_los'] = round(df.loc[_im,'length_of_stay'].mean(),1) \
+                                            if (_s['icu_n'] and 'length_of_stay' in df.columns) else 0
+                        else:
+                            _s['icu_n'] = _s['icu_d'] = _s['icu_dr'] = _s['icu_los'] = 0
+                        return _s
+
+                    _st_r = _calc(_df_r)
+
+                    # Trend table (ถ้า multi-month)
+                    _trend_txt = ""
+                    if _rscope == "📆 หลายเดือน (Trend)" and 'month_sort' in _df_r.columns:
+                        _trows = []
+                        for _p, _g in _df_r.groupby('month_sort'):
+                            _ml = _g['month_label'].iloc[0] \
+                                  if 'month_label' in _g.columns else str(_p)
+                            _ts = _calc(_g)
+                            _trows.append({'เดือน':_ml,'จำหน่าย':_ts['n'],'CMI':_ts['cmi'],
+                                           'Total RW':_ts['rw'],'LOS':_ts['los'],
+                                           'ตาย%':_ts['drate'],'ICU':_ts['icu_n'],
+                                           'ปอดบวม':_ts['pneu']})
+                        _df_trend_r = pd.DataFrame(_trows)
+                        st.dataframe(_df_trend_r, use_container_width=True, hide_index=True)
+                        _trend_txt = "\n[Trend Data]\n" + _df_trend_r.to_string(index=False)
+
+                    # Build report data text
+                    _secs = []
+                    if "📊 ภาพรวม IPD" in _rtypes:
+                        _secs.append(f"""[ภาพรวม IPD]
+จำหน่ายทั้งหมด: {_st_r['n']:,} ราย | CMI: {_st_r['cmi']} | Total adjRW: {_st_r['rw']:,.1f}
+Top 5 โรค: {_st_r['top5']}""")
+                    if "💀 Mortality & Outcome" in _rtypes:
+                        _secs.append(f"""[Mortality & Outcome]
+เสียชีวิต: {_st_r['death']} ราย ({_st_r['drate']}%) | จำหน่ายดีขึ้น: {_st_r['improve']} ราย ({_st_r['irate']}%)""")
+                    if "🚨 ICU" in _rtypes:
+                        _secs.append(f"""[ICU]
+ผู้ป่วย ICU: {_st_r['icu_n']} ราย | เสียชีวิต: {_st_r['icu_d']} ราย ({_st_r['icu_dr']}%) | LOS ICU เฉลี่ย: {_st_r['icu_los']} วัน""")
+                    if "🫁 ปอดบวม" in _rtypes:
+                        _secs.append(f"""[ปอดบวม]
+ผู้ป่วยปอดบวม: {_st_r['pneu']} ราย ({round(_st_r['pneu']/_st_r['n']*100,1) if _st_r['n'] else 0}% ของ IPD)""")
+                    if "🛏 LOS & Outlier" in _rtypes:
+                        _secs.append(f"""[LOS & Outlier]
+LOS เฉลี่ย: {_st_r['los']} วัน | นอนนาน >30 วัน: {_st_r['long30']} ราย""")
+                    if "💰 CMI & Revenue" in _rtypes:
+                        _secs.append(f"""[CMI & Revenue]
+CMI: {_st_r['cmi']} | Total adjRW: {_st_r['rw']:,.1f} (ใช้คำนวณรายได้ DRG)""")
+
+                    _rdata = "\n".join(_secs) + _trend_txt
+
+                    if _rtypes and st.button("📄 สร้าง Auto Report",
+                                             type="primary", key="rp_gen"):
+                        _rp_msg = f"""สร้างรายงานสรุปประจำเดือนสำหรับโรงพยาบาลสันทราย ฝ่ายเวชระเบียนและสารสนเทศสุขภาพ
+
+โรงพยาบาล: สันทราย จังหวัดเชียงใหม่
+ช่วงเวลา: {_rperiod}
+หัวข้อรายงาน: {', '.join(_rtypes)}
+
+ข้อมูลสำหรับรายงาน:
+{_rdata}
+
+กรุณาสร้างรายงานทางการที่เหมาะสำหรับนำเสนอต่อผู้บริหาร
+ใช้ตัวบ่งชี้ ↑ ↓ → เพื่อแสดง trend เมื่อมีข้อมูลหลายเดือน"""
+
+                        with st.spinner("🤖 Claude กำลังสร้างรายงาน..."):
+                            _res, _err = _call_claude(_SYS_REPORT, _rp_msg, max_tok=2000)
+
+                        if _err:
+                            st.error(f"❌ {_err}")
+                        else:
+                            st.markdown("""
+                            <div style="background:#FFF3E0;padding:.6rem 1rem;border-radius:8px;
+                                        border-left:4px solid #FF9800;margin-bottom:1rem;">
+                                <b style="color:#E65100;">📄 AI-Generated Report</b>
+                                <span style="color:#757575;font-size:.85rem;margin-left:.5rem;">
+                                    — กรุณาตรวจสอบก่อนนำเสนอ
+                                </span>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            st.markdown(_res)
+
+                            _dc1, _dc2 = st.columns(2)
+                            with _dc1:
+                                st.download_button(
+                                    "📥 ดาวน์โหลด TXT", _res,
+                                    f"report_{_rperiod.replace(' ','_')}_{pd.Timestamp.now().strftime('%Y%m%d')}.txt",
+                                    "text/plain", key="rp_dl_txt"
+                                )
+                            with _dc2:
+                                _html_r = f"""<!DOCTYPE html>
+<html lang="th"><head><meta charset="UTF-8">
+<title>รายงานประจำเดือน {_rperiod}</title>
+<style>
+body{{font-family:sans-serif;max-width:820px;margin:2rem auto;padding:1.5rem;
+      color:#333;line-height:1.7;}}
+h1,h2,h3{{color:#1565C0;}} hr{{border-color:#E0E0E0;}}
+.footer{{color:#9E9E9E;font-size:.85rem;margin-top:2rem;
+         border-top:1px solid #eee;padding-top:1rem;}}
+</style></head><body>
+<h1>📊 รายงานประจำเดือน</h1>
+<h2>โรงพยาบาลสันทราย · {_rperiod}</h2><hr>
+<div style="white-space:pre-wrap;">{_res}</div>
+<div class="footer">
+สร้างโดย Sansai Hospital Intelligence Platform (AI Gen Report) ·
+{pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}
+</div></body></html>"""
+                                st.download_button(
+                                    "📥 ดาวน์โหลด HTML", _html_r,
+                                    f"report_{pd.Timestamp.now().strftime('%Y%m%d')}.html",
+                                    "text/html", key="rp_dl_html"
+                                )
 
 
 
@@ -5184,759 +5922,6 @@ def show_home():
             """, unsafe_allow_html=True)
         
         st.markdown("---")
-
-
-        # ===========end=============================
-
-
-
-# ════════════════════════════════════════════════════
-    # TAB 7 : AI GEN REPORT
-    # ════════════════════════════════════════════════════
-    with tab7:
-        # ── System Prompts ─────────────────────────────────────────
-        _SYS_ICU = """คุณคือผู้ช่วยแพทย์ผู้เชี่ยวชาญด้าน ICU (หอผู้ป่วยหนัก) ที่มีความเชี่ยวชาญใน:
-- การแปลผล Risk Score และตัวชี้วัดทางสถิติทางการแพทย์
-- ปอดอักเสบจากการใช้เครื่องช่วยหายใจ (VAP) และปอดอักเสบในโรงพยาบาล (HAP)
-- การดูแลผู้ป่วยวิกฤต และ ICU Protocol ของโรงพยาบาลในประเทศไทย
-หน้าที่หลักของคุณ:
-รับข้อมูล Risk Score ของผู้ป่วย ICU แล้วสรุปเป็นภาษาไทยที่ชัดเจน กระชับ และนำไปใช้ได้จริงสำหรับแพทย์และพยาบาลที่ดูแลผู้ป่วย
-กฎการตอบ:
-1. ตอบเป็นภาษาไทยเสมอ ยกเว้นคำศัพท์เฉพาะทางการแพทย์ที่ไม่มีคำแปลที่ดีกว่า
-2. สรุปกระชับ 3-5 ประโยค ไม่ยาวเกินไป
-3. ระบุปัจจัยเสี่ยงสำคัญที่ควรติดตามเป็นอันดับแรก
-4. แนะนำ action ที่ควรทำ อย่างน้อย 1-2 ข้อ
-5. ไม่วินิจฉัยโรค ไม่สั่งการรักษา — เป็นเพียงการสรุปข้อมูลเพื่อสนับสนุนการตัดสินใจ
-6. ลงท้ายด้วยข้อความ: "* ข้อมูลนี้จากระบบ retrospective — ใช้เป็น reference ประกอบการตัดสินใจเท่านั้น"
-7. ห้ามเพิ่มข้อมูลที่ไม่มีใน input เด็ดขาด"""
-
-        _SYS_PROTOCOL = """คุณคือผู้เชี่ยวชาญด้าน ICU Protocol และ Evidence-Based Nursing ในโรงพยาบาลไทย
-หน้าที่: แนะนำ Protocol, Bundle และ Checklist ที่เหมาะสมตาม Risk Factors ของผู้ป่วย ICU
-กฎ:
-1. ตอบเป็นภาษาไทย ใช้ภาษาที่พยาบาลและแพทย์เข้าใจง่าย
-2. จัดเป็นหมวดหมู่ชัดเจน มี ☐ checkbox สำหรับ bundle
-3. ระบุ priority: [ด่วน] [ภายใน 24 ชม.] [ติดตาม]
-4. อ้างอิงแนวทาง evidence-based (ไม่ต้องใส่ citation เต็ม)
-5. ไม่สั่งการรักษา — เป็นการแนะนำ protocol สำหรับพิจารณา
-6. ลงท้ายด้วย: "* ปรึกษาแพทย์ผู้ดูแลก่อนดำเนินการทุกครั้ง" """
-
-        _SYS_CASE = """คุณคือผู้เชี่ยวชาญด้าน Clinical Outcome Analysis ใน ICU โรงพยาบาลไทย
-หน้าที่: วิเคราะห์ Historical Cases แล้วสรุป pattern, outcomes และข้อเสนอแนะในเชิงคลินิก
-กฎ:
-1. ตอบเป็นภาษาไทย กระชับ ได้ใจความ
-2. เปรียบเทียบ outcome ระหว่างกลุ่ม (มีปัจจัยเสี่ยง vs ไม่มี)
-3. ระบุ pattern ที่น่าสังเกต (mortality สูงในกลุ่มใด, LOS ยาวในสถานการณ์ใด)
-4. เสนอ implication สำหรับการดูแลผู้ป่วยกลุ่มเดียวกันในอนาคต
-5. ลงท้ายด้วย: "* ข้อมูลจาก historical cases — ใช้เป็น reference ประกอบการตัดสินใจเท่านั้น" """
-
-        _SYS_REPORT = """คุณคือผู้เชี่ยวชาญด้านการเขียนรายงานทางการแพทย์สำหรับโรงพยาบาลสันทราย จังหวัดเชียงใหม่
-หน้าที่: สร้างรายงานสรุปประจำเดือน/ไตรมาส สำหรับ IPD ที่อ่านง่าย นำเสนอต่อผู้บริหารได้
-โครงสร้างรายงาน:
-1. บทสรุปผู้บริหาร (Executive Summary) — 3-5 ประโยค
-2. ผลการดำเนินงานหลัก — KPI ที่สำคัญพร้อมตีความ
-3. จุดเด่นและความสำเร็จ
-4. ประเด็นที่ต้องติดตาม / พื้นที่ปรับปรุง
-5. ข้อเสนอแนะเชิงปฏิบัติ
-กฎ:
-1. ตอบเป็นภาษาไทย เป็นทางการแต่ไม่ซับซ้อน
-2. ตีความตัวเลขให้มีความหมาย ไม่ใช่แค่รายงานตัวเลข
-3. ระบุ trend: ดีขึ้น ↑ / แย่ลง ↓ / คงที่ →
-4. ลงท้ายด้วย: "* รายงานนี้สร้างโดย AI — กรุณาตรวจสอบความถูกต้องก่อนนำเสนอ" """
-
-        # ── Header ─────────────────────────────────────────────────
-        st.markdown("""
-        <div style="background:linear-gradient(135deg,#263238,#1565C0,#4A148C);
-                    padding:1.2rem 2rem;border-radius:12px;margin-bottom:1.2rem;">
-            <h2 style="color:white;margin:0;font-size:1.5rem;">
-                🤖 AI Gen Report — ระบบรายงานอัจฉริยะ
-            </h2>
-            <p style="color:#B3E5FC;margin:.3rem 0 0;font-size:.9rem;">
-                Powered by Claude AI · Smart Alert · Protocol Suggester · Case Comparator · Auto Report
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # ── API Key Section ─────────────────────────────────────────
-        with st.expander(
-            "🔑 ตั้งค่า Anthropic API Key" + (" ✅" if st.session_state.get('_ai_key') else " ⚠️"),
-            expanded=not bool(st.session_state.get('_ai_key'))
-        ):
-            st.markdown("""
-            <div style="background:#E3F2FD;padding:.8rem 1rem;border-radius:8px;
-                        border-left:4px solid #1976D2;margin-bottom:1rem;font-size:.9rem;">
-                <b style="color:#1565C0;">วิธีขอ API Key:</b>
-                ไปที่
-                <a href="https://console.anthropic.com" target="_blank"
-                   style="color:#1976D2;">console.anthropic.com</a>
-                → API Keys → Create Key
-                <br>
-                <span style="color:#546E7A;">
-                  API Key จะถูกเก็บเฉพาะใน session นี้ ไม่มีการบันทึกถาวร
-                </span>
-            </div>
-            """, unsafe_allow_html=True)
-
-            _key_input = st.text_input(
-                "Anthropic API Key",
-                type="password",
-                placeholder="sk-ant-api03-...",
-                key="_api_key_field"
-            )
-            _c1, _c2 = st.columns([1, 4])
-            with _c1:
-                if st.button("✅ บันทึก", key="_save_key"):
-                    if _key_input and (_key_input.startswith("sk-ant-") or _key_input.startswith("sk-")):
-                        st.session_state['_ai_key'] = _key_input
-                        st.success("บันทึกแล้ว")
-                        st.rerun()
-                    else:
-                        st.error("รูปแบบ API Key ไม่ถูกต้อง")
-            with _c2:
-                if st.session_state.get('_ai_key'):
-                    if st.button("🗑️ ลบ API Key", key="_del_key"):
-                        del st.session_state['_ai_key']
-                        st.rerun()
-
-        _ai_key = st.session_state.get('_ai_key', '')
-        if not _ai_key:
-            st.warning("⚠️ กรุณากรอก API Key ก่อนใช้งาน AI Features")
-        else:
-            # ── Claude caller ──────────────────────────────────────
-            def _call_claude(sys_prompt, user_msg, max_tok=1200):
-                try:
-                    r = requests.post(
-                        "https://api.anthropic.com/v1/messages",
-                        headers={
-                            "x-api-key": _ai_key,
-                            "anthropic-version": "2023-06-01",
-                            "content-type": "application/json"
-                        },
-                        json={
-                            "model": "claude-sonnet-4-20250514",
-                            "max_tokens": max_tok,
-                            "system": sys_prompt,
-                            "messages": [{"role": "user", "content": user_msg}]
-                        },
-                        timeout=60
-                    )
-                    if r.status_code == 200:
-                        return r.json()["content"][0]["text"], None
-                    else:
-                        try:
-                            err_msg = r.json().get("error", {}).get("message", r.text[:300])
-                        except Exception:
-                            err_msg = r.text[:300]
-                        return None, f"API Error {r.status_code}: {err_msg}"
-                except requests.exceptions.Timeout:
-                    return None, "⏱️ Request timeout — ลองใหม่อีกครั้ง"
-                except Exception as e:
-                    return None, f"❌ {str(e)}"
-
-            # ── Sub-tabs ────────────────────────────────────────────
-            ai1, ai2, ai3, ai4 = st.tabs([
-                "🚨 Smart Alert",
-                "📋 Protocol Suggester",
-                "🔍 Case Comparator",
-                "📄 Auto Report"
-            ])
-
-            # ════════════════════════════════════════════════
-            # AI-1 : SMART ALERT
-            # ════════════════════════════════════════════════
-            with ai1:
-                st.markdown("""
-                <div style="background:linear-gradient(135deg,#B71C1C,#4A148C);
-                            padding:1rem 1.5rem;border-radius:10px;margin-bottom:1rem;">
-                    <h3 style="color:white;margin:0;font-size:1.15rem;">
-                        🚨 Smart Alert — สรุปความเสี่ยงผู้ป่วย ICU
-                    </h3>
-                    <p style="color:#FFCDD2;margin:.3rem 0 0;font-size:.82rem;">
-                        แปล Risk Score + Sensitivity/PPV เป็นภาษาที่พยาบาลเข้าใจทันที
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
-
-                # ── เตรียม ICU data (re-calculate local scope) ──────
-                _df_icu = df_all[
-                    df_all.get('ward_name', pd.Series(dtype=str))
-                    .str.strip().eq('หอผู้ป่วยหนัก ICU')
-                ].copy() if 'ward_name' in df_all.columns else pd.DataFrame()
-
-                _input_mode = st.radio(
-                    "วิธีกรอกข้อมูล:",
-                    ["📋 เลือกจากข้อมูลในระบบ", "✏️ กรอกเอง"],
-                    horizontal=True, key="sa_mode"
-                )
-
-                _pd = {}  # patient dict
-
-                if _input_mode == "📋 เลือกจากข้อมูลในระบบ" and not _df_icu.empty:
-                    _df_icu['age']   = pd.to_numeric(_df_icu['age'],   errors='coerce').fillna(0)
-                    _df_icu['adjrw'] = pd.to_numeric(_df_icu['adjrw'], errors='coerce').fillna(0)
-                    _df_icu['_los']  = pd.to_numeric(_df_icu.get('length_of_stay', 0), errors='coerce').fillna(0)
-                    _df_icu['_vent'] = _df_icu.apply(has_ventilator, axis=1)
-                    _df_icu['_pneu'] = _df_icu.apply(classify_pneumonia_type, axis=1) \
-                                       if 'pdx' in _df_icu.columns else 'other'
-                    _df_icu['_sc'] = (
-                        (_df_icu['_pneu'] == 'vap').astype(int) * 3 +
-                        (_df_icu['_pneu'] == 'hap').astype(int) * 2 +
-                        _df_icu['_vent'].astype(int) * 2 +
-                        (_df_icu['adjrw'] > 3.0).astype(int) * 2 +
-                        (_df_icu['age'] >= 65).astype(int) +
-                        (_df_icu['_los'] > 7).astype(int)
-                    )
-                    _df_icu['_rl'] = _df_icu['_sc'].apply(
-                        lambda s: 'High' if s >= 5 else ('Medium' if s >= 3 else 'Low'))
-                    _df_icu_s = _df_icu.sort_values('_sc', ascending=False)
-
-                    _opts = _df_icu_s.apply(
-                        lambda r: (
-                            f"AN:{r.get('an','?')} | "
-                            f"{r.get('_rl','?')} | "
-                            f"Score:{int(r.get('_sc',0))}/11 | "
-                            f"อายุ {int(r.get('age',0))} ปี | "
-                            f"LOS {int(r.get('_los',0))} วัน | "
-                            f"{r.get('_pneu','').upper()}"
-                        ), axis=1
-                    ).tolist()
-
-                    _sel = st.selectbox("เลือกผู้ป่วย (เรียงตาม Risk Score สูง→ต่ำ):",
-                                        range(len(_opts)),
-                                        format_func=lambda x: _opts[x],
-                                        key="sa_sel")
-                    if _sel is not None:
-                        _r = _df_icu_s.iloc[_sel]
-                        _pd = {
-                            'risk_level': _r.get('_rl', 'Low'),
-                            'total_score': int(_r.get('_sc', 0)),
-                            'age': int(_r.get('age', 0)),
-                            'los': int(_r.get('_los', 0)),
-                            'adjrw': float(_r.get('adjrw', 0)),
-                            'has_vap': _r.get('_pneu') == 'vap',
-                            'has_hap': _r.get('_pneu') == 'hap',
-                            'on_vent': bool(_r.get('_vent', False)),
-                            'high_rw': float(_r.get('adjrw', 0)) > 3.0,
-                            'elderly': int(_r.get('age', 0)) >= 65,
-                            'long_los': int(_r.get('_los', 0)) > 7,
-                            'pdx': str(_r.get('pdx', 'N/A')),
-                        }
-                else:
-                    st.markdown("#### กรอกข้อมูลผู้ป่วย")
-                    _c1, _c2, _c3 = st.columns(3)
-                    with _c1:
-                        _m_rl  = st.selectbox("Risk Level", ["High","Medium","Low"], key="sa_rl")
-                        _m_sc  = st.number_input("คะแนนรวม (0–11)", 0, 11, 7, key="sa_sc")
-                        _m_age = st.number_input("อายุ (ปี)", 0, 120, 68, key="sa_age")
-                    with _c2:
-                        _m_los = st.number_input("LOS (วัน)", 0, 365, 9, key="sa_los")
-                        _m_rw  = st.number_input("adjRW", 0.0, 50.0, 3.5, 0.1, key="sa_rw")
-                        _m_pdx = st.text_input("PDX (ICD-10)", "J95.851", key="sa_pdx")
-                    with _c3:
-                        _m_vap  = st.checkbox("VAP (+3)", key="sa_vap")
-                        _m_hap  = st.checkbox("HAP (+2)", key="sa_hap")
-                        _m_vent = st.checkbox("On Ventilator (+2)", key="sa_vent")
-                        _m_hrw  = st.checkbox("adjRW > 3.0 (+2)", value=_m_rw > 3.0, key="sa_hrw")
-                        _m_eld  = st.checkbox("อายุ ≥ 65 ปี (+1)", value=_m_age >= 65, key="sa_eld")
-                        _m_llos = st.checkbox("LOS > 7 วัน (+1)", value=_m_los > 7, key="sa_llos")
-                    _pd = {
-                        'risk_level': _m_rl, 'total_score': _m_sc,
-                        'age': _m_age, 'los': _m_los, 'adjrw': _m_rw,
-                        'has_vap': _m_vap, 'has_hap': _m_hap, 'on_vent': _m_vent,
-                        'high_rw': _m_hrw, 'elderly': _m_eld, 'long_los': _m_llos,
-                        'pdx': _m_pdx,
-                    }
-
-                # ── Scoring metrics ─────────────────────────────────
-                st.markdown("#### ค่าความแม่นของระบบ (กรอกจาก Tab ICU Risk Score)")
-                _mc1,_mc2,_mc3,_mc4,_mc5 = st.columns(5)
-                _auroc = _mc1.number_input("AUROC",        0.0,1.0, 0.750,0.001,format="%.3f",key="sa_auroc")
-                _sens  = _mc2.number_input("Sensitivity%", 0.0,100.0,70.0,0.1,key="sa_sens")
-                _spec  = _mc3.number_input("Specificity%", 0.0,100.0,80.0,0.1,key="sa_spec")
-                _ppv   = _mc4.number_input("PPV%",         0.0,100.0,62.0,0.1,key="sa_ppv")
-                _npv   = _mc5.number_input("NPV%",         0.0,100.0,93.0,0.1,key="sa_npv")
-
-                if _pd and st.button("🤖 สร้าง Smart Alert", type="primary", key="sa_gen"):
-                    _user_msg = f"""สรุป ICU Risk Score ของผู้ป่วยรายนี้:
---- ข้อมูลผู้ป่วย ---
-Risk Level     : {_pd.get('risk_level','?')}
-คะแนนรวม      : {_pd.get('total_score',0)} / 11 คะแนน
-อายุ           : {_pd.get('age',0)} ปี
-ระยะเวลานอน   : {_pd.get('los',0)} วัน (LOS)
-adjRW          : {_pd.get('adjrw',0):.2f}
-รหัสโรค PDX   : {_pd.get('pdx','N/A')}
---- ปัจจัยที่ได้คะแนน ---
-VAP (ปอดอักเสบจากท่อช่วยหายใจ) : {"ใช่ +3" if _pd.get('has_vap') else "ไม่ใช่"}
-HAP (ปอดอักเสบในโรงพยาบาล)     : {"ใช่ +2" if _pd.get('has_hap') else "ไม่ใช่"}
-ใช้เครื่องช่วยหายใจ (On Vent)   : {"ใช่ +2" if _pd.get('on_vent') else "ไม่ใช่"}
-adjRW > 3.0                      : {"ใช่ +2" if _pd.get('high_rw') else "ไม่ใช่"}
-อายุ ≥ 65 ปี                     : {"ใช่ +1" if _pd.get('elderly') else "ไม่ใช่"}
-LOS > 7 วัน                      : {"ใช่ +1" if _pd.get('long_los') else "ไม่ใช่"}
---- ประสิทธิภาพของระบบ Scoring ---
-AUROC          : {_auroc:.3f}
-Sensitivity    : {_sens:.1f}%
-Specificity    : {_spec:.1f}%
-PPV            : {_ppv:.1f}%
-NPV            : {_npv:.1f}%
---- สิ่งที่ต้องการ ---
-สรุปสถานะความเสี่ยงของผู้ป่วยรายนี้ ระบุปัจจัยสำคัญ และแนะนำสิ่งที่ควรติดตามหรือดำเนินการ"""
-
-                    with st.spinner("🤖 Claude กำลังวิเคราะห์..."):
-                        _res, _err = _call_claude(_SYS_ICU, _user_msg, max_tok=900)
-
-                    if _err:
-                        st.error(f"❌ {_err}")
-                    else:
-                        _rc = {"High":"#D32F2F","Medium":"#F57C00","Low":"#2E7D32"}.get(
-                            _pd.get('risk_level','Low'), '#546E7A')
-                        st.markdown(f"""
-                        <div style="background:white;padding:1.5rem;border-radius:12px;
-                                    box-shadow:0 4px 16px rgba(0,0,0,.1);
-                                    border-left:6px solid {_rc};margin-top:1rem;">
-                            <div style="display:flex;align-items:center;gap:.8rem;margin-bottom:1rem;">
-                                <span style="background:{_rc};color:white;padding:.3rem 1rem;
-                                             border-radius:20px;font-weight:700;font-size:.9rem;">
-                                    {_pd.get('risk_level','?')} Risk · {_pd.get('total_score',0)}/11
-                                </span>
-                                <span style="color:#9E9E9E;font-size:.82rem;">
-                                    🤖 AI Analysis · {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}
-                                </span>
-                            </div>
-                            <div style="color:#37474F;font-size:.95rem;line-height:1.9;white-space:pre-wrap;">{_res}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        st.download_button(
-                            "📥 ดาวน์โหลด Alert (TXT)", _res,
-                            f"smart_alert_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.txt",
-                            "text/plain", key="sa_dl"
-                        )
-
-            # ════════════════════════════════════════════════
-            # AI-2 : PROTOCOL SUGGESTER
-            # ════════════════════════════════════════════════
-            with ai2:
-                st.markdown("""
-                <div style="background:linear-gradient(135deg,#1B5E20,#2E7D32);
-                            padding:1rem 1.5rem;border-radius:10px;margin-bottom:1rem;">
-                    <h3 style="color:white;margin:0;font-size:1.15rem;">
-                        📋 Protocol Suggester — VAP Bundle & Weaning Protocol
-                    </h3>
-                    <p style="color:#C8E6C9;margin:.3rem 0 0;font-size:.82rem;">
-                        แนะนำ checklist ตาม combination ของ risk factors
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
-
-                _pt_types = st.multiselect(
-                    "Protocol ที่ต้องการ:",
-                    ["VAP Bundle", "Weaning Protocol (SBT)",
-                     "Sepsis Bundle", "Antibiotic Stewardship",
-                     "DVT/PE Prophylaxis", "Nutrition Protocol"],
-                    default=["VAP Bundle", "Weaning Protocol (SBT)"],
-                    key="pt_types"
-                )
-
-                st.markdown("#### Risk Factors ของผู้ป่วย")
-                _pc1, _pc2, _pc3 = st.columns(3)
-                with _pc1:
-                    _p_age  = st.number_input("อายุ", 0, 120, 68, key="pt_age")
-                    _p_los  = st.number_input("LOS (วัน)", 0, 365, 8, key="pt_los")
-                    _p_rw   = st.number_input("adjRW", 0.0, 50.0, 3.2, 0.1, key="pt_rw")
-                with _pc2:
-                    _p_vap  = st.checkbox("🔴 VAP", key="pt_vap")
-                    _p_hap  = st.checkbox("🟠 HAP", key="pt_hap")
-                    _p_vent = st.checkbox("💨 On Ventilator", True, key="pt_vent")
-                    _p_sep  = st.checkbox("⚠️ Sepsis/Septic Shock", key="pt_sep")
-                with _pc3:
-                    _p_dvt  = st.checkbox("🩸 DVT Risk", key="pt_dvt")
-                    _p_dm   = st.checkbox("🍬 Diabetes", key="pt_dm")
-                    _p_ckd  = st.checkbox("🫘 CKD/Renal impairment", key="pt_ckd")
-                    _p_note = st.text_area("หมายเหตุเพิ่มเติม", "", height=70, key="pt_note")
-
-                if _pt_types and st.button("📋 สร้าง Protocol คำแนะนำ",
-                                           type="primary", key="pt_gen"):
-                    _facts = []
-                    if _p_vap:  _facts.append("VAP")
-                    if _p_hap:  _facts.append("HAP")
-                    if _p_vent: _facts.append("On Mechanical Ventilation")
-                    if _p_sep:  _facts.append("Sepsis/Septic Shock")
-                    if _p_dvt:  _facts.append("DVT Risk")
-                    if _p_dm:   _facts.append("Diabetes")
-                    if _p_ckd:  _facts.append("CKD/Renal impairment")
-                    if _p_age >= 65: _facts.append(f"ผู้สูงอายุ {_p_age} ปี")
-                    if _p_los > 7:   _facts.append(f"LOS ยาว {_p_los} วัน")
-                    if _p_rw > 3:    _facts.append(f"adjRW สูง {_p_rw:.1f}")
-
-                    _pt_msg = f"""ผู้ป่วย ICU มีข้อมูลดังนี้:
-อายุ: {_p_age} ปี | LOS: {_p_los} วัน | adjRW: {_p_rw:.2f}
-Risk Factors: {', '.join(_facts) if _facts else 'ไม่มีปัจจัยพิเศษ'}
-หมายเหตุ: {_p_note or 'ไม่มี'}
-Protocol ที่ต้องการ: {', '.join(_pt_types)}
-
-กรุณาสร้าง checklist พร้อม priority [ด่วน] [ภายใน 24 ชม.] [ติดตาม]
-และระบุ rationale สั้นๆ ว่าทำไมต้องทำแต่ละข้อ"""
-
-                    with st.spinner("🤖 กำลังสร้าง Protocol..."):
-                        _res, _err = _call_claude(_SYS_PROTOCOL, _pt_msg, max_tok=1400)
-
-                    if _err:
-                        st.error(f"❌ {_err}")
-                    else:
-                        st.markdown("""
-                        <div style="background:#E8F5E9;padding:.6rem 1rem;border-radius:8px;
-                                    border-left:4px solid #4CAF50;margin-bottom:1rem;">
-                            <b style="color:#2E7D32;">✅ Protocol Recommendations</b>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        st.markdown(_res)
-                        st.download_button(
-                            "📥 ดาวน์โหลด Protocol (TXT)", _res,
-                            f"protocol_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.txt",
-                            "text/plain", key="pt_dl"
-                        )
-
-            # ════════════════════════════════════════════════
-            # AI-3 : CASE COMPARATOR
-            # ════════════════════════════════════════════════
-            with ai3:
-                st.markdown("""
-                <div style="background:linear-gradient(135deg,#4A148C,#7B1FA2);
-                            padding:1rem 1.5rem;border-radius:10px;margin-bottom:1rem;">
-                    <h3 style="color:white;margin:0;font-size:1.15rem;">
-                        🔍 Case Comparator — เปรียบเทียบ Historical Cases
-                    </h3>
-                    <p style="color:#E1BEE7;margin:.3rem 0 0;font-size:.82rem;">
-                        ค้นหา cases คล้ายกันในอดีต แล้วให้ Claude สรุป outcome และ pattern
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
-
-                st.markdown("#### กำหนด Profile ผู้ป่วยที่ต้องการค้นหา")
-                _cc1, _cc2, _cc3 = st.columns(3)
-                with _cc1:
-                    _c_pdx     = st.text_input("รหัสโรค PDX prefix (เช่น J95)", "J95", key="cc_pdx")
-                    _c_age_min = st.number_input("อายุขั้นต่ำ", 0, 120, 55, key="cc_amin")
-                    _c_age_max = st.number_input("อายุขั้นสูง", 0, 120, 85, key="cc_amax")
-                with _cc2:
-                    _c_ward = st.selectbox("Ward", ["หอผู้ป่วยหนัก ICU", "ทุก Ward"], key="cc_ward")
-                    _c_pneu = st.selectbox("Pneumonia Type",
-                                           ["ทั้งหมด", "VAP", "HAP", "CAP"], key="cc_pneu")
-                    _c_n    = st.number_input("จำนวน cases สูงสุด", 5, 100, 30, key="cc_n")
-                with _cc3:
-                    _c_lmin = st.number_input("LOS ขั้นต่ำ (วัน)", 0, 365, 0, key="cc_lmin")
-                    _c_lmax = st.number_input("LOS ขั้นสูง (วัน)", 0, 365, 60, key="cc_lmax")
-
-                if st.button("🔍 ค้นหา Cases", type="primary", key="cc_search"):
-                    _df_c = df_all.copy()
-
-                    if 'age' in _df_c.columns:
-                        _df_c['age'] = pd.to_numeric(_df_c['age'], errors='coerce')
-                        _df_c = _df_c[(_df_c['age'] >= _c_age_min) & (_df_c['age'] <= _c_age_max)]
-
-                    if _c_ward != "ทุก Ward" and 'ward_name' in _df_c.columns:
-                        _df_c = _df_c[_df_c['ward_name'].str.strip() == _c_ward]
-
-                    if 'length_of_stay' in _df_c.columns:
-                        _df_c['length_of_stay'] = pd.to_numeric(_df_c['length_of_stay'], errors='coerce')
-                        _df_c = _df_c[(_df_c['length_of_stay'] >= _c_lmin) &
-                                      (_df_c['length_of_stay'] <= _c_lmax)]
-
-                    if _c_pdx and 'pdx' in _df_c.columns:
-                        _df_c = _df_c[_df_c['pdx'].astype(str).str.upper()
-                                      .str.startswith(_c_pdx.strip().upper())]
-
-                    if _c_pneu != "ทั้งหมด" and 'pdx' in _df_c.columns:
-                        _df_c['_cp'] = _df_c.apply(classify_pneumonia_type, axis=1)
-                        _df_c = _df_c[_df_c['_cp'] == _c_pneu.lower()]
-
-                    _df_c = _df_c.head(int(_c_n))
-
-                    if _df_c.empty:
-                        st.warning("⚠️ ไม่พบผู้ป่วยที่ตรงตามเงื่อนไข")
-                    else:
-                        st.success(f"✅ พบ {len(_df_c)} cases")
-                        _show_cc = [c for c in ['hn','an','age','pdx','length_of_stay',
-                                                  'discharge_status','adjrw','ward_name']
-                                    if c in _df_c.columns]
-                        st.dataframe(_df_c[_show_cc].reset_index(drop=True),
-                                     use_container_width=True, hide_index=True)
-
-                        # สรุปสถิติ
-                        _nc  = len(_df_c)
-                        _nd  = _df_c['discharge_status'].str.contains('ตาย', na=False).sum() \
-                               if 'discharge_status' in _df_c.columns else 0
-                        _ni  = _df_c['discharge_status'].str.contains('ดีขึ้น', na=False).sum() \
-                               if 'discharge_status' in _df_c.columns else 0
-                        _aa  = _df_c['age'].mean() if 'age' in _df_c.columns else 0
-                        _al  = _df_c['length_of_stay'].mean() if 'length_of_stay' in _df_c.columns else 0
-                        _ar  = _df_c['adjrw'].mean() if 'adjrw' in _df_c.columns else 0
-                        _st  = _df_c['discharge_status'].value_counts().to_dict() \
-                               if 'discharge_status' in _df_c.columns else {}
-                        _pdxt= _df_c['pdx'].value_counts().head(5).to_dict() \
-                               if 'pdx' in _df_c.columns else {}
-
-                        st.session_state['_cc_summary'] = {
-                            'n': _nc, 'deaths': int(_nd), 'improve': int(_ni),
-                            'avg_age': round(_aa,1), 'avg_los': round(_al,1),
-                            'avg_rw': round(_ar,2), 'death_rate': round(_nd/_nc*100,1) if _nc else 0,
-                            'status_dist': ', '.join(f"{k}({v})" for k,v in _st.items()),
-                            'pdx_dist': ', '.join(f"{k}({v})" for k,v in _pdxt.items()),
-                            'criteria': f"PDX:{_c_pdx} | Ward:{_c_ward} | อายุ:{_c_age_min}-{_c_age_max} | LOS:{_c_lmin}-{_c_lmax}",
-                        }
-
-                if st.session_state.get('_cc_summary'):
-                    _s = st.session_state['_cc_summary']
-                    st.markdown("---")
-                    _kk1,_kk2,_kk3,_kk4 = st.columns(4)
-                    _kk1.metric("Cases",    f"{_s['n']} ราย")
-                    _kk2.metric("Mortality", f"{_s['deaths']} ราย ({_s['death_rate']}%)")
-                    _kk3.metric("Avg LOS",  f"{_s['avg_los']} วัน")
-                    _kk4.metric("Avg adjRW",f"{_s['avg_rw']}")
-
-                    if st.button("🤖 ให้ Claude วิเคราะห์ Cases", key="cc_analyze"):
-                        _cc_msg = f"""วิเคราะห์ Historical Cases ดังนี้:
---- เงื่อนไขการค้นหา ---
-{_s['criteria']}
-
---- สถิติ cases ที่พบ ---
-จำนวน: {_s['n']} ราย | อายุเฉลี่ย: {_s['avg_age']} ปี
-LOS เฉลี่ย: {_s['avg_los']} วัน | adjRW เฉลี่ย: {_s['avg_rw']}
-Mortality Rate: {_s['death_rate']}% ({_s['deaths']} ราย)
-จำหน่ายดีขึ้น: {_s['improve']} ราย
-Discharge Status: {_s['status_dist']}
-Top PDX codes: {_s['pdx_dist']}
-
---- สิ่งที่ต้องการ ---
-1. Pattern ที่พบในกลุ่มนี้
-2. เปรียบเทียบ outcome ที่น่าสังเกต
-3. ข้อเสนอแนะสำหรับการดูแลผู้ป่วยกลุ่มเดียวกันในอนาคต"""
-
-                        with st.spinner("🤖 Claude กำลังวิเคราะห์..."):
-                            _res, _err = _call_claude(_SYS_CASE, _cc_msg, max_tok=1100)
-
-                        if _err:
-                            st.error(f"❌ {_err}")
-                        else:
-                            st.markdown("""
-                            <div style="background:#F3E5F5;padding:.6rem 1rem;border-radius:8px;
-                                        border-left:4px solid #7B1FA2;margin-bottom:1rem;">
-                                <b style="color:#4A148C;">🤖 AI Case Analysis</b>
-                            </div>
-                            """, unsafe_allow_html=True)
-                            st.markdown(_res)
-                            st.download_button(
-                                "📥 ดาวน์โหลด Analysis (TXT)", _res,
-                                f"case_analysis_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.txt",
-                                "text/plain", key="cc_dl"
-                            )
-
-            # ════════════════════════════════════════════════
-            # AI-4 : AUTO REPORT GENERATOR
-            # ════════════════════════════════════════════════
-            with ai4:
-                st.markdown("""
-                <div style="background:linear-gradient(135deg,#E65100,#BF360C);
-                            padding:1rem 1.5rem;border-radius:10px;margin-bottom:1rem;">
-                    <h3 style="color:white;margin:0;font-size:1.15rem;">
-                        📄 Auto Report Generator — รายงานรายเดือน + Trend Analysis
-                    </h3>
-                    <p style="color:#FFF3E0;margin:.3rem 0 0;font-size:.82rem;">
-                        สร้างรายงานสรุปพร้อม Executive Summary อัตโนมัติ
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
-
-                if 'month_sort' not in df_all.columns:
-                    st.warning("⚠️ ไม่มีข้อมูลสำหรับสร้างรายงาน")
-                else:
-                    _mths_r = sorted(df_all['month_sort'].dropna().unique())
-                    _mths_l = [str(m) for m in _mths_r]
-
-                    _rscope = st.radio(
-                        "ขอบเขตรายงาน:",
-                        ["📅 เดือนเดียว", "📆 หลายเดือน (Trend)"],
-                        horizontal=True, key="rp_scope"
-                    )
-
-                    if _rscope == "📅 เดือนเดียว":
-                        _rm = st.selectbox("เลือกเดือน:", _mths_l,
-                                           index=len(_mths_l)-1, key="rp_month")
-                        _df_r = df_all[df_all['month_sort'] == _rm].copy()
-                        _rperiod = _rm
-                    else:
-                        _rc1, _rc2 = st.columns(2)
-                        with _rc1:
-                            _rs = st.selectbox("เริ่มต้น", _mths_l, index=0, key="rp_start")
-                        with _rc2:
-                            _re = st.selectbox("สิ้นสุด",  _mths_l, index=len(_mths_l)-1, key="rp_end")
-                        _df_r   = df_all[(df_all['month_sort'] >= _rs) &
-                                         (df_all['month_sort'] <= _re)].copy()
-                        _rperiod = f"{_rs} ถึง {_re}"
-
-                    _rtypes = st.multiselect(
-                        "หัวข้อที่รวมในรายงาน:",
-                        ["📊 ภาพรวม IPD", "🫁 ปอดบวม",
-                         "🚨 ICU", "💀 Mortality & Outcome",
-                         "🛏 LOS & Outlier", "💰 CMI & Revenue"],
-                        default=["📊 ภาพรวม IPD", "💀 Mortality & Outcome",
-                                 "🚨 ICU", "🛏 LOS & Outlier"],
-                        key="rp_types"
-                    )
-
-                    # คำนวณ stats
-                    def _calc(df):
-                        _s = {}
-                        _s['n'] = len(df)
-                        _s['cmi'] = round(df['adjrw'].mean(), 3) if 'adjrw' in df.columns else 0
-                        _s['rw']  = round(df['adjrw'].sum(), 1)  if 'adjrw' in df.columns else 0
-                        _s['los'] = round(df['length_of_stay'].mean(), 1) \
-                                    if 'length_of_stay' in df.columns else 0
-                        if 'discharge_status' in df.columns:
-                            _s['death']   = df['discharge_status'].str.contains('ตาย', na=False).sum()
-                            _s['improve'] = df['discharge_status'].str.contains('ดีขึ้น', na=False).sum()
-                        else:
-                            _s['death'] = _s['improve'] = 0
-                        _s['drate'] = round(_s['death']/_s['n']*100,2) if _s['n'] else 0
-                        _s['irate'] = round(_s['improve']/_s['n']*100,1) if _s['n'] else 0
-                        if 'length_of_stay' in df.columns:
-                            _s['long30'] = (df['length_of_stay'] > 30).sum()
-                        else:
-                            _s['long30'] = 0
-                        _PCODES = ['J10','J11','J12','J13','J14','J15','J16','J17','J18',
-                                   'J85.0','J85.1','J95.0','J95.85','J22']
-                        if 'pdx' in df.columns:
-                            _s['pneu'] = df['pdx'].apply(
-                                lambda x: any(str(x).startswith(c) for c in _PCODES)
-                                if pd.notna(x) else False).sum()
-                            _s['top5'] = ', '.join(
-                                f"{k}({v})" for k,v in
-                                df['pdx'].value_counts().head(5).items())
-                        else:
-                            _s['pneu'] = 0; _s['top5'] = 'N/A'
-                        if 'ward_name' in df.columns:
-                            _im = df['ward_name'].str.strip().eq('หอผู้ป่วยหนัก ICU')
-                            _s['icu_n'] = int(_im.sum())
-                            _s['icu_d'] = int(df.loc[_im,'discharge_status']
-                                              .str.contains('ตาย',na=False).sum()) \
-                                          if _s['icu_n'] else 0
-                            _s['icu_dr'] = round(_s['icu_d']/_s['icu_n']*100,1) \
-                                           if _s['icu_n'] else 0
-                            _s['icu_los'] = round(df.loc[_im,'length_of_stay'].mean(),1) \
-                                            if (_s['icu_n'] and 'length_of_stay' in df.columns) else 0
-                        else:
-                            _s['icu_n'] = _s['icu_d'] = _s['icu_dr'] = _s['icu_los'] = 0
-                        return _s
-
-                    _st_r = _calc(_df_r)
-
-                    # Trend table (ถ้า multi-month)
-                    _trend_txt = ""
-                    if _rscope == "📆 หลายเดือน (Trend)" and 'month_sort' in _df_r.columns:
-                        _trows = []
-                        for _p, _g in _df_r.groupby('month_sort'):
-                            _ml = _g['month_label'].iloc[0] \
-                                  if 'month_label' in _g.columns else str(_p)
-                            _ts = _calc(_g)
-                            _trows.append({'เดือน':_ml,'จำหน่าย':_ts['n'],'CMI':_ts['cmi'],
-                                           'Total RW':_ts['rw'],'LOS':_ts['los'],
-                                           'ตาย%':_ts['drate'],'ICU':_ts['icu_n'],
-                                           'ปอดบวม':_ts['pneu']})
-                        _df_trend_r = pd.DataFrame(_trows)
-                        st.dataframe(_df_trend_r, use_container_width=True, hide_index=True)
-                        _trend_txt = "\n[Trend Data]\n" + _df_trend_r.to_string(index=False)
-
-                    # Build report data text
-                    _secs = []
-                    if "📊 ภาพรวม IPD" in _rtypes:
-                        _secs.append(f"""[ภาพรวม IPD]
-จำหน่ายทั้งหมด: {_st_r['n']:,} ราย | CMI: {_st_r['cmi']} | Total adjRW: {_st_r['rw']:,.1f}
-Top 5 โรค: {_st_r['top5']}""")
-                    if "💀 Mortality & Outcome" in _rtypes:
-                        _secs.append(f"""[Mortality & Outcome]
-เสียชีวิต: {_st_r['death']} ราย ({_st_r['drate']}%) | จำหน่ายดีขึ้น: {_st_r['improve']} ราย ({_st_r['irate']}%)""")
-                    if "🚨 ICU" in _rtypes:
-                        _secs.append(f"""[ICU]
-ผู้ป่วย ICU: {_st_r['icu_n']} ราย | เสียชีวิต: {_st_r['icu_d']} ราย ({_st_r['icu_dr']}%) | LOS ICU เฉลี่ย: {_st_r['icu_los']} วัน""")
-                    if "🫁 ปอดบวม" in _rtypes:
-                        _secs.append(f"""[ปอดบวม]
-ผู้ป่วยปอดบวม: {_st_r['pneu']} ราย ({round(_st_r['pneu']/_st_r['n']*100,1) if _st_r['n'] else 0}% ของ IPD)""")
-                    if "🛏 LOS & Outlier" in _rtypes:
-                        _secs.append(f"""[LOS & Outlier]
-LOS เฉลี่ย: {_st_r['los']} วัน | นอนนาน >30 วัน: {_st_r['long30']} ราย""")
-                    if "💰 CMI & Revenue" in _rtypes:
-                        _secs.append(f"""[CMI & Revenue]
-CMI: {_st_r['cmi']} | Total adjRW: {_st_r['rw']:,.1f} (ใช้คำนวณรายได้ DRG)""")
-
-                    _rdata = "\n".join(_secs) + _trend_txt
-
-                    if _rtypes and st.button("📄 สร้าง Auto Report",
-                                             type="primary", key="rp_gen"):
-                        _rp_msg = f"""สร้างรายงานสรุปประจำเดือนสำหรับโรงพยาบาลสันทราย ฝ่ายเวชระเบียนและสารสนเทศสุขภาพ
-
-โรงพยาบาล: สันทราย จังหวัดเชียงใหม่
-ช่วงเวลา: {_rperiod}
-หัวข้อรายงาน: {', '.join(_rtypes)}
-
-ข้อมูลสำหรับรายงาน:
-{_rdata}
-
-กรุณาสร้างรายงานทางการที่เหมาะสำหรับนำเสนอต่อผู้บริหาร
-ใช้ตัวบ่งชี้ ↑ ↓ → เพื่อแสดง trend เมื่อมีข้อมูลหลายเดือน"""
-
-                        with st.spinner("🤖 Claude กำลังสร้างรายงาน..."):
-                            _res, _err = _call_claude(_SYS_REPORT, _rp_msg, max_tok=2000)
-
-                        if _err:
-                            st.error(f"❌ {_err}")
-                        else:
-                            st.markdown("""
-                            <div style="background:#FFF3E0;padding:.6rem 1rem;border-radius:8px;
-                                        border-left:4px solid #FF9800;margin-bottom:1rem;">
-                                <b style="color:#E65100;">📄 AI-Generated Report</b>
-                                <span style="color:#757575;font-size:.85rem;margin-left:.5rem;">
-                                    — กรุณาตรวจสอบก่อนนำเสนอ
-                                </span>
-                            </div>
-                            """, unsafe_allow_html=True)
-                            st.markdown(_res)
-
-                            _dc1, _dc2 = st.columns(2)
-                            with _dc1:
-                                st.download_button(
-                                    "📥 ดาวน์โหลด TXT", _res,
-                                    f"report_{_rperiod.replace(' ','_')}_{pd.Timestamp.now().strftime('%Y%m%d')}.txt",
-                                    "text/plain", key="rp_dl_txt"
-                                )
-                            with _dc2:
-                                _html_r = f"""<!DOCTYPE html>
-<html lang="th"><head><meta charset="UTF-8">
-<title>รายงานประจำเดือน {_rperiod}</title>
-<style>
-body{{font-family:sans-serif;max-width:820px;margin:2rem auto;padding:1.5rem;
-      color:#333;line-height:1.7;}}
-h1,h2,h3{{color:#1565C0;}} hr{{border-color:#E0E0E0;}}
-.footer{{color:#9E9E9E;font-size:.85rem;margin-top:2rem;
-         border-top:1px solid #eee;padding-top:1rem;}}
-</style></head><body>
-<h1>📊 รายงานประจำเดือน</h1>
-<h2>โรงพยาบาลสันทราย · {_rperiod}</h2><hr>
-<div style="white-space:pre-wrap;">{_res}</div>
-<div class="footer">
-สร้างโดย Sansai Hospital Intelligence Platform (AI Gen Report) ·
-{pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}
-</div></body></html>"""
-                                st.download_button(
-                                    "📥 ดาวน์โหลด HTML", _html_r,
-                                    f"report_{pd.Timestamp.now().strftime('%Y%m%d')}.html",
-                                    "text/html", key="rp_dl_html"
-                                )
-
-
-
-
-
-
-
-        
         
         # ========================================
         # FOOTER: System Status
