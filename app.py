@@ -4010,14 +4010,18 @@ def show_reports():
 ลงท้ายด้วย: * ข้อมูลจากระบบ retrospective — ใช้ประกอบการตัดสินใจเท่านั้น"""
 
         _SYS_PROTOCOL = """คุณคือผู้เชี่ยวชาญด้าน ICU Protocol และ Evidence-Based Nursing ในโรงพยาบาลไทย
-หน้าที่: แนะนำ Protocol, Bundle และ Checklist ที่เหมาะสมตาม Risk Factors ของผู้ป่วย ICU
-กฎ:
+หน้าที่: สร้าง Protocol, Bundle และ Checklist ที่ครบถ้วนและละเอียด สำหรับผู้ป่วย ICU
+กฎการตอบ:
 1. ตอบเป็นภาษาไทย ใช้ภาษาที่พยาบาลและแพทย์เข้าใจง่าย
-2. จัดเป็นหมวดหมู่ชัดเจน มี ☐ checkbox สำหรับ bundle
-3. ระบุ priority: [ด่วน] [ภายใน 24 ชม.] [ติดตาม]
-4. อ้างอิงแนวทาง evidence-based (ไม่ต้องใส่ citation เต็ม)
-5. ไม่สั่งการรักษา — เป็นการแนะนำ protocol สำหรับพิจารณา
-6. ลงท้ายด้วย: "* ปรึกษาแพทย์ผู้ดูแลก่อนดำเนินการทุกครั้ง" """
+2. แต่ละ Protocol ต้องมีครบ:
+   - Rationale (เหตุผลที่ต้องทำ)
+   - Checklist ☐ อย่างน้อย 5-8 ข้อ
+   - Priority [ด่วน] [ภายใน 24 ชม.] [ติดตามทุกเวร]
+   - Monitoring parameters ที่ต้องติดตาม
+   - เป้าหมาย (Goal/Target)
+3. ห้ามตัดข้อมูลออก ให้ครบทุก Protocol ที่ขอ
+4. ไม่สั่งการรักษา — เป็นการแนะนำ protocol สำหรับพิจารณา
+5. ลงท้ายด้วย: "* ปรึกษาแพทย์ผู้ดูแลก่อนดำเนินการทุกครั้ง" """
 
         _SYS_CASE = """คุณคือผู้เชี่ยวชาญด้าน Clinical Outcome Analysis ใน ICU โรงพยาบาลไทย
 หน้าที่: วิเคราะห์ Historical Cases แล้วสรุป pattern, outcomes และข้อเสนอแนะในเชิงคลินิก
@@ -4106,7 +4110,7 @@ def show_reports():
             st.warning("⚠️ กรุณากรอก API Key ก่อนใช้งาน AI Features")
         else:
             # ── gemini caller ──────────────────────────────────────
-            def _call_gemini(sys_prompt, user_msg, max_tok=1200):
+            def _call_gemini(sys_prompt, user_msg, max_tok=65535):
                 models = [
                     "gemini-2.0-flash",
                     "gemini-2.5-flash",
@@ -4404,6 +4408,7 @@ NPV            : {_npv:.1f}%
                     </h3>
                     <p style="color:#C8E6C9;margin:.3rem 0 0;font-size:.82rem;">
                         แนะนำ checklist ตาม combination ของ risk factors
+                        สำหรับวิเคราะห์ผู้ป่วยใหม่เข้า ICU ต้องการ Protocol ที่เหมาะสม
                     </p>
                 </div>
                 """, unsafe_allow_html=True)
@@ -4454,11 +4459,15 @@ Risk Factors: {', '.join(_facts) if _facts else 'ไม่มีปัจจั�
 หมายเหตุ: {_p_note or 'ไม่มี'}
 Protocol ที่ต้องการ: {', '.join(_pt_types)}
 
-กรุณาสร้าง checklist พร้อม priority [ด่วน] [ภายใน 24 ชม.] [ติดตาม]
-และระบุ rationale สั้นๆ ว่าทำไมต้องทำแต่ละข้อ"""
+กรุณาสร้าง Protocol ให้ครบทุกหัวข้อที่ขอ แต่ละ Protocol ต้องมี:
+1. Rationale — อธิบายว่าทำไมผู้ป่วยรายนี้ถึงต้องการ Protocol นี้
+2. Checklist ☐ อย่างน้อย 5-8 ข้อ พร้อม priority [ด่วน]/[ภายใน 24 ชม.]/[ติดตามทุกเวร]
+3. Monitoring — สิ่งที่ต้องติดตามและความถี่
+4. Goal — เป้าหมายที่ต้องการบรรลุ
+ห้ามย่อหรือตัดข้อมูลออก ให้ละเอียดและนำไปใช้ได้จริง"""
 
                     with st.spinner("🤖 กำลังสร้าง Protocol..."):
-                        _res, _err = _call_gemini(_SYS_PROTOCOL, _pt_msg, max_tok=1400)
+                        _res, _err = _call_gemini(_SYS_PROTOCOL, _pt_msg, max_tok=65535)
 
                     if _err:
                         st.error(f"❌ {_err}")
@@ -4593,7 +4602,7 @@ Top PDX codes: {_s['pdx_dist']}
 3. ข้อเสนอแนะสำหรับการดูแลผู้ป่วยกลุ่มเดียวกันในอนาคต"""
 
                         with st.spinner("🤖 Gemini กำลังวิเคราะห์..."):
-                            _res, _err = _call_gemini(_SYS_CASE, _cc_msg, max_tok=1100)
+                            _res, _err = _call_gemini(_SYS_CASE, _cc_msg, max_tok=65535)
 
                         if _err:
                             st.error(f"❌ {_err}")
@@ -4765,7 +4774,7 @@ CMI: {_st_r['cmi']} | Total adjRW: {_st_r['rw']:,.1f} (ใช้คำนวณ�
 ใช้ตัวบ่งชี้ ↑ ↓ → เพื่อแสดง trend เมื่อมีข้อมูลหลายเดือน"""
 
                         with st.spinner("🤖 Gemini กำลังสร้างรายงาน..."):
-                            _res, _err = _call_gemini(_SYS_REPORT, _rp_msg, max_tok=2000)
+                            _res, _err = _call_gemini(_SYS_REPORT, _rp_msg, max_tok=65535)
 
                         if _err:
                             st.error(f"❌ {_err}")
