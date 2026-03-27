@@ -4159,25 +4159,16 @@ def show_reports():
                     # รวม system prompt เข้ากับ user message
                     # เพราะ Gemini ไม่มี system role แบบ Anthropic
                     full_prompt = f"{sys_prompt}\n\n---\n\n{user_msg}"
-            
                     r = requests.post(
-                        f"https://generativelanguage.googleapis.com/v1beta/models/"
-                        f"gemini-2.0-flash-lite:generateContent?key={_ai_key}"
+                        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={_ai_key}",
                         headers={"Content-Type": "application/json"},
                         json={
-                            "contents": [
-                                {
-                                    "role": "user",
-                                    "parts": [{"text": full_prompt}]
-                                }
-                            ],
-                            "generationConfig": {
-                                "maxOutputTokens": max_tok,
-                                "temperature": 0.3,
-                            }
+                            "contents": [{"role": "user", "parts": [{"text": full_prompt}]}],
+                            "generationConfig": {"maxOutputTokens": max_tok, "temperature": 0.3}
                         },
                         timeout=60
                     )
+                    
             
                     if r.status_code == 200:
                         data = r.json()
