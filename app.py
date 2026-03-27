@@ -425,8 +425,17 @@ def show_reports():
     client = init_supabase()
     
     with st.spinner("กำลังโหลดข้อมูล..."):
-        try:
-            result = client.select('ipd_monthly')
+        try: 
+            result = client.select(
+                'ipd_monthly',
+                columns='id,an,hn,month_year,admit_date,discharge_date,ward_name,'
+                        'pttype_name,pdx,dx0,dx1,dx2,dx3,dx4,dx5,dx6,dx7,dx8,dx9,dx10,'
+                        'op0,op1,op2,op3,op4,op5,op6,op7,op8,op9,op10,op11,'
+                        'age,sex,adjrw,length_of_stay,discharge_status,clinic_name,fiscal_year',
+                limit=50000  # จำกัดไว้ก่อน
+            )
+
+        
         except Exception as e:
             st.error(f"❌ เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล: {str(e)}")
             st.info("💡 ลองไปที่เมนู '🔧 ทดสอบการเชื่อมต่อ' เพื่อตรวจสอบปัญหา")
@@ -5296,8 +5305,16 @@ def show_home():
         client = init_supabase()
         
         # โหลดข้อมูล
-        with st.spinner("⚡ Loading real-time data..."):
-            result = client.select('ipd_monthly')
+        with st.spinner("⚡ Loading real-time data..."): 
+            result = client.select(
+                'ipd_monthly',
+                columns='id,an,hn,month_year,admit_date,discharge_date,ward_name,'
+                        'pttype_name,pdx,dx0,dx1,dx2,dx3,dx4,dx5,dx6,dx7,dx8,dx9,dx10,'
+                        'op0,op1,op2,op3,op4,op5,op6,op7,op8,op9,op10,op11,'
+                        'age,sex,adjrw,length_of_stay,discharge_status,clinic_name,fiscal_year',
+                limit=50000  # จำกัดไว้ก่อน
+            )
+        
         
         if result['error'] or not result['data']:
             st.warning("⚠️ ไม่สามารถโหลดข้อมูลได้ กรุณาตรวจสอบการเชื่อมต่อ")
