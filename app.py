@@ -4116,8 +4116,8 @@ def show_reports():
         # ✅ วางตรงนี้ — นอก if/else ทั้งหมด
             def _call_gemini(sys_prompt, user_msg, max_tok=1200):
                 models = [
-                    "gemini-1.5-flash",
-                    "gemini-1.5-flash-8b",
+                    "gemini-2.0-flash",
+                    "gemini-2.5-flash",
                     "gemini-2.0-flash-lite",
                 ]
                 full_prompt = f"{sys_prompt}\n\n---\n\n{user_msg}"
@@ -4154,9 +4154,14 @@ def show_reports():
             if not _ai_key:
                 st.warning("⚠️ กรุณากรอก API Key ก่อนใช้งาน AI Features")
             else:
-                # sub-tabs, buttons ฯลฯ
-                ai1, ai2, ai3, ai4 = st.tabs([...])
-                ...
+              
+
+                ai1, ai2, ai3, ai4 = st.tabs([
+                    "🚨 Smart Alert",
+                    "📋 Protocol Suggester",
+                    "🔍 Case Comparator",
+                    "📄 Auto Report"
+                ]) 
                 # เรียกใช้ได้เลย
                 _res, _err = _call_gemini(_SYS_ICU, _user_msg, max_tok=900)
                 
