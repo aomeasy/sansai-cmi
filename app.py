@@ -3283,6 +3283,7 @@ def show_reports():
     st.markdown("---")
     st.caption(f"🕐 อัปเดตล่าสุด: {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}")
      
+  
 
     # ════════════════════════════════════════════════════
     # TAB 6 : ICU EARLY WARNING RISK SCORE
@@ -3299,7 +3300,7 @@ def show_reports():
             </p>
         </div>
         """, unsafe_allow_html=True)
-    
+
         st.markdown("""
         <div style="background:#FFF3E0;padding:1rem;border-radius:8px;
                     border-left:4px solid #FF9800;margin-bottom:1.5rem;">
@@ -3313,16 +3314,16 @@ def show_reports():
             </span>
         </div>
         """, unsafe_allow_html=True)
-    
+
         # ── กรองเฉพาะ ICU ──────────────────────────────────────
         df_icu_risk = df_all[
             df_all['ward_name'].str.strip() == 'หอผู้ป่วยหนัก ICU'
         ].copy()
-    
+
         if df_icu_risk.empty:
             st.warning("⚠️ ไม่พบข้อมูลผู้ป่วย ICU")
             st.stop()
-    
+
         # ── เตรียมตัวแปร ───────────────────────────────────────
         df_icu_risk['is_death'] = df_icu_risk['discharge_status'].str.contains(
             'ตาย', na=False)
@@ -3331,12 +3332,12 @@ def show_reports():
         df_icu_risk['los']      = pd.to_numeric(
             df_icu_risk['length_of_stay'], errors='coerce').fillna(0)
         df_icu_risk['on_vent']  = df_icu_risk.apply(has_ventilator, axis=1)
-    
+
         # pneu_type สำหรับ ICU
         df_icu_risk['pneu_type'] = df_icu_risk.apply(classify_pneumonia_type, axis=1) \
                                    if 'pdx' in df_icu_risk.columns \
                                    else 'other'
-    
+
         # ── Scoring ────────────────────────────────────────────
         # คะแนนแต่ละ factor
         df_icu_risk['score_vap']    = (df_icu_risk['pneu_type'] == 'vap').astype(int) * 3
@@ -3345,7 +3346,7 @@ def show_reports():
         df_icu_risk['score_rw']     = (df_icu_risk['adjrw'] > 3.0).astype(int) * 2
         df_icu_risk['score_age']    = (df_icu_risk['age'] >= 65).astype(int) * 1
         df_icu_risk['score_los']    = (df_icu_risk['los'] > 7).astype(int) * 1
-    
+
         df_icu_risk['total_score']  = (
             df_icu_risk['score_vap']  +
             df_icu_risk['score_hap']  +
@@ -3354,39 +3355,85 @@ def show_reports():
             df_icu_risk['score_age']  +
             df_icu_risk['score_los']
         )
-    
+
         # Risk Level
         def risk_level(s):
             if s >= 5:   return 'High'
             elif s >= 3: return 'Medium'
             else:        return 'Low'
-    
+
         df_icu_risk['risk_level'] = df_icu_risk['total_score'].apply(risk_level)
-    
+
         # Long LOS outcome (> 7 วัน)
         df_icu_risk['long_los'] = df_icu_risk['los'] > 7
-    
+
         # ── KPI Overview ───────────────────────────────────────
         n_total  = len(df_icu_risk)
         n_high   = (df_icu_risk['risk_level'] == 'High').sum()
         n_medium = (df_icu_risk['risk_level'] == 'Medium').sum()
         n_low    = (df_icu_risk['risk_level'] == 'Low').sum()
         n_death  = df_icu_risk['is_death'].sum()
-    
+
         k1, k2, k3, k4, k5 = st.columns(5)
-        k1.metric("🏥 ผู้ป่วย ICU ทั้งหมด", f"{n_total} ราย")
-        k2.metric("🔴 High Risk",   f"{n_high} ราย",
-                  f"{n_high/n_total*100:.1f}%" if n_total else "0%")
-        k3.metric("🟠 Medium Risk", f"{n_medium} ราย",
-                  f"{n_medium/n_total*100:.1f}%" if n_total else "0%")
-        k4.metric("🟢 Low Risk",    f"{n_low} ราย",
-                  f"{n_low/n_total*100:.1f}%" if n_total else "0%")
-        k5.metric("💀 เสียชีวิต",  f"{n_death} ราย",
-                  f"{n_death/n_total*100:.1f}%" if n_total else "0%",
-                  delta_color="inverse")
-    
+
+        # ── [แก้ไข] เพิ่ม help= อธิบายแต่ละ KPI card ──────────
+        k1.metric(
+            "🏥 ผู้ป่วย ICU ทั้งหมด",
+            f"{n_total} ราย",
+            help=(
+                "จำนวนผู้ป่วยทั้งหมดที่เข้ารับการรักษาใน ICU (หอผู้ป่วยหนัก) "
+                "ในช่วงเวลาที่เลือก — ตัวเลขนี้คือฐานของการคำนวณทุกอย่างในหน้านี้"
+            )
+        )
+        k2.metric(
+            "🔴 High Risk",
+            f"{n_high} ราย",
+            f"{n_high/n_total*100:.1f}%" if n_total else "0%",
+            help=(
+                "ผู้ป่วยที่ได้คะแนนความเสี่ยง ≥ 5 คะแนน\n\n"
+                "กลุ่มนี้มีปัจจัยเสี่ยงหลายอย่างรวมกัน เช่น มีปอดอักเสบจากการใส่ท่อ (VAP) "
+                "ใช้เครื่องช่วยหายใจ หรือมีความซับซ้อนของโรคสูง "
+                "ควรได้รับการดูแลและติดตามอย่างใกล้ชิดเป็นพิเศษ\n\n"
+                "% ที่แสดง = สัดส่วนของกลุ่ม High Risk ต่อผู้ป่วย ICU ทั้งหมด"
+            )
+        )
+        k3.metric(
+            "🟠 Medium Risk",
+            f"{n_medium} ราย",
+            f"{n_medium/n_total*100:.1f}%" if n_total else "0%",
+            help=(
+                "ผู้ป่วยที่ได้คะแนนความเสี่ยง 3–4 คะแนน\n\n"
+                "กลุ่มนี้มีปัจจัยเสี่ยงบางอย่าง เช่น อายุมาก หรือนอนนาน "
+                "ควรติดตามอาการสม่ำเสมอและประเมินซ้ำหากอาการเปลี่ยนแปลง\n\n"
+                "% ที่แสดง = สัดส่วนของกลุ่ม Medium Risk ต่อผู้ป่วย ICU ทั้งหมด"
+            )
+        )
+        k4.metric(
+            "🟢 Low Risk",
+            f"{n_low} ราย",
+            f"{n_low/n_total*100:.1f}%" if n_total else "0%",
+            help=(
+                "ผู้ป่วยที่ได้คะแนนความเสี่ยง < 3 คะแนน\n\n"
+                "กลุ่มนี้มีปัจจัยเสี่ยงน้อย อาการโดยรวมไม่ซับซ้อน "
+                "แม้จะอยู่ใน ICU แต่โอกาสเกิดภาวะแทรกซ้อนรุนแรงต่ำกว่ากลุ่มอื่น\n\n"
+                "% ที่แสดง = สัดส่วนของกลุ่ม Low Risk ต่อผู้ป่วย ICU ทั้งหมด"
+            )
+        )
+        k5.metric(
+            "💀 เสียชีวิต",
+            f"{n_death} ราย",
+            f"{n_death/n_total*100:.1f}%" if n_total else "0%",
+            delta_color="inverse",
+            help=(
+                "จำนวนผู้ป่วยที่เสียชีวิตระหว่างรับการรักษาใน ICU "
+                "ในช่วงเวลาที่เลือก\n\n"
+                "% ที่แสดง = อัตราเสียชีวิต (Mortality Rate) ของผู้ป่วย ICU ทั้งหมด "
+                "— ยิ่งน้อยยิ่งดี จึงแสดงสีแดงเมื่อค่าสูงขึ้น"
+            )
+        )
+
         st.markdown("---")
-    
+
         # ════════════════════════════════════════════════════
         # SECTION 1: Scoring Criteria (แสดง weight)
         # ════════════════════════════════════════════════════
@@ -3400,69 +3447,104 @@ def show_reports():
             | 💰 adjRW > 3.0 | adjRW สูง | **+2** | ความซับซ้อนสูง |
             | 👴 อายุ ≥ 65 ปี | age ≥ 65 | **+1** | ผู้สูงอายุ |
             | 🛏 LOS > 7 วัน | length_of_stay > 7 | **+1** | นอนนาน |
-    
+
             **ระดับความเสี่ยง:**
             - 🔴 **High** = คะแนน ≥ 5
             - 🟠 **Medium** = คะแนน 3–4
             - 🟢 **Low** = คะแนน < 3
             """)
-    
+
         st.markdown("---")
-    
+
         # ════════════════════════════════════════════════════
         # SECTION 2: วัดความแม่น (Validation)
         # ════════════════════════════════════════════════════
         st.markdown("#### 🎯 ความแม่นของ Risk Score")
-    
+
         col_v1, col_v2 = st.columns(2)
-    
+
         # ── Mortality Prediction ──────────────────────────
         with col_v1:
             st.markdown("##### 💀 ทำนายการเสียชีวิต")
-    
+
             from sklearn.metrics import (
                 confusion_matrix, classification_report,
                 roc_auc_score, roc_curve
             )
             import numpy as np
-    
+
             y_true_death = df_icu_risk['is_death'].astype(int)
             y_score      = df_icu_risk['total_score']
             y_pred_death = (df_icu_risk['risk_level'] == 'High').astype(int)
-    
+
             if y_true_death.sum() > 0:
                 # Confusion Matrix
                 cm = confusion_matrix(y_true_death, y_pred_death)
                 tn, fp, fn, tp = cm.ravel() if cm.size == 4 else (0,0,0,0)
-    
+
                 sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0
                 specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
                 ppv         = tp / (tp + fp) if (tp + fp) > 0 else 0
                 npv         = tn / (tn + fn) if (tn + fn) > 0 else 0
-    
+
                 # AUROC
                 try:
                     auroc = roc_auc_score(y_true_death, y_score)
                 except:
                     auroc = 0.0
-    
-                # แสดง metrics
+
+                # ── [แก้ไข] เพิ่ม help= อธิบาย metrics แต่ละตัว ──
                 m1, m2 = st.columns(2)
-                m1.metric("Sensitivity", f"{sensitivity*100:.1f}%",
-                          help="จับผู้ที่เสียชีวิตจริงได้กี่ %")
-                m2.metric("Specificity", f"{specificity*100:.1f}%",
-                          help="ไม่ false alarm กี่ %")
+                m1.metric(
+                    "Sensitivity",
+                    f"{sensitivity*100:.1f}%",
+                    help=(
+                        "**Sensitivity (ความไว)** = ระบบจับผู้ป่วยที่เสียชีวิตจริงได้กี่ %\n\n"
+                        f"คำนวณ: {tp} (จับได้จริง) ÷ {tp+fn} (เสียชีวิตจริงทั้งหมด) × 100\n\n"
+                        "ถ้าค่านี้สูง → ระบบ 'ไม่พลาด' ผู้ป่วยที่มีความเสี่ยงสูง\n"
+                        "ถ้าค่านี้ต่ำ → มีผู้ป่วยเสี่ยงสูงบางส่วนที่ระบบมองข้ามไป"
+                    )
+                )
+                m2.metric(
+                    "Specificity",
+                    f"{specificity*100:.1f}%",
+                    help=(
+                        "**Specificity (ความจำเพาะ)** = ระบบไม่แจ้งเตือนผิดในผู้ที่รอดชีวิตกี่ %\n\n"
+                        f"คำนวณ: {tn} (ไม่เตือนและรอดจริง) ÷ {tn+fp} (รอดชีวิตทั้งหมด) × 100\n\n"
+                        "ถ้าค่านี้สูง → แจ้งเตือนเฉพาะคนที่เสี่ยงจริง ไม่ False Alarm บ่อย\n"
+                        "ถ้าค่านี้ต่ำ → มีการแจ้งเตือนผิดบ่อย ทำให้สูญเสียทรัพยากรโดยเปล่าประโยชน์"
+                    )
+                )
                 m3, m4 = st.columns(2)
-                m3.metric("PPV", f"{ppv*100:.1f}%",
-                          help="Alert แล้วเสียชีวิตจริงกี่ %")
-                m4.metric("NPV", f"{npv*100:.1f}%",
-                          help="Low risk แล้วรอดจริงกี่ %")
-    
+                m3.metric(
+                    "PPV",
+                    f"{ppv*100:.1f}%",
+                    help=(
+                        "**PPV (Positive Predictive Value / ค่าทำนายบวก)**\n"
+                        "= เมื่อระบบแจ้งเตือนว่า 'High Risk' แล้วผู้ป่วยเสียชีวิตจริงกี่ %\n\n"
+                        f"คำนวณ: {tp} (เตือนแล้วเสียชีวิตจริง) ÷ {tp+fp} (เตือนทั้งหมด) × 100\n\n"
+                        "ถ้าค่านี้สูง → เมื่อระบบเตือน แปลว่าน่าเชื่อถือ ควรรีบดูแล\n"
+                        "ถ้าค่านี้ต่ำ → เตือนบ่อยแต่ส่วนใหญ่ไม่ได้เสี่ยงจริง"
+                    )
+                )
+                m4.metric(
+                    "NPV",
+                    f"{npv*100:.1f}%",
+                    help=(
+                        "**NPV (Negative Predictive Value / ค่าทำนายลบ)**\n"
+                        "= เมื่อระบบบอกว่า 'Low Risk' แล้วผู้ป่วยรอดชีวิตจริงกี่ %\n\n"
+                        f"คำนวณ: {tn} (ไม่เตือนและรอดจริง) ÷ {tn+fn} (ไม่เตือนทั้งหมด) × 100\n\n"
+                        "ถ้าค่านี้สูง → มั่นใจได้ว่ากลุ่ม Low Risk ปลอดภัยจริง\n"
+                        "ถ้าค่านี้ต่ำ → อาจมีผู้ป่วยที่ระบบมองว่าปลอดภัย แต่จริงๆ ยังเสี่ยงอยู่"
+                    )
+                )
+
+                # ── [แก้ไข] เพิ่มคำอธิบาย AUROC card ──────────────
                 auroc_color = "#4CAF50" if auroc >= 0.7 else \
                               "#FF9800" if auroc >= 0.6 else "#F44336"
                 auroc_label = "ดี" if auroc >= 0.7 else \
                               "พอใช้" if auroc >= 0.6 else "ต่ำ"
-    
+
                 st.markdown(f"""
                 <div style="background:#F5F5F5;padding:1rem;border-radius:8px;
                             text-align:center;margin-top:0.5rem;">
@@ -3478,7 +3560,22 @@ def show_reports():
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
-    
+
+                # ── [แก้ไข] คำอธิบาย AUROC ใต้ card ───────────────
+                st.markdown("""
+                <div style="background:#E8F5E9;padding:0.7rem 1rem;border-radius:6px;
+                            margin-top:0.5rem;font-size:0.82rem;color:#37474F;">
+                    <b>💡 AUROC คืออะไร?</b><br>
+                    ตัวเลขนี้บอกว่า Risk Score สามารถ <b>แยกกลุ่มที่เสียชีวิต ออกจากกลุ่มที่รอดชีวิต</b>
+                    ได้ดีแค่ไหน โดยรวม Sensitivity และ Specificity ทุก threshold ไว้ด้วยกัน<br><br>
+                    <b>อ่านค่าง่ายๆ :</b><br>
+                    &nbsp;&nbsp;• 1.0 = สมบูรณ์แบบ แยกได้ถูกทุกราย<br>
+                    &nbsp;&nbsp;• 0.7–0.9 = ดี ใช้งานได้จริงในทางคลินิก<br>
+                    &nbsp;&nbsp;• 0.6–0.7 = พอใช้ ควรปรับ scoring ต่อ<br>
+                    &nbsp;&nbsp;• 0.5 = แย่เท่ากับการเดาสุ่ม
+                </div>
+                """, unsafe_allow_html=True)
+
                 # ROC Curve
                 try:
                     fpr, tpr, _ = roc_curve(y_true_death, y_score)
@@ -3501,46 +3598,94 @@ def show_reports():
                     st.altair_chart(ch_roc + diag, use_container_width=True)
                 except:
                     pass
+
+                # ── [แก้ไข] คำอธิบาย ROC Curve ───────────────────
+                st.markdown("""
+                <div style="background:#FFF8E1;padding:0.7rem 1rem;border-radius:6px;
+                            font-size:0.82rem;color:#37474F;">
+                    <b>📈 อ่านกราฟ ROC อย่างไร?</b><br>
+                    แกน X = โอกาสแจ้งเตือนผิด (False Alarm) &nbsp;|&nbsp;
+                    แกน Y = โอกาสจับผู้ป่วยที่เสียชีวิตได้<br>
+                    เส้นกราฟยิ่ง <b>โค้งไปมุมบนซ้ายมากเท่าไหร่ = ยิ่งดี</b><br>
+                    เส้นประ = เส้นฐาน (เดาสุ่ม 50:50)
+                </div>
+                """, unsafe_allow_html=True)
+
             else:
                 st.info("ℹ️ ไม่มีข้อมูลการเสียชีวิตใน ICU")
-    
+
         # ── Long LOS Prediction ───────────────────────────
         with col_v2:
             st.markdown("##### 🛏 ทำนาย LOS > 7 วัน")
-    
+
             y_true_los   = df_icu_risk['long_los'].astype(int)
             y_pred_los   = (df_icu_risk['risk_level'].isin(['High','Medium'])).astype(int)
-    
+
             if y_true_los.sum() > 0:
                 cm2 = confusion_matrix(y_true_los, y_pred_los)
                 tn2, fp2, fn2, tp2 = cm2.ravel() if cm2.size == 4 else (0,0,0,0)
-    
+
                 sensitivity2 = tp2 / (tp2 + fn2) if (tp2 + fn2) > 0 else 0
                 specificity2 = tn2 / (tn2 + fp2) if (tn2 + fp2) > 0 else 0
                 ppv2         = tp2 / (tp2 + fp2) if (tp2 + fp2) > 0 else 0
                 npv2         = tn2 / (tn2 + fn2) if (tn2 + fn2) > 0 else 0
-    
+
                 try:
                     auroc2 = roc_auc_score(y_true_los, y_score)
                 except:
                     auroc2 = 0.0
-    
+
+                # ── [แก้ไข] เพิ่ม help= อธิบาย metrics LOS ─────────
                 m1, m2 = st.columns(2)
-                m1.metric("Sensitivity", f"{sensitivity2*100:.1f}%",
-                          help="จับผู้ที่ LOS ยาวจริงได้กี่ %")
-                m2.metric("Specificity", f"{specificity2*100:.1f}%",
-                          help="ไม่ false alarm กี่ %")
+                m1.metric(
+                    "Sensitivity",
+                    f"{sensitivity2*100:.1f}%",
+                    help=(
+                        "**Sensitivity (ความไว)** = ระบบจับผู้ป่วยที่นอน ICU นาน (>7 วัน) ได้กี่ %\n\n"
+                        f"คำนวณ: {tp2} (จับได้จริง) ÷ {tp2+fn2} (นอนนานจริงทั้งหมด) × 100\n\n"
+                        "ถ้าค่านี้สูง → ระบบช่วยระบุผู้ป่วยที่ต้องการเตียง ICU นานล่วงหน้าได้ดี\n"
+                        "ช่วยให้วางแผนเตียงและทรัพยากรได้แม่นขึ้น"
+                    )
+                )
+                m2.metric(
+                    "Specificity",
+                    f"{specificity2*100:.1f}%",
+                    help=(
+                        "**Specificity (ความจำเพาะ)** = ระบบไม่แจ้งเตือนผิดในผู้ที่จะออก ICU เร็วกี่ %\n\n"
+                        f"คำนวณ: {tn2} (ไม่เตือนและออกเร็วจริง) ÷ {tn2+fp2} (ออกเร็วทั้งหมด) × 100\n\n"
+                        "ถ้าค่านี้สูง → ระบบไม่กักเตียงไว้โดยไม่จำเป็น\n"
+                        "ถ้าค่านี้ต่ำ → อาจวางแผนเตียงเกินจำเป็น"
+                    )
+                )
                 m3, m4 = st.columns(2)
-                m3.metric("PPV", f"{ppv2*100:.1f}%",
-                          help="Alert แล้ว LOS ยาวจริงกี่ %")
-                m4.metric("NPV", f"{npv2*100:.1f}%",
-                          help="Low risk แล้ว LOS สั้นจริงกี่ %")
-    
+                m3.metric(
+                    "PPV",
+                    f"{ppv2*100:.1f}%",
+                    help=(
+                        "**PPV (Positive Predictive Value)** = เมื่อระบบบอกว่า 'Medium/High Risk'\n"
+                        "แล้วผู้ป่วยนอนนาน > 7 วัน จริงกี่ %\n\n"
+                        f"คำนวณ: {tp2} (เตือนแล้วนอนนานจริง) ÷ {tp2+fp2} (เตือนทั้งหมด) × 100\n\n"
+                        "ค่านี้สูง = เมื่อระบบเตือน ควรจองทรัพยากรไว้ได้เลย"
+                    )
+                )
+                m4.metric(
+                    "NPV",
+                    f"{npv2*100:.1f}%",
+                    help=(
+                        "**NPV (Negative Predictive Value)** = เมื่อระบบบอกว่า 'Low Risk'\n"
+                        "แล้วผู้ป่วยออก ICU เร็ว (≤7 วัน) จริงกี่ %\n\n"
+                        f"คำนวณ: {tn2} (ไม่เตือนและออกเร็วจริง) ÷ {tn2+fn2} (ไม่เตือนทั้งหมด) × 100\n\n"
+                        "ค่านี้สูง = กลุ่ม Low Risk มีแนวโน้มออกจาก ICU เร็วจริง\n"
+                        "ช่วยบริหารเตียงได้อย่างมีประสิทธิภาพ"
+                    )
+                )
+
+                # ── [แก้ไข] เพิ่มคำอธิบาย AUROC card LOS ──────────
                 auroc_color2 = "#4CAF50" if auroc2 >= 0.7 else \
                                "#FF9800" if auroc2 >= 0.6 else "#F44336"
                 auroc_label2 = "ดี" if auroc2 >= 0.7 else \
                                "พอใช้" if auroc2 >= 0.6 else "ต่ำ"
-    
+
                 st.markdown(f"""
                 <div style="background:#F5F5F5;padding:1rem;border-radius:8px;
                             text-align:center;margin-top:0.5rem;">
@@ -3556,7 +3701,19 @@ def show_reports():
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
-    
+
+                # ── [แก้ไข] คำอธิบาย AUROC LOS ใต้ card ──────────
+                st.markdown("""
+                <div style="background:#E3F2FD;padding:0.7rem 1rem;border-radius:6px;
+                            margin-top:0.5rem;font-size:0.82rem;color:#37474F;">
+                    <b>💡 AUROC สำหรับ LOS คืออะไร?</b><br>
+                    ตัวเลขนี้บอกว่า Risk Score สามารถ <b>แยกผู้ป่วยที่จะนอนนาน (>7 วัน)
+                    ออกจากผู้ที่จะออกเร็ว</b> ได้ดีแค่ไหน<br><br>
+                    ใช้ประโยชน์ในการ <b>วางแผนเตียง ICU</b> และ <b>จัดสรรทรัพยากร</b>
+                    ล่วงหน้าได้อย่างมีประสิทธิภาพ
+                </div>
+                """, unsafe_allow_html=True)
+
                 try:
                     fpr2, tpr2, _ = roc_curve(y_true_los, y_score)
                     roc_df2 = pd.DataFrame({'FPR': fpr2, 'TPR': tpr2})
@@ -3577,24 +3734,37 @@ def show_reports():
                     st.altair_chart(ch_roc2 + diag2, use_container_width=True)
                 except:
                     pass
+
+                # ── [แก้ไข] คำอธิบาย ROC Curve LOS ──────────────
+                st.markdown("""
+                <div style="background:#FFF8E1;padding:0.7rem 1rem;border-radius:6px;
+                            font-size:0.82rem;color:#37474F;">
+                    <b>📈 อ่านกราฟ ROC อย่างไร?</b><br>
+                    แกน X = โอกาสแจ้งเตือนผิด (False Alarm) &nbsp;|&nbsp;
+                    แกน Y = โอกาสจับผู้ป่วยที่นอนนานได้<br>
+                    เส้นกราฟยิ่ง <b>โค้งไปมุมบนซ้ายมากเท่าไหร่ = ยิ่งดี</b><br>
+                    เส้นประ = เส้นฐาน (เดาสุ่ม 50:50)
+                </div>
+                """, unsafe_allow_html=True)
+
             else:
                 st.info("ℹ️ ไม่มีข้อมูล LOS > 7 วัน")
-    
+
         st.markdown("---")
-    
+
         # ════════════════════════════════════════════════════
         # SECTION 3: Score Distribution
         # ════════════════════════════════════════════════════
         st.markdown("#### 📊 การกระจายของ Risk Score")
-    
+
         col_d1, col_d2 = st.columns(2)
-    
+
         with col_d1:
             # Distribution ของ Score แยกตาม outcome
             score_df = df_icu_risk[['total_score','is_death','long_los','risk_level']].copy()
             score_df['Outcome'] = score_df['is_death'].map(
                 {True:'💀 เสียชีวิต', False:'✅ รอดชีวิต'})
-    
+
             ch_dist = alt.Chart(score_df).mark_bar(opacity=0.7).encode(
                 x=alt.X('total_score:Q', bin=alt.Bin(step=1), title='Risk Score'),
                 y=alt.Y('count()', title='จำนวนราย', stack=True),
@@ -3604,17 +3774,26 @@ def show_reports():
                 tooltip=['total_score','count()','Outcome']
             ).properties(height=260, title='Distribution of Risk Score by Outcome')
             st.altair_chart(ch_dist, use_container_width=True)
-    
+
+            # ── [แก้ไข] คำอธิบาย Distribution Chart ──────────
+            st.markdown("""
+            <div style="background:#F3E5F5;padding:0.7rem 1rem;border-radius:6px;
+                        font-size:0.82rem;color:#37474F;">
+                <b>📊 อ่านกราฟนี้อย่างไร?</b><br>
+                แต่ละแท่ง = กลุ่มผู้ป่วยที่ได้คะแนนเท่ากัน<br>
+                สีแดง = เสียชีวิต &nbsp;|&nbsp; สีเขียว = รอดชีวิต<br>
+                ถ้า Score สูง แล้วสัดส่วนสีแดง<b>มากขึ้น</b> = ระบบทำงานได้ดี
+            </div>
+            """, unsafe_allow_html=True)
+
         with col_d2:
             # Mortality rate ในแต่ละ Risk Level
-       
-
             risk_summary = df_icu_risk.groupby('risk_level').agg(
                 n_total=('is_death','count'),
                 n_death=('is_death','sum'),
                 n_los=('long_los','sum')
             ).reset_index()
-            
+
             risk_summary['จำนวน']           = risk_summary['n_total']
             risk_summary['เสียชีวิต']       = risk_summary['n_death']
             risk_summary['LOS_ยาว']         = risk_summary['n_los']
@@ -3623,8 +3802,8 @@ def show_reports():
             ).round(1)
             risk_summary['อัตรา LOS ยาว (%)'] = (
                 risk_summary['n_los'] / risk_summary['n_total'] * 100
-            ).round(1)          
-    
+            ).round(1)
+
             color_map = {'High':'#D32F2F','Medium':'#F57C00','Low':'#2E7D32'}
             ch_risk = alt.Chart(risk_summary).mark_bar(cornerRadiusTopLeft=4,
                                                         cornerRadiusTopRight=4).encode(
@@ -3637,7 +3816,18 @@ def show_reports():
                 tooltip=['risk_level','จำนวน','เสียชีวิต','อัตราตาย (%)']
             ).properties(height=260, title='Mortality Rate ตาม Risk Level')
             st.altair_chart(ch_risk, use_container_width=True)
-    
+
+            # ── [แก้ไข] คำอธิบาย Mortality Rate Chart ────────
+            st.markdown("""
+            <div style="background:#FBE9E7;padding:0.7rem 1rem;border-radius:6px;
+                        font-size:0.82rem;color:#37474F;">
+                <b>📊 อ่านกราฟนี้อย่างไร?</b><br>
+                แท่งกราฟแสดงอัตราเสียชีวิต (%) ของแต่ละกลุ่มความเสี่ยง<br>
+                ถ้า High Risk มีแท่ง<b>สูงกว่า</b> Medium และ Low อย่างชัดเจน<br>
+                = ระบบแบ่งกลุ่มความเสี่ยงได้มีความหมายจริงในทางคลินิก
+            </div>
+            """, unsafe_allow_html=True)
+
         # ── ตารางสรุป Risk Level ──────────────────────────
         st.dataframe(
             risk_summary[['risk_level','จำนวน','เสียชีวิต',
@@ -3651,22 +3841,22 @@ def show_reports():
                     'อัตรา LOS ยาว (%)', min_value=0, max_value=100, format="%.1f%%"),
             }
         )
-    
+
         st.markdown("---")
-    
+
         # ════════════════════════════════════════════════════
         # SECTION 4: รายชื่อผู้ป่วย High Risk
         # ════════════════════════════════════════════════════
         st.markdown("#### 🔴 รายชื่อผู้ป่วย High Risk")
-    
+
         df_high = df_icu_risk[df_icu_risk['risk_level'] == 'High'].copy()
-    
+
         if not df_high.empty:
             show_cols_risk = ['hn','an','age','pdx','pneu_type',
                               'total_score','los','adjrw',
                               'on_vent','is_death','discharge_status','month_label']
             show_cols_risk = [c for c in show_cols_risk if c in df_high.columns]
-    
+
             st.dataframe(
                 df_high[show_cols_risk].sort_values(
                     'total_score', ascending=False
@@ -3685,7 +3875,7 @@ def show_reports():
                     'is_death':    st.column_config.CheckboxColumn('เสียชีวิต'),
                 }
             )
-    
+
             csv_risk = df_high[show_cols_risk].to_csv(
                 index=False, encoding='utf-8-sig'
             ).encode('utf-8-sig')
@@ -3696,24 +3886,24 @@ def show_reports():
             )
         else:
             st.info("ℹ️ ไม่พบผู้ป่วย High Risk")
-    
+
         st.markdown("---")
-    
+
         # ════════════════════════════════════════════════════
         # SECTION 5: Factor Analysis
         # ════════════════════════════════════════════════════
         st.markdown("#### 🔍 วิเคราะห์ปัจจัยที่มีผลต่อ Mortality")
-    
+
         factor_rows = []
         factors = {
             'VAP':         df_icu_risk['pneu_type'] == 'vap',
-            'HAP':         df_icu_risk['pneu_type'] == 'hap',
+            'HAP':         df_icu_risk['on_vent'],
             'On Vent':     df_icu_risk['on_vent'],
             'adjRW > 3':   df_icu_risk['adjrw'] > 3.0,
             'อายุ ≥ 65':   df_icu_risk['age'] >= 65,
             'LOS > 7 วัน': df_icu_risk['los'] > 7,
         }
-    
+
         for fname, fmask in factors.items():
             n_f      = fmask.sum()
             n_f_dead = (fmask & df_icu_risk['is_death']).sum()
@@ -3732,7 +3922,7 @@ def show_reports():
                 'อัตราตาย % (ไม่มี)':   round(rate_nf, 1),
                 'Odds Ratio':           round(or_val, 2) if or_val != float('inf') else '∞',
             })
-    
+
         df_factors = pd.DataFrame(factor_rows)
         st.dataframe(
             df_factors,
@@ -3747,11 +3937,65 @@ def show_reports():
                     min_value=0, max_value=100, format="%.1f%%"),
             }
         )
-    
+
         st.markdown("""
         > 💡 **Odds Ratio > 1** = ปัจจัยนั้นเพิ่มความเสี่ยงเสียชีวิต  
         > **OR > 2** = เสี่ยงสูงอย่างมีนัยสำคัญ ควรพิจารณาใน Protocol
         """)
+
+        # ── [แก้ไข] คำอธิบาย Odds Ratio เพิ่มเติม ──────────
+        st.markdown("""
+        <div style="background:#E8EAF6;padding:0.8rem 1.1rem;border-radius:8px;
+                    font-size:0.83rem;color:#37474F;margin-top:0.5rem;">
+            <b>💡 Odds Ratio (OR) คืออะไร?</b><br>
+            ตัวเลขที่บอกว่า ผู้ป่วยที่ <b>มีปัจจัยนั้น</b> มีโอกาสเสียชีวิต
+            มากกว่าผู้ที่ <b>ไม่มีปัจจัยนั้น</b> กี่เท่า<br><br>
+            <b>ตัวอย่างอ่านค่า:</b><br>
+            &nbsp;&nbsp;• OR = 1.0 → ไม่ต่างกัน ปัจจัยนี้ไม่มีผล<br>
+            &nbsp;&nbsp;• OR = 2.0 → มีปัจจัยนี้แล้ว เสี่ยงตาย <b>2 เท่า</b><br>
+            &nbsp;&nbsp;• OR = 5.0 → มีปัจจัยนี้แล้ว เสี่ยงตาย <b>5 เท่า</b> ⚠️<br>
+            &nbsp;&nbsp;• OR = ∞ → ทุกคนที่ไม่มีปัจจัยนี้รอดชีวิต แต่มีบางคนที่มีปัจจัยแล้วตาย<br><br>
+            <b>หมายเหตุ:</b> OR นี้คำนวณแบบง่าย ยังไม่ได้ปรับตัวแปรอื่น (Crude OR)
+            ใช้สำหรับ <b>คัดกรองปัจจัยสำคัญ</b> เพื่อนำไปวิเคราะห์เชิงลึกต่อไป
+        </div>
+        """, unsafe_allow_html=True)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 def get_fiscal_year(date_value):
     """คำนวณปีงบประมาณ (ตุลาคม-กันยายน)"""
