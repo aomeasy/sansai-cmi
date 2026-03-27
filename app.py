@@ -4488,6 +4488,8 @@ Protocol ที่ต้องการ: {', '.join(_pt_types)}
             # ════════════════════════════════════════════════
             # AI-3 : CASE COMPARATOR
             # ════════════════════════════════════════════════
+           
+           
             with ai3:
                 st.markdown("""
                 <div style="background:linear-gradient(135deg,#4A148C,#7B1FA2);
@@ -4500,49 +4502,143 @@ Protocol ที่ต้องการ: {', '.join(_pt_types)}
                     </p>
                 </div>
                 """, unsafe_allow_html=True)
-
+            
+                # ── คำอธิบายภาพรวม ──────────────────────────────────────
+                st.markdown("""
+                <div style="background:#F3E5F5;padding:1rem 1.2rem;border-radius:10px;
+                            border-left:5px solid #7B1FA2;margin-bottom:1.2rem;font-size:.9rem;
+                            line-height:1.8;">
+                    <b style="color:#4A148C;font-size:1rem;">🔍 Case Comparator คืออะไร?</b><br>
+                    เครื่องมือนี้ใช้ <b>ค้นหาผู้ป่วยในอดีต</b> ที่มีลักษณะคล้ายกับผู้ป่วยที่สนใจ
+                    โดยกรองจากเงื่อนไขที่กำหนด เช่น รหัสโรค อายุ ระยะเวลานอน และ Ward<br><br>
+                    จากนั้น <b>Gemini AI จะวิเคราะห์</b> กลุ่มผู้ป่วยที่พบ เพื่อสรุป:
+                    <ul style="margin:.4rem 0 0 1rem;padding:0;">
+                        <li>📌 Pattern ที่พบบ่อยในกลุ่มนี้</li>
+                        <li>📊 เปรียบเทียบ Outcome เช่น อัตราเสียชีวิต, LOS เฉลี่ย</li>
+                        <li>💡 ข้อเสนอแนะสำหรับการดูแลผู้ป่วยกลุ่มเดียวกันในอนาคต</li>
+                    </ul>
+                    <span style="color:#757575;font-size:.82rem;">
+                        ⚠️ ข้อมูลจาก historical records — ใช้ประกอบการตัดสินใจเท่านั้น ไม่ใช่การสั่งการรักษา
+                    </span>
+                </div>
+                """, unsafe_allow_html=True)
+            
                 st.markdown("#### กำหนด Profile ผู้ป่วยที่ต้องการค้นหา")
+            
+                # ── คำอธิบาย workflow ──────────────────────────────────
+                st.markdown("""
+                <div style="background:#EDE7F6;padding:.7rem 1rem;border-radius:8px;
+                            margin-bottom:1rem;font-size:.85rem;color:#4A148C;">
+                    <b>วิธีใช้งาน:</b>
+                    กรอกเงื่อนไขด้านล่าง →
+                    กด <b>🔍 ค้นหา Cases</b> →
+                    ดูตารางผู้ป่วยที่พบ →
+                    กด <b>🤖 ให้ Gemini วิเคราะห์</b> เพื่อรับ AI Summary
+                </div>
+                """, unsafe_allow_html=True)
+            
                 _cc1, _cc2, _cc3 = st.columns(3)
                 with _cc1:
-                    _c_pdx     = st.text_input("รหัสโรค PDX prefix (เช่น J95)", "J95", key="cc_pdx")
-                    _c_age_min = st.number_input("อายุขั้นต่ำ", 0, 120, 55, key="cc_amin")
-                    _c_age_max = st.number_input("อายุขั้นสูง", 0, 120, 85, key="cc_amax")
+                    _c_pdx = st.text_input(
+                        "รหัสโรค PDX prefix (เช่น J95)",
+                        "J95", key="cc_pdx",
+                        help="กรอกตัวอักษรนำหน้า ICD-10 เช่น 'J95' จะค้นหาทุก code ที่ขึ้นต้นด้วย J95 เช่น J95.0, J95.851"
+                    )
+                    _c_age_min = st.number_input(
+                        "อายุขั้นต่ำ", 0, 120, 55, key="cc_amin",
+                        help="กรองเฉพาะผู้ป่วยที่อายุมากกว่าหรือเท่ากับค่านี้"
+                    )
+                    _c_age_max = st.number_input(
+                        "อายุขั้นสูง", 0, 120, 85, key="cc_amax",
+                        help="กรองเฉพาะผู้ป่วยที่อายุน้อยกว่าหรือเท่ากับค่านี้"
+                    )
                 with _cc2:
-                    _c_ward = st.selectbox("Ward", ["หอผู้ป่วยหนัก ICU", "ทุก Ward"], key="cc_ward")
-                    _c_pneu = st.selectbox("Pneumonia Type",
-                                           ["ทั้งหมด", "VAP", "HAP", "CAP"], key="cc_pneu")
-                    _c_n    = st.number_input("จำนวน cases สูงสุด", 5, 100, 30, key="cc_n")
+                    _c_ward = st.selectbox(
+                        "Ward", ["หอผู้ป่วยหนัก ICU", "ทุก Ward"], key="cc_ward",
+                        help="เลือก 'ทุก Ward' เพื่อค้นหาจากข้อมูลทั้งโรงพยาบาล หรือเลือก ICU เพื่อจำกัดเฉพาะ Ward นั้น"
+                    )
+                    _c_pneu = st.selectbox(
+                        "Pneumonia Type",
+                        ["ทั้งหมด", "VAP", "HAP", "CAP"], key="cc_pneu",
+                        help=(
+                            "VAP = ปอดอักเสบจากท่อช่วยหายใจ | "
+                            "HAP = ปอดอักเสบในโรงพยาบาล (ไม่ได้ใส่ท่อ) | "
+                            "CAP = ปอดอักเสบจากชุมชน | "
+                            "ทั้งหมด = ไม่กรองประเภทปอดบวม"
+                        )
+                    )
+                    _c_n = st.number_input(
+                        "จำนวน cases สูงสุด", 5, 100, 30, key="cc_n",
+                        help="จำกัดจำนวนแถวที่ส่งให้ AI วิเคราะห์ ค่ามากขึ้น = ข้อมูลครบ แต่ใช้เวลานานขึ้น"
+                    )
                 with _cc3:
-                    _c_lmin = st.number_input("LOS ขั้นต่ำ (วัน)", 0, 365, 0, key="cc_lmin")
-                    _c_lmax = st.number_input("LOS ขั้นสูง (วัน)", 0, 365, 60, key="cc_lmax")
-
+                    _c_lmin = st.number_input(
+                        "LOS ขั้นต่ำ (วัน)", 0, 365, 0, key="cc_lmin",
+                        help="Length of Stay — จำนวนวันนอนขั้นต่ำ ค่า 0 = ไม่กำหนดขั้นต่ำ"
+                    )
+                    _c_lmax = st.number_input(
+                        "LOS ขั้นสูง (วัน)", 0, 365, 60, key="cc_lmax",
+                        help="Length of Stay — จำนวนวันนอนสูงสุด เพื่อตัด outlier ที่นอนนานผิดปกติออก"
+                    )
                 if st.button("🔍 ค้นหา Cases", type="primary", key="cc_search"):
                     _df_c = df_all.copy()
-
+                    _n_start = len(_df_c)
+                    _filter_log = []  # เก็บ log แต่ละขั้น
+                
+                    # --- กรอง อายุ ---
                     if 'age' in _df_c.columns:
                         _df_c['age'] = pd.to_numeric(_df_c['age'], errors='coerce')
+                        _before = len(_df_c)
                         _df_c = _df_c[(_df_c['age'] >= _c_age_min) & (_df_c['age'] <= _c_age_max)]
-
+                        _filter_log.append(f"อายุ {_c_age_min}–{_c_age_max} ปี → เหลือ **{len(_df_c)}** ราย (ตัดออก {_before - len(_df_c)})")
+                    else:
+                        _filter_log.append("⚠️ ไม่พบคอลัมน์ `age` — ข้ามขั้นตอนนี้")
+                
+                    # --- กรอง Ward ---
                     if _c_ward != "ทุก Ward" and 'ward_name' in _df_c.columns:
+                        _before = len(_df_c)
                         _df_c = _df_c[_df_c['ward_name'].str.strip() == _c_ward]
-
+                        _filter_log.append(f"Ward = {_c_ward} → เหลือ **{len(_df_c)}** ราย (ตัดออก {_before - len(_df_c)})")
+                    
+                    # --- กรอง LOS ---
                     if 'length_of_stay' in _df_c.columns:
                         _df_c['length_of_stay'] = pd.to_numeric(_df_c['length_of_stay'], errors='coerce')
-                        _df_c = _df_c[(_df_c['length_of_stay'] >= _c_lmin) &
-                                      (_df_c['length_of_stay'] <= _c_lmax)]
-
-                    if _c_pdx and 'pdx' in _df_c.columns:
-                        _df_c = _df_c[_df_c['pdx'].astype(str).str.upper()
-                                      .str.startswith(_c_pdx.strip().upper())]
-
+                        _before = len(_df_c)
+                        _df_c = _df_c[(_df_c['length_of_stay'] >= _c_lmin) & (_df_c['length_of_stay'] <= _c_lmax)]
+                        _filter_log.append(f"LOS {_c_lmin}–{_c_lmax} วัน → เหลือ **{len(_df_c)}** ราย (ตัดออก {_before - len(_df_c)})")
+                    else:
+                        _filter_log.append("⚠️ ไม่พบคอลัมน์ `length_of_stay` — ข้ามขั้นตอนนี้")
+                
+                    # --- กรอง PDX (แก้: trim + upper ทั้งสองฝั่ง) ---
+                    if _c_pdx.strip() and 'pdx' in _df_c.columns:
+                        _before = len(_df_c)
+                        _pdx_clean = _c_pdx.strip().upper()
+                        _df_c = _df_c[_df_c['pdx'].astype(str).str.strip().str.upper().str.startswith(_pdx_clean)]
+                        _filter_log.append(f"PDX ขึ้นต้นด้วย '{_pdx_clean}' → เหลือ **{len(_df_c)}** ราย (ตัดออก {_before - len(_df_c)})")
+                    elif 'pdx' not in _df_c.columns:
+                        _filter_log.append("⚠️ ไม่พบคอลัมน์ `pdx` — ข้ามขั้นตอนนี้")
+                
+                    # --- กรอง Pneumonia Type ---
                     if _c_pneu != "ทั้งหมด" and 'pdx' in _df_c.columns:
+                        _before = len(_df_c)
                         _df_c['_cp'] = _df_c.apply(classify_pneumonia_type, axis=1)
-                        _df_c = _df_c[_df_c['_cp'] == _c_pneu.lower()]
-
+                        # ตรวจสอบค่าที่ฟังก์ชันคืน เพื่อ match ได้ถูกต้อง
+                        _pneu_target = _c_pneu.lower()  # "VAP"→"vap", "HAP"→"hap", "CAP"→"cap"
+                        _df_c = _df_c[_df_c['_cp'] == _pneu_target]
+                        _filter_log.append(f"Pneumonia Type = {_c_pneu} → เหลือ **{len(_df_c)}** ราย (ตัดออก {_before - len(_df_c)})")
+                
+                    # --- แสดง Filter Log เพื่อ debug ---
+                    with st.expander("🔎 ดูรายละเอียดการกรองข้อมูล (Filter Log)", expanded=len(_df_c) == 0):
+                        st.markdown(f"**ข้อมูลทั้งหมด: {_n_start:,} ราย**")
+                        for _log in _filter_log:
+                            st.markdown(f"→ {_log}")
+                        if len(_df_c) == 0:
+                            st.error("❌ ทุก filter ผ่านแล้วแต่ไม่มีข้อมูลเหลือ — ลองขยายเงื่อนไข เช่น เพิ่มช่วงอายุ หรือเปลี่ยน PDX")
+                
                     _df_c = _df_c.head(int(_c_n))
-
+                
                     if _df_c.empty:
-                        st.warning("⚠️ ไม่พบผู้ป่วยที่ตรงตามเงื่อนไข")
+                        st.warning("⚠️ ไม่พบผู้ป่วยที่ตรงตามเงื่อนไข — ดู Filter Log ด้านบนเพื่อปรับค่า")
                     else:
                         st.success(f"✅ พบ {len(_df_c)} cases")
                         _show_cc = [c for c in ['hn','an','age','pdx','length_of_stay',
@@ -4550,8 +4646,8 @@ Protocol ที่ต้องการ: {', '.join(_pt_types)}
                                     if c in _df_c.columns]
                         st.dataframe(_df_c[_show_cc].reset_index(drop=True),
                                      use_container_width=True, hide_index=True)
-
-                        # สรุปสถิติ
+                
+                        # สรุปสถิติ (logic เดิมทุกอย่าง)
                         _nc  = len(_df_c)
                         _nd  = _df_c['discharge_status'].str.contains('ตาย', na=False).sum() \
                                if 'discharge_status' in _df_c.columns else 0
@@ -4564,7 +4660,7 @@ Protocol ที่ต้องการ: {', '.join(_pt_types)}
                                if 'discharge_status' in _df_c.columns else {}
                         _pdxt= _df_c['pdx'].value_counts().head(5).to_dict() \
                                if 'pdx' in _df_c.columns else {}
-
+                
                         st.session_state['_cc_summary'] = {
                             'n': _nc, 'deaths': int(_nd), 'improve': int(_ni),
                             'avg_age': round(_aa,1), 'avg_los': round(_al,1),
@@ -4574,6 +4670,10 @@ Protocol ที่ต้องการ: {', '.join(_pt_types)}
                             'criteria': f"PDX:{_c_pdx} | Ward:{_c_ward} | อายุ:{_c_age_min}-{_c_age_max} | LOS:{_c_lmin}-{_c_lmax}",
                         }
 
+
+
+
+                
                 if st.session_state.get('_cc_summary'):
                     _s = st.session_state['_cc_summary']
                     st.markdown("---")
