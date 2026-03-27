@@ -1013,231 +1013,225 @@ def show_reports():
             st.markdown("#### 📊 ตารางสรุป CAP / HAP / VAP แยกตาม Ward")
 
 
-            def render_matrix_table_v2(df_m):
+            def render_matrix_table_v2(df_m, df_source=None):
+                """
+                df_source = df_pn2 ที่มีคอลัมน์ pneu_type, ward_group, is_death, hn, an, age, pdx, month_label
+                ใช้สำหรับสร้าง popup HN เมื่อคลิกที่ตัวเลขในตาราง
+                """
+                import json
+            
+                # ── สร้าง HN lookup dict (key → list of HN strings) ──────────
+                # key รูปแบบ: "MONTH|WARD|TYPE|all" หรือ "MONTH|WARD|TYPE|dead"
+                hn_data = {}
+            
+                if df_source is not None and not df_source.empty:
+                    TYPE_MAP = {"cap": "CAP", "hap": "HAP", "vap": "VAP"}
+                    for _, grp in df_source.groupby("month_sort"):
+                        ml = str(grp["month_label"].iloc[0]) if "month_label" in grp.columns else ""
+                        for ward_key in grp["ward_group"].dropna().unique():
+                            ward_df = grp[grp["ward_group"] == ward_key]
+                            for t_code, t_label in TYPE_MAP.items():
+                                sub = ward_df[ward_df["pneu_type"] == t_code]
+                                for flag, mask in [("all", sub), ("dead", sub[sub["is_death"]])]:
+                                    key = f"{ml}|{ward_key}|{t_label}|{flag}"
+                                    hn_data[key] = [
+                                        f"HN: {str(r.get('hn','?'))}  |  AN: {str(r.get('an','?'))}  |  "
+                                        f"อายุ {r.get('age','?')} ปี  |  ICD-10: {str(r.get('pdx','?'))}"
+                                        for _, r in mask.iterrows()
+                                    ]
+                            # Total column
+                            for flag, mask in [("all", ward_df), ("dead", ward_df[ward_df["is_death"]])]:
+                                hn_data[f"{ml}|{ward_key}|Total|{flag}"] = [
+                                    f"HN: {str(r.get('hn','?'))}  |  AN: {str(r.get('an','?'))}  |  "
+                                    f"อายุ {r.get('age','?')} ปี  |  ICD-10: {str(r.get('pdx','?'))}"
+                                    for _, r in mask.iterrows()
+                                ]
+            
+                hn_json = json.dumps(hn_data, ensure_ascii=False)
+            
+                # ── helper สร้าง <td> ที่คลิกได้ ─────────────────────────────
+                def num_cell(val, color, ml, ward_key, type_label, flag="all"):
+                    key = f"{ml}|{ward_key}|{type_label}|{flag}"
+                    key_js = json.dumps(key)
+                    if val == 0:
+                        inner = f'<span style="color:#BDBDBD;">0</span>'
+                    else:
+                        inner = (
+                            f'<span onclick="showHNPopup({key_js})" '
+                            f'style="color:{color};font-weight:700;cursor:pointer;'
+                            f'border-bottom:2px dotted {color};" '
+                            f'title="คลิกเพื่อดูรายชื่อ HN">{val}</span>'
+                        )
+                    return f'<td style="text-align:center;padding:0.6rem 0.8rem;white-space:nowrap;">{inner}</td>'
+            
+                def death_cell(val, ml, ward_key, type_label):
+                    key = f"{ml}|{ward_key}|{type_label}|dead"
+                    key_js = json.dumps(key)
+                    if val == 0:
+                        badge = '<span style="color:#9E9E9E;">—</span>'
+                    else:
+                        badge = (
+                            f'<span onclick="showHNPopup({key_js})" '
+                            f'style="background:#FFCDD2;color:#C62828;padding:2px 8px;'
+                            f'border-radius:10px;font-size:0.85rem;font-weight:700;cursor:pointer;" '
+                            f'title="คลิกเพื่อดูรายชื่อ HN">{val}</span>'
+                        )
+                    return f'<td style="text-align:center;padding:0.6rem 0.8rem;">{badge}</td>'
+            
+                # ── สร้าง rows HTML ───────────────────────────────────────────
                 rows_html = ""
                 for i, row in df_m.iterrows():
-                    is_total = row.get('_is_total', False)
-                    month_label = row.get('_month_label', "")
-                    bg = "#EDE7F6" if is_total else ("white" if i % 2 == 0 else "#F5F5F5")
-                    fw = "700" if is_total else "400"
+                    is_total    = row.get("_is_total", False)
+                    month_label = row.get("_month_label", "")
+                    bg  = "#EDE7F6" if is_total else ("white" if i % 2 == 0 else "#F5F5F5")
+                    fw  = "700"     if is_total else "400"
+                    ward     = str(row["Ward"])
+                    ward_key = ward.replace("🔷 ", "")   # ลบ emoji ออกก่อนใช้เป็น key
             
-                    def cell(val, color="#37474F", bold=False):
-                        b = "font-weight:700;" if bold else ""
-                        return f'<td style="text-align:center;padding:0.6rem 0.8rem;white-space:nowrap;{b}color:{color};">{val}</td>'
-            
-                    def death_badge(n):
-                        if n == 0:
-                            return '<span style="color:#9E9E9E;">—</span>'
-                        return f'<span style="background:#FFCDD2;color:#C62828;padding:2px 8px;border-radius:10px;font-size:0.85rem;font-weight:700;">{n}</span>'
-            
-                    month_cell = f'<td style="padding:0.6rem 1rem;white-space:nowrap;color:#E65100;font-weight:600;vertical-align:top;">{month_label}</td>'
-                    ward_cell  = f'<td style="padding:0.6rem 1rem;font-weight:{fw};color:#1565C0;white-space:nowrap;">{row["Ward"]}</td>'
+                    month_cell = (
+                        f'<td style="padding:0.6rem 1rem;white-space:nowrap;'
+                        f'color:#E65100;font-weight:600;vertical-align:top;">{month_label}</td>'
+                    )
+                    ward_cell = (
+                        f'<td style="padding:0.6rem 1rem;font-weight:{fw};'
+                        f'color:#1565C0;white-space:nowrap;">{ward}</td>'
+                    )
             
                     rows_html += f"""
                     <tr style="background:{bg};font-weight:{fw};">
                         {month_cell}
                         {ward_cell}
-                        {cell(row['CAP_n'],   '#1976D2', True)}
-                        {cell(death_badge(row['CAP_death']))}
-                        {cell(row['HAP_n'],   '#F57C00', True)}
-                        {cell(death_badge(row['HAP_death']))}
-                        {cell(row['VAP_n'],   '#D32F2F', True)}
-                        {cell(death_badge(row['VAP_death']))}
-                        {cell(row['Total_n'], '#4CAF50', True)}
-                        {cell(death_badge(row['Total_death']))}
+                        {num_cell(row['CAP_n'],   '#1976D2', month_label, ward_key, 'CAP')}
+                        {death_cell(row['CAP_death'],         month_label, ward_key, 'CAP')}
+                        {num_cell(row['HAP_n'],   '#F57C00', month_label, ward_key, 'HAP')}
+                        {death_cell(row['HAP_death'],         month_label, ward_key, 'HAP')}
+                        {num_cell(row['VAP_n'],   '#D32F2F', month_label, ward_key, 'VAP')}
+                        {death_cell(row['VAP_death'],         month_label, ward_key, 'VAP')}
+                        {num_cell(row['Total_n'], '#4CAF50', month_label, ward_key, 'Total')}
+                        {death_cell(row['Total_death'],       month_label, ward_key, 'Total')}
                     </tr>
                     """
             
+                # ── HTML ทั้งหมด รวม Modal popup + JavaScript ─────────────────
                 return f"""
-                <div style="overflow-x:auto;overflow-y:auto;max-height:500px;border-radius:12px;
-                            box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-                <table style="width:100%;border-collapse:collapse;min-width:900px;">
-                  <thead style="position:sticky;top:0;z-index:10;">
-                    <tr style="background:linear-gradient(135deg,#1565C0,#283593);color:white;">
-                      <th rowspan="2" style="padding:0.8rem 1rem;text-align:left;min-width:100px;background:#1565C0;">
-                          📅 เดือน
-                      </th>
-                      <th rowspan="2" style="padding:0.8rem 1rem;text-align:left;min-width:160px;background:#1565C0;">
-                          🏥 Ward
-                      </th>
-                      <th colspan="2" style="padding:0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);background:#1565C0;">
-                          🏘️ CAP
-                      </th>
-                      <th colspan="2" style="padding:0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);background:#1565C0;">
-                          🏥 HAP
-                      </th>
-                      <th colspan="2" style="padding:0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);background:#1565C0;">
-                          💨 VAP
-                      </th>
-                      <th colspan="2" style="padding:0.8rem;text-align:center;background:#1565C0;">
-                          📊 Total
-                      </th>
-                    </tr>
-                    <tr style="background:#1976D2;color:white;font-size:0.85rem;">
-                      <th style="padding:0.5rem 0.8rem;text-align:center;background:#1976D2;">จำนวน</th>
-                      <th style="padding:0.5rem 0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);background:#1976D2;">💀 ตาย</th>
-                      <th style="padding:0.5rem 0.8rem;text-align:center;background:#1976D2;">จำนวน</th>
-                      <th style="padding:0.5rem 0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);background:#1976D2;">💀 ตาย</th>
-                      <th style="padding:0.5rem 0.8rem;text-align:center;background:#1976D2;">จำนวน</th>
-                      <th style="padding:0.5rem 0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);background:#1976D2;">💀 ตาย</th>
-                      <th style="padding:0.5rem 0.8rem;text-align:center;background:#1976D2;">จำนวน</th>
-                      <th style="padding:0.5rem 0.8rem;text-align:center;background:#1976D2;">💀 ตาย</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows_html}
-                  </tbody>
-                </table>
-                </div>
-                """
+            <style>
+              #hn-overlay {{
+                display:none;position:fixed;top:0;left:0;width:100%;height:100%;
+                background:rgba(0,0,0,0.5);z-index:9999;
+                justify-content:center;align-items:center;
+              }}
+              #hn-overlay.active {{ display:flex; }}
+              #hn-box {{
+                background:white;border-radius:14px;padding:1.5rem 2rem;
+                width:90%;max-width:540px;max-height:70vh;overflow-y:auto;
+                box-shadow:0 20px 60px rgba(0,0,0,0.3);position:relative;
+                font-family:sans-serif;
+              }}
+              #hn-title {{ color:#1565C0;margin:0 0 1rem 0;font-size:1.05rem;font-weight:700; }}
+              #hn-list  {{ list-style:none;padding:0;margin:0; }}
+              #hn-list li {{
+                padding:0.5rem 0.8rem;margin-bottom:0.4rem;border-radius:6px;
+                background:#F5F9FC;border-left:3px solid #1976D2;
+                font-family:monospace;font-size:0.88rem;color:#37474F;
+              }}
+              #hn-close {{
+                position:absolute;top:0.8rem;right:1rem;background:none;
+                border:none;font-size:1.4rem;cursor:pointer;color:#9E9E9E;
+              }}
+              #hn-close:hover {{ color:#1565C0; }}
+              #hn-copy {{
+                margin-top:1rem;padding:0.45rem 1.2rem;background:#1565C0;
+                color:white;border:none;border-radius:8px;cursor:pointer;
+                font-size:0.88rem;font-weight:600;
+              }}
+              #hn-copy:hover {{ background:#0D47A1; }}
+              .hn-empty {{ color:#9E9E9E;font-style:italic; }}
+            </style>
             
+            <!-- Modal -->
+            <div id="hn-overlay">
+              <div id="hn-box">
+                <button id="hn-close" onclick="closeHNPopup()">✕</button>
+                <div id="hn-title">รายชื่อผู้ป่วย</div>
+                <ul id="hn-list"></ul>
+                <button id="hn-copy" onclick="copyHN()">📋 คัดลอก HN ทั้งหมด</button>
+              </div>
+            </div>
+            
+            <!-- ตาราง -->
+            <div style="overflow-x:auto;overflow-y:auto;max-height:500px;border-radius:12px;
+                        box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+            <table style="width:100%;border-collapse:collapse;min-width:900px;">
+              <thead style="position:sticky;top:0;z-index:10;">
+                <tr style="background:linear-gradient(135deg,#1565C0,#283593);color:white;">
+                  <th rowspan="2" style="padding:0.8rem 1rem;text-align:left;min-width:100px;background:#1565C0;">📅 เดือน</th>
+                  <th rowspan="2" style="padding:0.8rem 1rem;text-align:left;min-width:160px;background:#1565C0;">🏥 Ward</th>
+                  <th colspan="2" style="padding:0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);background:#1565C0;">🏘️ CAP</th>
+                  <th colspan="2" style="padding:0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);background:#1565C0;">🏥 HAP</th>
+                  <th colspan="2" style="padding:0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);background:#1565C0;">💨 VAP</th>
+                  <th colspan="2" style="padding:0.8rem;text-align:center;background:#1565C0;">📊 Total</th>
+                </tr>
+                <tr style="background:#1976D2;color:white;font-size:0.85rem;">
+                  <th style="padding:0.5rem 0.8rem;text-align:center;background:#1976D2;">จำนวน</th>
+                  <th style="padding:0.5rem 0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);background:#1976D2;">💀 ตาย</th>
+                  <th style="padding:0.5rem 0.8rem;text-align:center;background:#1976D2;">จำนวน</th>
+                  <th style="padding:0.5rem 0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);background:#1976D2;">💀 ตาย</th>
+                  <th style="padding:0.5rem 0.8rem;text-align:center;background:#1976D2;">จำนวน</th>
+                  <th style="padding:0.5rem 0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);background:#1976D2;">💀 ตาย</th>
+                  <th style="padding:0.5rem 0.8rem;text-align:center;background:#1976D2;">จำนวน</th>
+                  <th style="padding:0.5rem 0.8rem;text-align:center;background:#1976D2;">💀 ตาย</th>
+                </tr>
+              </thead>
+              <tbody>{rows_html}</tbody>
+            </table>
+            </div>
+            
+            <script>
+            const HN_LOOKUP = {hn_json};
+            
+            function showHNPopup(key) {{
+              const data  = HN_LOOKUP[key] || [];
+              const parts = key.split("|");
+              document.getElementById("hn-title").textContent =
+                parts[0] + "  ·  Ward: " + parts[1] + "  ·  " + parts[2] +
+                (parts[3] === "dead" ? "  (เสียชีวิต)" : "") +
+                "  —  " + data.length + " ราย";
+              const ul = document.getElementById("hn-list");
+              ul.innerHTML = data.length === 0
+                ? '<li class="hn-empty">ไม่มีข้อมูล</li>'
+                : data.map(h => `<li>${{h}}</li>`).join("");
+              document.getElementById("hn-overlay").classList.add("active");
+            }}
+            
+            function closeHNPopup() {{
+              document.getElementById("hn-overlay").classList.remove("active");
+            }}
+            
+            function copyHN() {{
+              const rows = document.querySelectorAll("#hn-list li");
+              navigator.clipboard.writeText([...rows].map(r => r.textContent).join("\\n"))
+                .then(() => {{
+                  const btn = document.getElementById("hn-copy");
+                  btn.textContent = "✅ คัดลอกแล้ว!";
+                  setTimeout(() => btn.textContent = "📋 คัดลอก HN ทั้งหมด", 2000);
+                }});
+            }}
+            
+            // คลิกนอก popup ให้ปิด
+            document.getElementById("hn-overlay").addEventListener("click", function(e) {{
+              if (e.target === this) closeHNPopup();
+            }});
+            </script>
+            """
             import streamlit.components.v1 as components
-            html_content = render_matrix_table_v2(df_summary_matrix)
+            html_content = render_matrix_table_v2(df_summary_matrix, df_pn2)
             components.html(
                 f"<div style='font-family:sans-serif;font-size:14px;'>{html_content}</div>",
                 height=520,
                 scrolling=True
             )
-            
-            
-            def render_matrix_table(df_m, month_label=""):
-                rows_html = ""
-                for i, row in df_m.iterrows():
-                    is_total = 'Total' in str(row['Ward'])
-                    bg = "#EDE7F6" if is_total else ("white" if i % 2 == 0 else "#F5F5F5")
-                    fw = "700" if is_total else "400"
-            
-                    def cell(val, color="#37474F", bold=False):
-                        b = "font-weight:700;" if bold else ""
-                        return f'<td style="text-align:center;padding:0.6rem 0.8rem;white-space:nowrap;{b}color:{color};">{val}</td>'
-            
-                    def death_badge(n):
-                        if n == 0:
-                            return '<span style="color:#9E9E9E;">—</span>'
-                        return f'<span style="background:#FFCDD2;color:#C62828;padding:2px 8px;border-radius:10px;font-size:0.85rem;font-weight:700;">{n}</span>'
-            
-                    rows_html += f"""
-                    <tr style="background:{bg};font-weight:{fw};">
-                        <td style="padding:0.6rem 1rem;white-space:nowrap;color:#E65100;font-weight:600;">{month_label}</td>
-                        <td style="padding:0.6rem 1rem;font-weight:{fw};color:#1565C0;white-space:nowrap;">{row['Ward']}</td>
-                        {cell(row['CAP_n'],   '#1976D2', True)}
-                        {cell(death_badge(row['CAP_death']))}
-                        {cell(row['HAP_n'],   '#F57C00', True)}
-                        {cell(death_badge(row['HAP_death']))}
-                        {cell(row['VAP_n'],   '#D32F2F', True)}
-                        {cell(death_badge(row['VAP_death']))}
-                        {cell(row['Total_n'], '#4CAF50', True)}
-                        {cell(death_badge(row['Total_death']))}
-                    </tr>
-                    """
-            
-                return f"""
-                <div style="overflow-x:auto;overflow-y:auto;max-height:500px;border-radius:12px;
-                            box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-                <table style="width:100%;border-collapse:collapse;min-width:900px;">
-                  <thead style="position:sticky;top:0;z-index:10;">
-                    <tr style="background:linear-gradient(135deg,#1565C0,#283593);color:white;">
-                      <th rowspan="2" style="padding:0.8rem 1rem;text-align:left;min-width:100px;
-                                              position:sticky;top:0;background:#1565C0;">
-                          📅 เดือน
-                      </th>
-                      <th rowspan="2" style="padding:0.8rem 1rem;text-align:left;min-width:160px;
-                                              position:sticky;top:0;background:#1565C0;">
-                          🏥 Ward
-                      </th>
-                      <th colspan="2" style="padding:0.8rem;text-align:center;
-                                              border-right:2px solid rgba(255,255,255,0.3);
-                                              position:sticky;top:0;background:#1565C0;">
-                          🏘️ CAP
-                      </th>
-                      <th colspan="2" style="padding:0.8rem;text-align:center;
-                                              border-right:2px solid rgba(255,255,255,0.3);
-                                              position:sticky;top:0;background:#1565C0;">
-                          🏥 HAP
-                      </th>
-                      <th colspan="2" style="padding:0.8rem;text-align:center;
-                                              border-right:2px solid rgba(255,255,255,0.3);
-                                              position:sticky;top:0;background:#1565C0;">
-                          💨 VAP
-                      </th>
-                      <th colspan="2" style="padding:0.8rem;text-align:center;
-                                              position:sticky;top:0;background:#1565C0;">
-                          📊 Total
-                      </th>
-                    </tr>
-                    <tr style="background:#1976D2;color:white;font-size:0.85rem;">
-                      <th style="padding:0.5rem 0.8rem;text-align:center;position:sticky;top:41px;background:#1976D2;">จำนวน</th>
-                      <th style="padding:0.5rem 0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);position:sticky;top:41px;background:#1976D2;">💀 ตาย</th>
-                      <th style="padding:0.5rem 0.8rem;text-align:center;position:sticky;top:41px;background:#1976D2;">จำนวน</th>
-                      <th style="padding:0.5rem 0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);position:sticky;top:41px;background:#1976D2;">💀 ตาย</th>
-                      <th style="padding:0.5rem 0.8rem;text-align:center;position:sticky;top:41px;background:#1976D2;">จำนวน</th>
-                      <th style="padding:0.5rem 0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);position:sticky;top:41px;background:#1976D2;">💀 ตาย</th>
-                      <th style="padding:0.5rem 0.8rem;text-align:center;position:sticky;top:41px;background:#1976D2;">จำนวน</th>
-                      <th style="padding:0.5rem 0.8rem;text-align:center;position:sticky;top:41px;background:#1976D2;">💀 ตาย</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows_html}
-                  </tbody>
-                </table>
-                </div>
-                """
-                
-            
-                return f"""
-                <div style="overflow-x:auto;">
-                <table style="width:100%;border-collapse:collapse;border-radius:12px;overflow:hidden;
-                              box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-                  <thead>
-                    <tr style="background:linear-gradient(135deg,#1565C0,#283593);color:white;">
-                      <th rowspan="2" style="padding:0.8rem 1rem;text-align:left;min-width:160px;">
-                          🏥 Ward
-                      </th>
-                      <th colspan="2" style="padding:0.8rem;text-align:center;
-                                              border-right:2px solid rgba(255,255,255,0.3);">
-                          🏘️ CAP
-                      </th>
-                      <th colspan="2" style="padding:0.8rem;text-align:center;
-                                              border-right:2px solid rgba(255,255,255,0.3);">
-                          🏥 HAP
-                      </th>
-                      <th colspan="2" style="padding:0.8rem;text-align:center;
-                                              border-right:2px solid rgba(255,255,255,0.3);">
-                          💨 VAP
-                      </th>
-                      <th colspan="2" style="padding:0.8rem;text-align:center;">
-                          📊 Total
-                      </th>
-                    </tr>
-                    <tr style="background:#1976D2;color:white;font-size:0.85rem;">
-                      <th style="padding:0.5rem 0.8rem;text-align:center;">จำนวน</th>
-                      <th style="padding:0.5rem 0.8rem;text-align:center;
-                                 border-right:2px solid rgba(255,255,255,0.3);">💀 ตาย</th>
-                      <th style="padding:0.5rem 0.8rem;text-align:center;">จำนวน</th>
-                      <th style="padding:0.5rem 0.8rem;text-align:center;
-                                 border-right:2px solid rgba(255,255,255,0.3);">💀 ตาย</th>
-                      <th style="padding:0.5rem 0.8rem;text-align:center;">จำนวน</th>
-                      <th style="padding:0.5rem 0.8rem;text-align:center;
-                                 border-right:2px solid rgba(255,255,255,0.3);">💀 ตาย</th>
-                      <th style="padding:0.5rem 0.8rem;text-align:center;">จำนวน</th>
-                      <th style="padding:0.5rem 0.8rem;text-align:center;">💀 ตาย</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows_html}
-                  </tbody>
-                </table>
-                </div>
-                """
+  
              
-            import streamlit.components.v1 as components
-            html_content = render_matrix_table(df_summary_matrix)
-            components.html(
-                f"<div style='font-family:sans-serif;font-size:14px;'>{html_content}</div>",
-                height=280,
-                scrolling=False
-            )
-            
             # ── Download ────────────────────────────────────────────────────
             csv_matrix = df_summary_matrix.drop(
                 columns=['_month_label', '_is_total'], errors='ignore'
