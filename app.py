@@ -4034,16 +4034,20 @@ def show_reports():
                     padding:1.2rem 2rem;border-radius:12px;margin-bottom:1.2rem;">
             <h2 style="color:white;margin:0;font-size:1.5rem;">
                 🤖 AI Gen Report — ระบบรายงานอัจฉริยะ
-            </h2>
+            </h2> 
             <p style="color:#B3E5FC;margin:.3rem 0 0;font-size:.9rem;">
-                Powered by Claude AI · Smart Alert · Protocol Suggester · Case Comparator · Auto Report
+                Powered by Gemini AI · Smart Alert · Protocol Suggester · Case Comparator · Auto Report
             </p>
         </div>
         """, unsafe_allow_html=True)
 
-        # ── API Key Section ─────────────────────────────────────────
+        # ── API Key Section ───────────────────────────────────────── 
+
+
+
+
         with st.expander(
-            "🔑 ตั้งค่า Anthropic API Key" + (" ✅" if st.session_state.get('_ai_key') else " ⚠️"),
+            "🔑 ตั้งค่า Google Gemini API Key" + (" ✅" if st.session_state.get('_ai_key') else " ⚠️"),
             expanded=not bool(st.session_state.get('_ai_key'))
         ):
             st.markdown("""
@@ -4051,71 +4055,103 @@ def show_reports():
                         border-left:4px solid #1976D2;margin-bottom:1rem;font-size:.9rem;">
                 <b style="color:#1565C0;">วิธีขอ API Key:</b>
                 ไปที่
-                <a href="https://console.anthropic.com" target="_blank"
-                   style="color:#1976D2;">console.anthropic.com</a>
-                → API Keys → Create Key
+                <a href="https://aistudio.google.com/app/apikey" target="_blank"
+                   style="color:#1976D2;">aistudio.google.com</a>
+                → Create API Key
                 <br>
                 <span style="color:#546E7A;">
                   API Key จะถูกเก็บเฉพาะใน session นี้ ไม่มีการบันทึกถาวร
                 </span>
             </div>
             """, unsafe_allow_html=True)
-
+        
             _key_input = st.text_input(
-                "Anthropic API Key",
+                "Google Gemini API Key",
                 type="password",
-                placeholder="sk-ant-api03-...",
+                placeholder="AIza...",
                 key="_api_key_field"
             )
             _c1, _c2 = st.columns([1, 4])
             with _c1:
                 if st.button("✅ บันทึก", key="_save_key"):
-                    if _key_input and (_key_input.startswith("sk-ant-") or _key_input.startswith("sk-")):
+                    if _key_input and _key_input.startswith("AIza"):
                         st.session_state['_ai_key'] = _key_input
                         st.success("บันทึกแล้ว")
                         st.rerun()
                     else:
-                        st.error("รูปแบบ API Key ไม่ถูกต้อง")
+                        st.error("รูปแบบ API Key ไม่ถูกต้อง (ต้องขึ้นต้นด้วย AIza)")
             with _c2:
                 if st.session_state.get('_ai_key'):
                     if st.button("🗑️ ลบ API Key", key="_del_key"):
                         del st.session_state['_ai_key']
                         st.rerun()
 
+
+
+
+
+
+
+
+
+
+        
         _ai_key = st.session_state.get('_ai_key', '')
         if not _ai_key:
             st.warning("⚠️ กรุณากรอก API Key ก่อนใช้งาน AI Features")
         else:
-            # ── Claude caller ──────────────────────────────────────
-            def _call_claude(sys_prompt, user_msg, max_tok=1200):
+            # ── gemini caller ──────────────────────────────────────
+
+
+
+            def _call_gemini(sys_prompt, user_msg, max_tok=1200):
                 try:
+                    # รวม system prompt เข้ากับ user message
+                    # เพราะ Gemini ไม่มี system role แบบ Anthropic
+                    full_prompt = f"{sys_prompt}\n\n---\n\n{user_msg}"
+            
                     r = requests.post(
-                        "https://api.anthropic.com/v1/messages",
-                        headers={
-                            "x-api-key": _ai_key,
-                            "anthropic-version": "2023-06-01",
-                            "content-type": "application/json"
-                        },
+                        f"https://generativelanguage.googleapis.com/v1beta/models/"
+                        f"gemini-2.0-flash:generateContent?key={_ai_key}",
+                        headers={"Content-Type": "application/json"},
                         json={
-                            "model": "claude-sonnet-4-20250514",
-                            "max_tokens": max_tok,
-                            "system": sys_prompt,
-                            "messages": [{"role": "user", "content": user_msg}]
+                            "contents": [
+                                {
+                                    "role": "user",
+                                    "parts": [{"text": full_prompt}]
+                                }
+                            ],
+                            "generationConfig": {
+                                "maxOutputTokens": max_tok,
+                                "temperature": 0.3,
+                            }
                         },
                         timeout=60
                     )
+            
                     if r.status_code == 200:
-                        return r.json()["content"][0]["text"], None
+                        data = r.json()
+                        text = data["candidates"][0]["content"]["parts"][0]["text"]
+                        return text, None
                     else:
                         try:
                             err_msg = r.json().get("error", {}).get("message", r.text[:300])
                         except Exception:
                             err_msg = r.text[:300]
                         return None, f"API Error {r.status_code}: {err_msg}"
+            
                 except requests.exceptions.Timeout:
                     return None, "⏱️ Request timeout — ลองใหม่อีกครั้ง"
                 except Exception as e:
                     return None, f"❌ {str(e)}"
+
+
+
+
+
+
+
+ 
 
             # ── Sub-tabs ────────────────────────────────────────────
             ai1, ai2, ai3, ai4 = st.tabs([
@@ -4265,8 +4301,8 @@ NPV            : {_npv:.1f}%
 --- สิ่งที่ต้องการ ---
 สรุปสถานะความเสี่ยงของผู้ป่วยรายนี้ ระบุปัจจัยสำคัญ และแนะนำสิ่งที่ควรติดตามหรือดำเนินการ"""
 
-                    with st.spinner("🤖 Claude กำลังวิเคราะห์..."):
-                        _res, _err = _call_claude(_SYS_ICU, _user_msg, max_tok=900)
+                    with st.spinner("🤖 Gemini กำลังวิเคราะห์..."):
+                        _res, _err = _call_gemini(_SYS_ICU, _user_msg, max_tok=900)
 
                     if _err:
                         st.error(f"❌ {_err}")
@@ -4361,7 +4397,7 @@ Protocol ที่ต้องการ: {', '.join(_pt_types)}
 และระบุ rationale สั้นๆ ว่าทำไมต้องทำแต่ละข้อ"""
 
                     with st.spinner("🤖 กำลังสร้าง Protocol..."):
-                        _res, _err = _call_claude(_SYS_PROTOCOL, _pt_msg, max_tok=1400)
+                        _res, _err = _call_gemini(_SYS_PROTOCOL, _pt_msg, max_tok=1400)
 
                     if _err:
                         st.error(f"❌ {_err}")
@@ -4390,7 +4426,7 @@ Protocol ที่ต้องการ: {', '.join(_pt_types)}
                         🔍 Case Comparator — เปรียบเทียบ Historical Cases
                     </h3>
                     <p style="color:#E1BEE7;margin:.3rem 0 0;font-size:.82rem;">
-                        ค้นหา cases คล้ายกันในอดีต แล้วให้ Claude สรุป outcome และ pattern
+                        ค้นหา cases คล้ายกันในอดีต แล้วให้ Gemini สรุป outcome และ pattern
                     </p>
                 </div>
                 """, unsafe_allow_html=True)
@@ -4477,7 +4513,7 @@ Protocol ที่ต้องการ: {', '.join(_pt_types)}
                     _kk3.metric("Avg LOS",  f"{_s['avg_los']} วัน")
                     _kk4.metric("Avg adjRW",f"{_s['avg_rw']}")
 
-                    if st.button("🤖 ให้ Claude วิเคราะห์ Cases", key="cc_analyze"):
+                    if st.button("🤖 ให้ Gemini วิเคราะห์ Cases", key="cc_analyze"):
                         _cc_msg = f"""วิเคราะห์ Historical Cases ดังนี้:
 --- เงื่อนไขการค้นหา ---
 {_s['criteria']}
@@ -4495,8 +4531,8 @@ Top PDX codes: {_s['pdx_dist']}
 2. เปรียบเทียบ outcome ที่น่าสังเกต
 3. ข้อเสนอแนะสำหรับการดูแลผู้ป่วยกลุ่มเดียวกันในอนาคต"""
 
-                        with st.spinner("🤖 Claude กำลังวิเคราะห์..."):
-                            _res, _err = _call_claude(_SYS_CASE, _cc_msg, max_tok=1100)
+                        with st.spinner("🤖 Gemini กำลังวิเคราะห์..."):
+                            _res, _err = _call_gemini(_SYS_CASE, _cc_msg, max_tok=1100)
 
                         if _err:
                             st.error(f"❌ {_err}")
@@ -4667,8 +4703,8 @@ CMI: {_st_r['cmi']} | Total adjRW: {_st_r['rw']:,.1f} (ใช้คำนวณ�
 กรุณาสร้างรายงานทางการที่เหมาะสำหรับนำเสนอต่อผู้บริหาร
 ใช้ตัวบ่งชี้ ↑ ↓ → เพื่อแสดง trend เมื่อมีข้อมูลหลายเดือน"""
 
-                        with st.spinner("🤖 Claude กำลังสร้างรายงาน..."):
-                            _res, _err = _call_claude(_SYS_REPORT, _rp_msg, max_tok=2000)
+                        with st.spinner("🤖 Gemini กำลังสร้างรายงาน..."):
+                            _res, _err = _call_gemini(_SYS_REPORT, _rp_msg, max_tok=2000)
 
                         if _err:
                             st.error(f"❌ {_err}")
