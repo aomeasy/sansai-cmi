@@ -188,6 +188,56 @@ class SupabaseClient:
             "Content-Type": "application/json",
             "Prefer": "return=representation"
         }
+
+
+
+    import time
+
+    def _call_gemini(sys_prompt, user_msg, max_tok=1200):
+        # ลอง model ตามลำดับ fallback
+        models = [
+            "gemini-1.5-flash",
+            "gemini-1.5-flash-8b",
+            "gemini-2.0-flash-lite",
+        ]
+        
+        full_prompt = f"{sys_prompt}\n\n---\n\n{user_msg}"
+        
+        for model in models:
+            try:
+                r = requests.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/"
+                    f"{model}:generateContent?key={_ai_key}",
+                    headers={"Content-Type": "application/json"},
+                    json={
+                        "contents": [{"role": "user", "parts": [{"text": full_prompt}]}],
+                        "generationConfig": {"maxOutputTokens": max_tok, "temperature": 0.3}
+                    },
+                    timeout=60
+                )
+                
+                if r.status_code == 200:
+                    data = r.json()
+                    text = data["candidates"][0]["content"]["parts"][0]["text"]
+                    return text, None
+                
+                elif r.status_code == 429:
+                    # quota หมด → ลอง model ถัดไป
+                    continue
+                
+                else:
+                    try:
+                        err_msg = r.json().get("error", {}).get("message", r.text[:300])
+                    except Exception:
+                        err_msg = r.text[:300]
+                    return None, f"API Error {r.status_code}: {err_msg}"
+            
+            except requests.exceptions.Timeout:
+                return None, "⏱️ Request timeout — ลองใหม่อีกครั้ง"
+            except Exception as e:
+                return None, f"❌ {str(e)}"
+        
+        return None, "❌ ทุก model quota หมดแล้ว — กรุณาเปิดใช้ billing ที่ Google AI Studio"
     
     def test_connection(self):
         """ทดสอบการเชื่อมต่อ Supabase"""
@@ -4112,7 +4162,7 @@ def show_reports():
             
                     r = requests.post(
                         f"https://generativelanguage.googleapis.com/v1beta/models/"
-                        f"gemini-2.0-flash:generateContent?key={_ai_key}",
+                        f"gemini-2.0-flash-lite:generateContent?key={_ai_key}"
                         headers={"Content-Type": "application/json"},
                         json={
                             "contents": [
