@@ -3667,10 +3667,21 @@ def show_reports():
                     เส้นประ = เส้นฐาน (เดาสุ่ม 50:50)
                 </div>
                 """, unsafe_allow_html=True)
-
+                st.session_state['_icu_metrics'] = {
+                    'auroc':       round(auroc,  3),
+                    'sensitivity': round(sensitivity * 100, 1),
+                    'specificity': round(specificity * 100, 1),
+                    'ppv':         round(ppv * 100, 1),
+                    'npv':         round(npv * 100, 1),
+                    'tp': int(tp), 'fp': int(fp),
+                    'tn': int(tn), 'fn': int(fn),
+                    'n_total':     int(n_total),
+                    'n_death':     int(n_death),
+                }  
             else:
                 st.info("ℹ️ ไม่มีข้อมูลการเสียชีวิตใน ICU")
-
+ 
+                 
         # ── Long LOS Prediction ───────────────────────────
         with col_v2:
             st.markdown("##### 🛏 ทำนาย LOS > 7 วัน")
@@ -4309,13 +4320,67 @@ def show_reports():
                     }
 
                 # ── Scoring metrics ─────────────────────────────────
-                st.markdown("#### ค่าความแม่นของระบบ (กรอกจาก Tab ICU Risk Score)")
+                #st.markdown("#### ค่าความแม่นของระบบ (กรอกจาก Tab ICU Risk Score)")
+                #_mc1,_mc2,_mc3,_mc4,_mc5 = st.columns(5)
+                #_auroc = _mc1.number_input("AUROC",        0.0,1.0, 0.750,0.001,format="%.3f",key="sa_auroc")
+                #_sens  = _mc2.number_input("Sensitivity%", 0.0,100.0,70.0,0.1,key="sa_sens")
+                #_spec  = _mc3.number_input("Specificity%", 0.0,100.0,80.0,0.1,key="sa_spec")
+                #_ppv   = _mc4.number_input("PPV%",         0.0,100.0,62.0,0.1,key="sa_ppv")
+                #_npv   = _mc5.number_input("NPV%",         0.0,100.0,93.0,0.1,key="sa_npv")
+
+
+
+                # ── ดึงค่าจาก Tab 6 อัตโนมัติ ──────────────────────────
+                _metrics = st.session_state.get('_icu_metrics', {})
+                
+                if _metrics:
+                    st.markdown("""
+                    <div style="background:#E8F5E9;padding:.7rem 1rem;border-radius:8px;
+                                border-left:4px solid #4CAF50;margin-bottom:.8rem;font-size:.85rem;">
+                        <b style="color:#2E7D32;">✅ โหลดค่าจาก Tab ICU Risk Score อัตโนมัติ</b><br>
+                        <span style="color:#546E7A;">
+                        คำนวณจาก Confusion Matrix (Mortality Prediction) ·
+                        TP={tp} FP={fp} TN={tn} FN={fn} ·
+                        จากผู้ป่วย ICU ทั้งหมด {n} ราย (เสียชีวิต {nd} ราย)<br>
+                        ✏️ แก้ไขค่าด้านล่างได้หากต้องการ
+                        </span>
+                    </div>
+                    """.format(
+                        tp=_metrics['tp'], fp=_metrics['fp'],
+                        tn=_metrics['tn'], fn=_metrics['fn'],
+                        n=_metrics['n_total'], nd=_metrics['n_death']
+                    ), unsafe_allow_html=True)
+                else:
+                    st.markdown("""
+                    <div style="background:#FFF3E0;padding:.7rem 1rem;border-radius:8px;
+                                border-left:4px solid #FF9800;margin-bottom:.8rem;font-size:.85rem;">
+                        <b style="color:#E65100;">⚠️ ยังไม่มีข้อมูลจาก Tab ICU Risk Score</b><br>
+                        <span style="color:#546E7A;">
+                        กรุณาเปิด Tab 🚨 ICU Early Warning Risk Score ก่อน
+                        แล้วกลับมาที่นี่ ระบบจะโหลดค่าให้อัตโนมัติ<br>
+                        หรือกรอกค่าด้านล่างด้วยตนเอง
+                        </span>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                st.markdown("#### ค่าความแม่นของระบบ (แก้ไขได้)")
                 _mc1,_mc2,_mc3,_mc4,_mc5 = st.columns(5)
-                _auroc = _mc1.number_input("AUROC",        0.0,1.0, 0.750,0.001,format="%.3f",key="sa_auroc")
-                _sens  = _mc2.number_input("Sensitivity%", 0.0,100.0,70.0,0.1,key="sa_sens")
-                _spec  = _mc3.number_input("Specificity%", 0.0,100.0,80.0,0.1,key="sa_spec")
-                _ppv   = _mc4.number_input("PPV%",         0.0,100.0,62.0,0.1,key="sa_ppv")
-                _npv   = _mc5.number_input("NPV%",         0.0,100.0,93.0,0.1,key="sa_npv")
+                _auroc = _mc1.number_input("AUROC",        0.0, 1.0,
+                    float(_metrics.get('auroc', 0.750)),
+                    0.001, format="%.3f", key="sa_auroc")
+                _sens  = _mc2.number_input("Sensitivity%", 0.0, 100.0,
+                    float(_metrics.get('sensitivity', 70.0)),
+                    0.1, key="sa_sens")
+                _spec  = _mc3.number_input("Specificity%", 0.0, 100.0,
+                    float(_metrics.get('specificity', 80.0)),
+                    0.1, key="sa_spec")
+                _ppv   = _mc4.number_input("PPV%",         0.0, 100.0,
+                    float(_metrics.get('ppv', 62.0)),
+                    0.1, key="sa_ppv")
+                _npv   = _mc5.number_input("NPV%",         0.0, 100.0,
+                    float(_metrics.get('npv', 93.0)),
+                    0.1, key="sa_npv")
+                
 
                 if _pd and st.button("🤖 สร้าง Smart Alert", type="primary", key="sa_gen"):
                     _user_msg = f"""สรุป ICU Risk Score ของผู้ป่วยรายนี้:
