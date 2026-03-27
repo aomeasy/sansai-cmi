@@ -3607,17 +3607,23 @@ def show_reports():
     
         with col_d2:
             # Mortality rate ในแต่ละ Risk Level
+       
+
             risk_summary = df_icu_risk.groupby('risk_level').agg(
-                จำนวน=('is_death','count'),
-                เสียชีวิต=('is_death','sum'),
-                LOS_ยาว=('long_los','sum')
+                n_total=('is_death','count'),
+                n_death=('is_death','sum'),
+                n_los=('long_los','sum')
             ).reset_index()
-            risk_summary['อัตราตาย (%)'] = (
-                risk_summary['เสียชีวิต'] / risk_summary['จำนวน'] * 100
+            
+            risk_summary['จำนวน']           = risk_summary['n_total']
+            risk_summary['เสียชีวิต']       = risk_summary['n_death']
+            risk_summary['LOS_ยาว']         = risk_summary['n_los']
+            risk_summary['อัตราตาย (%)']    = (
+                risk_summary['n_death'] / risk_summary['n_total'] * 100
             ).round(1)
             risk_summary['อัตรา LOS ยาว (%)'] = (
-                risk_summary['LOS_ยาว'] / risk_summary['จำนวน'] * 100
-            ).round(1)
+                risk_summary['n_los'] / risk_summary['n_total'] * 100
+            ).round(1)          
     
             color_map = {'High':'#D32F2F','Medium':'#F57C00','Low':'#2E7D32'}
             ch_risk = alt.Chart(risk_summary).mark_bar(cornerRadiusTopLeft=4,
