@@ -1035,55 +1035,18 @@ def show_reports():
             # ── แสดงตาราง ──────────────────────────────────────────────────────────────
             st.markdown("#### 📊 ตารางสรุป CAP / HAP / VAP แยกตาม Ward")
 
-
-
-
-            def render_matrix_table_v2(df_m, df_source=None):
+            def render_matrix_table_v2(df_m, hn_data=None):
                 import json
             
-                TYPE_MAP   = {"cap": "CAP", "hap": "HAP", "vap": "VAP"}
-            
-                # ── สร้าง hn_data ─────────────────────────────────────────────
-                # ใช้ month_sort (Period) เป็น key แทน month_label เพื่อหลีกเลี่ยง format ต่างกัน
-                hn_data = {}
-                if df_source is not None and not df_source.empty:
-                    for period, grp in df_source.groupby("month_sort"):
-                        # ใช้ str(period) เช่น "2025-06" เป็น key — stable ไม่ขึ้นกับ format
-                        period_key = str(period)
-                        for ward_key in grp["ward_group"].dropna().unique():
-                            ward_key = str(ward_key)
-                            ward_df  = grp[grp["ward_group"] == ward_key]
-                            for t_code, t_label in TYPE_MAP.items():
-                                sub = ward_df[ward_df["pneu_type"] == t_code]
-                                hn_data[f"{period_key}||{ward_key}||{t_label}||all"] = [
-                                    f"HN: {str(r.get('hn','?'))}  |  AN: {str(r.get('an','?'))}  |  "
-                                    f"อายุ {r.get('age','?')} ปี  |  ICD-10: {str(r.get('pdx','?'))}"
-                                    for _, r in sub.iterrows()
-                                ]
-                                hn_data[f"{period_key}||{ward_key}||{t_label}||dead"] = [
-                                    f"HN: {str(r.get('hn','?'))}  |  AN: {str(r.get('an','?'))}  |  "
-                                    f"อายุ {r.get('age','?')} ปี  |  ICD-10: {str(r.get('pdx','?'))}"
-                                    for _, r in sub[sub["is_death"]].iterrows()
-                                ]
-                            # Total
-                            hn_data[f"{period_key}||{ward_key}||Total||all"] = [
-                                f"HN: {str(r.get('hn','?'))}  |  AN: {str(r.get('an','?'))}  |  "
-                                f"อายุ {r.get('age','?')} ปี  |  ICD-10: {str(r.get('pdx','?'))}"
-                                for _, r in ward_df.iterrows()
-                            ]
-                            hn_data[f"{period_key}||{ward_key}||Total||dead"] = [
-                                f"HN: {str(r.get('hn','?'))}  |  AN: {str(r.get('an','?'))}  |  "
-                                f"อายุ {r.get('age','?')} ปี  |  ICD-10: {str(r.get('pdx','?'))}"
-                                for _, r in ward_df[ward_df["is_death"]].iterrows()
-                            ]
+                if hn_data is None:
+                    hn_data = {}
             
                 hn_json = json.dumps(hn_data, ensure_ascii=False)
             
-                # ── helper td ─────────────────────────────────────────────────
                 def num_td(val, color, period_key, wk, tlabel, flag="all"):
                     key = f"{period_key}||{wk}||{tlabel}||{flag}"
                     if val == 0:
-                        inner = f'<span style="color:#BDBDBD;">0</span>'
+                        inner = '<span style="color:#BDBDBD;">0</span>'
                     else:
                         inner = (
                             f'<span class="clickable" data-key="{key}" '
@@ -1104,14 +1067,13 @@ def show_reports():
                         )
                     return f'<td style="text-align:center;padding:0.6rem 0.8rem;">{badge}</td>'
             
-                # ── rows — ใช้ _period_key แทน _month_label ───────────────────
                 rows_html = ""
                 for i, row in df_m.iterrows():
                     is_total   = row.get("_is_total", False)
-                    ml_display = row.get("_month_label", "")   # แสดงผลเท่านั้น
-                    period_key = str(row.get("_period_key", "")) # ← ใช้ค้นหา key
-                    bg  = "#EDE7F6" if is_total else ("white" if i % 2 == 0 else "#F5F5F5")
-                    fw  = "700" if is_total else "400"
+                    ml_display = row.get("_month_label", "")
+                    period_key = str(row.get("_period_key", ""))
+                    bg = "#EDE7F6" if is_total else ("white" if i % 2 == 0 else "#F5F5F5")
+                    fw = "700" if is_total else "400"
                     ward = str(row["Ward"])
                     wk   = ward.replace("🔷 ", "")
             
@@ -1129,7 +1091,6 @@ def show_reports():
                       {death_td(row['Total_death'],       period_key, wk, 'Total')}
                     </tr>"""
             
-                # ── HTML + JS (เหมือนเดิม ไม่เปลี่ยน) ────────────────────────
                 return f"""<!DOCTYPE html>
             <html><head><meta charset="utf-8">
             <style>
@@ -1194,21 +1155,64 @@ def show_reports():
                 const parts = key.split('||');
                 const flag  = parts[3] || 'all';
                 document.getElementById('modal-title').textContent =
-                  parts[1] + '  ·  ' + parts[2] + (flag === 'dead' ? ' (เสียชีวิต)' : '') + '  —  ' + list.length + ' ราย';
+                  parts[1] + '  ·  ' + parts[2] + (flag==='dead' ? ' (เสียชีวิต)' : '') + '  —  ' + list.length + ' ราย';
                 const ul = document.getElementById('modal-list');
                 ul.innerHTML = list.length === 0
                   ? '<li class="empty-msg">ไม่มีข้อมูล</li>'
                   : list.map(h => '<li>' + h + '</li>').join('');
                 document.getElementById('overlay').classList.add('show');
               }}
-              document.getElementById('btn-close').onclick = function() {{ document.getElementById('overlay').classList.remove('show'); }};
-              document.getElementById('overlay').onclick   = function(e) {{ if (e.target===this) document.getElementById('overlay').classList.remove('show'); }};
-              document.getElementById('btn-copy').onclick  = function() {{
-                const text = [...document.querySelectorAll('#modal-list li')].map(li=>li.textContent).join('\\n');
-                navigator.clipboard.writeText(text).then(()=>{{ this.textContent='✅ คัดลอกแล้ว!'; setTimeout(()=>this.textContent='📋 คัดลอก HN ทั้งหมด',2000); }});
+              document.getElementById('btn-close').onclick = function() {{
+                document.getElementById('overlay').classList.remove('show');
+              }};
+              document.getElementById('overlay').onclick = function(e) {{
+                if (e.target === this) document.getElementById('overlay').classList.remove('show');
+              }};
+              document.getElementById('btn-copy').onclick = function() {{
+                const text = [...document.querySelectorAll('#modal-list li')].map(li => li.textContent).join('\\n');
+                navigator.clipboard.writeText(text).then(() => {{
+                  this.textContent = '✅ คัดลอกแล้ว!';
+                  setTimeout(() => this.textContent = '📋 คัดลอก HN ทั้งหมด', 2000);
+                }});
               }};
             </script>
             </body></html>"""
+
+             # ── สร้าง hn_data ก่อนส่งเข้าฟังก์ชัน ────────────────────────────
+            TYPE_MAP = {"cap": "CAP", "hap": "HAP", "vap": "VAP"}
+            hn_data  = {}
+            
+            for period, grp in df_pn2.groupby("month_sort"):
+                period_key = str(period)
+                for ward_key in grp["ward_group"].dropna().unique():
+                    ward_key = str(ward_key)
+                    ward_df  = grp[grp["ward_group"] == ward_key]
+                    for t_code, t_label in TYPE_MAP.items():
+                        sub = ward_df[ward_df["pneu_type"] == t_code]
+                        hn_data[f"{period_key}||{ward_key}||{t_label}||all"] = [
+                            f"HN: {str(r.get('hn','?'))}  |  AN: {str(r.get('an','?'))}  |  "
+                            f"อายุ {r.get('age','?')} ปี  |  ICD-10: {str(r.get('pdx','?'))}"
+                            for _, r in sub.iterrows()
+                        ]
+                        hn_data[f"{period_key}||{ward_key}||{t_label}||dead"] = [
+                            f"HN: {str(r.get('hn','?'))}  |  AN: {str(r.get('an','?'))}  |  "
+                            f"อายุ {r.get('age','?')} ปี  |  ICD-10: {str(r.get('pdx','?'))}"
+                            for _, r in sub[sub["is_death"]].iterrows()
+                        ]
+                    hn_data[f"{period_key}||{ward_key}||Total||all"] = [
+                        f"HN: {str(r.get('hn','?'))}  |  AN: {str(r.get('an','?'))}  |  "
+                        f"อายุ {r.get('age','?')} ปี  |  ICD-10: {str(r.get('pdx','?'))}"
+                        for _, r in ward_df.iterrows()
+                    ]
+                    hn_data[f"{period_key}||{ward_key}||Total||dead"] = [
+                        f"HN: {str(r.get('hn','?'))}  |  AN: {str(r.get('an','?'))}  |  "
+                        f"อายุ {r.get('age','?')} ปี  |  ICD-10: {str(r.get('pdx','?'))}"
+                        for _, r in ward_df[ward_df["is_death"]].iterrows()
+                    ]
+            
+            # ── call site ──────────────────────────────────────────────────────
+            html_content = render_matrix_table_v2(df_summary_matrix, hn_data)
+            components.html(html_content, height=560, scrolling=False)
             
  
             import streamlit.components.v1 as components
