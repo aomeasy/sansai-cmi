@@ -1162,7 +1162,7 @@ def show_reports():
              # ── สร้าง hn_data ก่อนส่งเข้าฟังก์ชัน ────────────────────────────
             TYPE_MAP = {"cap": "CAP", "hap": "HAP", "vap": "VAP"}
             hn_data  = {}
-            
+
             for period, grp in df_pn2.groupby("month_sort"):
                 period_key = str(period)
                 for ward_key in grp["ward_group"].dropna().unique():
@@ -1171,25 +1171,22 @@ def show_reports():
                     for t_code, t_label in TYPE_MAP.items():
                         sub = ward_df[ward_df["pneu_type"] == t_code]
                         hn_data[f"{period_key}||{ward_key}||{t_label}||all"] = [
-                            f"HN: {str(r.get('hn','?'))}  |  AN: {str(r.get('an','?'))}  |  "
-                            f"อายุ {r.get('age','?')} ปี  |  ICD-10: {str(r.get('pdx','?'))}"
+                            str(r.get('hn','?'))
                             for _, r in sub.iterrows()
                         ]
                         hn_data[f"{period_key}||{ward_key}||{t_label}||dead"] = [
-                            f"HN: {str(r.get('hn','?'))}  |  AN: {str(r.get('an','?'))}  |  "
-                            f"อายุ {r.get('age','?')} ปี  |  ICD-10: {str(r.get('pdx','?'))}"
+                            str(r.get('hn','?'))
                             for _, r in sub[sub["is_death"]].iterrows()
                         ]
                     hn_data[f"{period_key}||{ward_key}||Total||all"] = [
-                        f"HN: {str(r.get('hn','?'))}  |  AN: {str(r.get('an','?'))}  |  "
-                        f"อายุ {r.get('age','?')} ปี  |  ICD-10: {str(r.get('pdx','?'))}"
+                        str(r.get('hn','?'))
                         for _, r in ward_df.iterrows()
                     ]
                     hn_data[f"{period_key}||{ward_key}||Total||dead"] = [
-                        f"HN: {str(r.get('hn','?'))}  |  AN: {str(r.get('an','?'))}  |  "
-                        f"อายุ {r.get('age','?')} ปี  |  ICD-10: {str(r.get('pdx','?'))}"
+                        str(r.get('hn','?'))
                         for _, r in ward_df[ward_df["is_death"]].iterrows()
                     ]
+             
             
             # ── call site ──────────────────────────────────────────────────────
             html_content = render_matrix_table_v2(df_summary_matrix, hn_data)
