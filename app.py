@@ -1186,8 +1186,21 @@ def show_reports():
                         str(r.get('hn','?'))
                         for _, r in ward_df[ward_df["is_death"]].iterrows()
                     ]
-             
-            
+                for t_code, t_label in TYPE_MAP.items():
+                    sub = grp[grp["pneu_type"] == t_code]
+                    hn_data[f"{period_key}||Total||{t_label}||all"] = [
+                        str(r.get('hn','?')) for _, r in sub.iterrows()
+                    ]
+                    hn_data[f"{period_key}||Total||{t_label}||dead"] = [
+                        str(r.get('hn','?')) for _, r in sub[sub["is_death"]].iterrows()
+                    ]
+                hn_data[f"{period_key}||Total||Total||all"] = [
+                    str(r.get('hn','?')) for _, r in grp.iterrows()
+                ]
+                hn_data[f"{period_key}||Total||Total||dead"] = [
+                    str(r.get('hn','?')) for _, r in grp[grp["is_death"]].iterrows()
+                ]             
+                
             # ── call site ──────────────────────────────────────────────────────
             html_content = render_matrix_table_v2(df_summary_matrix, hn_data)
             components.html(html_content, height=560, scrolling=False)
