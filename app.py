@@ -510,10 +510,9 @@ def show_reports():
         st.error("❌ ไม่สามารถโหลด Altair library กรุณาติดตั้ง: pip install altair")
         return
         
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    tab1, tab2, tab4, tab5 = st.tabs([
         "🏥 Dashboard ภาพรวม",
         "🫁 ปอดบวม (Pneumonia)",
-        "💨 VAP Analysis",
         "🧠 Stroke & ACS",
         "🔬 เชิงลึก"
     ])
@@ -1479,166 +1478,7 @@ def show_reports():
                 av = [c for c in det_cols if c in df_pn.columns]
                 st.dataframe(df_pn[av], use_container_width=True, hide_index=True)
 
-    # ════════════════════════════════════════════════════
-    # TAB 3 : VAP
-    # ════════════════════════════════════════════════════
-    with tab3:
-        st.markdown("""
-        <div style="background:linear-gradient(135deg,#37474F,#546E7A);
-                    padding:1.2rem 2rem;border-radius:12px;margin-bottom:1.2rem;">
-            <h2 style="color:white;margin:0;font-size:1.5rem;">
-                💨 VAP Analysis
-            </h2>
-            <p style="color:#CFD8DC;margin:.3rem 0 0;font-size:.9rem;">
-                Ventilator-Associated Pneumonia | J95.851 / ปอดบวม + op 96.71/96.72
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-
-        
-        with tab3:
-            st.markdown("""
-            <div style="background:linear-gradient(135deg,#37474F,#546E7A);
-                        padding:1.2rem 2rem;border-radius:12px;margin-bottom:1.2rem;">
-                <h2 style="color:white;margin:0;font-size:1.5rem;">
-                    💨 VAP Analysis
-                </h2>
-            </div>
-            """, unsafe_allow_html=True)
-        
-            # ✅ debug วางตรงนี้
-            all_dx_cols_debug = ['pdx'] + [f'dx{i}' for i in range(11)]
-            all_dx_cols_debug = [c for c in all_dx_cols_debug if c in df_all.columns]
-        
-            j95_found = []
-            for col in all_dx_cols_debug:
-                mask = df_all[col].astype(str).str.startswith('J95')
-                found = df_all[mask][['hn', 'an', 'ward_name', col]].copy()
-                found['found_in_col'] = col
-                found = found.rename(columns={col: 'code'})
-                j95_found.append(found)
-        
-            if j95_found:
-                df_j95 = pd.concat(j95_found, ignore_index=True)
-                df_j95 = df_j95[df_j95['code'] != 'nan']
-                st.write(f"พบ J95.x ทั้งหมด {len(df_j95)} รายการ")
-                st.write(df_j95['code'].value_counts())
-                st.dataframe(df_j95, use_container_width=True)
-            else:
-                st.warning("ไม่พบ J95.x เลยในทุก column")
-
-        
-        # หา VAP โดยตรง (J95.851)
-        all_dx = ['pdx'] + [f'dx{i}' for i in range(11)]
-        vap_code_mask = pd.Series([False]*len(df_all), index=df_all.index)
-        for col in all_dx:
-            if col in df_all.columns:
-                vap_code_mask |= df_all[col].astype(str).str.startswith('J95.85')
-        df_vap_coded = df_all[vap_code_mask].copy()
-
-        # ปอดบวม + ventilator
-        df_pn_vent = df_pneumonia[df_pneumonia['on_vent']].copy() if 'on_vent' in df_pneumonia.columns else pd.DataFrame()
-
-        # all ventilator cases
-        df_all['on_vent'] = df_all.apply(has_ventilator, axis=1)
-        df_vent_all = df_all[df_all['on_vent']].copy()
-
-         # ✅ แก้ Bug: คำนวณ death_pn_vent ก่อนใช้งาน
-        if not df_pn_vent.empty and 'discharge_status' in df_pn_vent.columns:
-            death_pn_vent = int(
-                df_pn_vent['discharge_status'].str.contains('ตาย', na=False).sum()
-            )
-        else:
-            death_pn_vent = 0
-            
-        k1, k2, k3, k4 = st.columns(4)
-        
-        k1.metric(
-            "🔴 J95.851 (VAP code)", 
-            f"{len(df_vap_coded)} ราย",
-            "⚠️ ควรตรวจสอบ" if len(df_vap_coded)==0 else "",
-            help="🔴 **VAP ที่ลง Code โดยตรง (J95.851)**\n\nVentilator-Associated Pneumonia ที่ Coder ลงรหัสไว้แล้ว\n\n🔹 **เกณฑ์วินิจฉัย VAP:**\n   • ใส่ท่อช่วยหายใจ > 48 ชม.\n   • เกิดปอดบวมใหม่หลังใส่ท่อ\n   • มี Clinical + Radiologic evidence\n\n⚠️ **ถ้าเป็น 0:**\n   • ยังไม่มี VAP ✅\n   • หรือมีแต่ยังไม่ได้ลง Code ❌\n\n💡 **ต้อง cross-check กับ IC records**"
-        )
-        
-        k2.metric(
-            "💨 ใช้ Ventilator ทั้งหมด", 
-            f"{len(df_vent_all)} ราย",
-            help="💨 **ผู้ป่วยทั้งหมดที่ใช้เครื่องช่วยหายใจ**\n\nผู้ป่วยทุกรายที่มี OP 96.7x (Mechanical Ventilation)\n\n🔹 **รวมทุก diagnosis:** ไม่เฉพาะปอดบวม\n🔹 **At risk for VAP:** ทุกรายที่ใส่ท่อ > 48 ชม.\n\n💡 **VAP rate = (จำนวน VAP / Ventilator days) × 1000**\n\n⚠️ **Target:** < 2-3 per 1000 ventilator days"
-        )
-        
-        k3.metric(
-            "🫁 ปอดบวม + Ventilator", 
-            f"{len(df_pn_vent)} ราย",
-            help="🫁 **ผู้ป่วยปอดบวมที่ใช้ Ventilator (Possible VAP)**\n\nผู้ป่วยที่มีทั้ง:\n• PDX = Pneumonia (J10-J18)\n• OP = Ventilator (96.7x)\n\n⚠️ **ไม่ใช่ VAP ทุกราย!**\n\nต้องตรวจสอบ:\n🔹 **Timeline:** ใส่ท่อก่อนหรือหลังเกิดปอดบวม?\n🔹 **Community-acquired** vs **Hospital-acquired**\n🔹 **Aspiration pneumonia** vs **VAP**\n\n💡 **การยืนยัน:** ดูจาก medical records + IC team"
-        )
-        
-        k4.metric(
-            "💀 เสียชีวิตใน ปอดบวม+Vent", 
-            f"{death_pn_vent} ราย",
-            help="💀 **Mortality ในผู้ป่วยปอดบวมที่ใช้ Ventilator**\n\nอัตราเสียชีวิตในกลุ่ม high-risk นี้\n\n🔹 **Expected mortality:** 30-50%\n🔹 **ปัจจัยเสี่ยง:**\n   • VAP\n   • Sepsis\n   • Multi-organ failure\n   • Prolonged ventilation\n\n💡 **Quality indicators:**\n   • VAP bundle compliance\n   • Time to appropriate antibiotic\n   • Weaning protocol"
-        )
-        
-        st.markdown("---")
-
-        # ── VAP coded ──
-        st.markdown("#### 🔴 ผู้ป่วยที่ code J95.851 (VAP โดยตรง)")
-        if df_vap_coded.empty:
-            st.info("""
-            ℹ️ **ไม่พบรหัส J95.851** ในข้อมูล
-
-            **ความเป็นไปได้:**
-            - ยังไม่มีผู้ป่วย VAP ในช่วงนี้ ✅
-            - มีผู้ป่วย VAP แต่ยังไม่ได้ลง code → ควรแจ้ง **ทีม Coder** และ **IC**
-
-            **เกณฑ์การวินิจฉัย VAP:**
-            ใส่ท่อช่วยหายใจ > 48 ชั่วโมง แล้วเกิดปอดบวมใหม่
-            """)
-        else:
-            vc = [c for c in ['hn','an','age','pdx','ward_name',
-                               'length_of_stay','discharge_status'] if c in df_vap_coded.columns]
-            st.dataframe(df_vap_coded[vc], use_container_width=True, hide_index=True)
-
-        st.markdown("---")
-
-        # ── ปอดบวม + ventilator ──
-        st.markdown("#### 🫁 ผู้ป่วยปอดบวม + ใช้ Ventilator (Possible VAP)")
-        st.caption("⚠️ ไม่ใช่ VAP ทุกราย — ต้องประเมินทางคลินิกเพิ่มเติม (ลำดับเวลา admit vs ventilator)")
-
-        if df_pn_vent.empty:
-            st.info("ไม่พบผู้ป่วยในกลุ่มนี้")
-        else:
-            vc2 = [c for c in ['hn','an','age','sex','pdx','admit_date','discharge_date',
-                                'ward_name','length_of_stay','discharge_status','vent_codes']
-                   if c in df_pn_vent.columns]
-            df_pn_vent_show = df_pn_vent[vc2].copy()
-            df_pn_vent_show.index = range(1, len(df_pn_vent_show)+1)
-            st.dataframe(df_pn_vent_show, use_container_width=True)
-
-        st.markdown("---")
-
-        # ── Ventilator ทุก ward ──
-        st.markdown("#### 💨 การกระจาย Ventilator ตาม Ward")
-        if not df_vent_all.empty and 'ward_name' in df_vent_all.columns:
-            ward_vent = (df_vent_all['ward_name'].value_counts()
-                         .reset_index().rename(columns={'ward_name':'Ward','count':'จำนวน'}))
-            ch_v = alt.Chart(ward_vent).mark_bar(color='#546E7A').encode(
-                x=alt.X('จำนวน:Q'),
-                y=alt.Y('Ward:N', sort='-x'),
-                tooltip=['Ward','จำนวน']
-            ).properties(height=300)
-            st.altair_chart(ch_v, use_container_width=True)
-
-        # ── คำแนะนำ ──
-        st.markdown("---")
-        st.markdown("""
-        #### 📌 คำแนะนำ
-        | ขั้นตอน | ผู้รับผิดชอบ |
-        |---------|------------|
-        | ตรวจสอบผู้ป่วย ICU ที่ใส่ ventilator > 48 ชม. | ทีม IC + แพทย์เจ้าของไข้ |
-        | Cross-check กับสมุดบันทึก VAP ของ IC | ทีม IC |
-        | ลง code J95.851 ถ้าวินิจฉัย VAP | ทีม Coder |
-        | ติดตาม VAP rate รายเดือน | งานพัฒนาคุณภาพ |
-        """)
+     
 
     # ════════════════════════════════════════════════════
     # TAB 4 : Stroke & ACS 
