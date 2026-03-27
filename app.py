@@ -1599,123 +1599,411 @@ def show_reports():
                     return key
             return None
 
-        
-        def build_matrix(df_src, type_a_codes, type_b_codes,
-                         label_a, label_b):
-            """
-            สร้าง summary matrix 2 ประเภท × N ward
-            Returns: DataFrame พร้อมแสดงผล
-            """
+
+
+        def build_matrix(df_src, type_a_codes, type_b_codes, label_a, label_b):
             if 'pdx' not in df_src.columns:
                 return pd.DataFrame()
-    
+        
             df_src = df_src.copy()
             df_src['ward_group'] = df_src['ward_name'].apply(get_ward_group5) \
                                    if 'ward_name' in df_src.columns else None
-    
-            df_src['is_type_a'] = df_src['pdx'].apply(
-                lambda x: starts_with_any(x, type_a_codes)
-            )
-            df_src['is_type_b'] = df_src['pdx'].apply(
-                lambda x: starts_with_any(x, type_b_codes)
-            )
+            df_src['is_type_a'] = df_src['pdx'].apply(lambda x: starts_with_any(x, type_a_codes))
+            df_src['is_type_b'] = df_src['pdx'].apply(lambda x: starts_with_any(x, type_b_codes))
             df_src['is_either'] = df_src['is_type_a'] | df_src['is_type_b']
-    
-            rows = []
-            for ward in WARD_ORDER_5:
-                sub = df_src[
-                    (df_src['ward_group'] == ward) & df_src['is_either']
-                ]
-                sub_a = sub[sub['is_type_a']]
-                sub_b = sub[sub['is_type_b']]
-                rows.append({
-                    'Ward': ward,
-                    f'{label_a}_n':     len(sub_a),
-                    f'{label_a}_death': int(sub_a['is_death'].sum()),
-                    f'{label_b}_n':     len(sub_b),
-                    f'{label_b}_death': int(sub_b['is_death'].sum()),
-                    'Total_n':          len(sub),
-                    'Total_death':      int(sub['is_death'].sum()),
+        
+            all_rows = []
+            for period, df_period in df_src.groupby('month_sort'):
+                month_label_str = df_period['month_label'].iloc[0] \
+                                  if 'month_label' in df_period.columns else str(period)
+                period_key_str  = str(period)
+                first_row = True
+        
+                for ward in WARD_ORDER_5:
+                    sub   = df_period[(df_period['ward_group'] == ward) & df_period['is_either']]
+                    sub_a = sub[sub['is_type_a']]
+                    sub_b = sub[sub['is_type_b']]
+                    all_rows.append({
+                        'Ward':             ward,
+                        f'{label_a}_n':     len(sub_a),
+                        f'{label_a}_death': int(sub_a['is_death'].sum()),
+                        f'{label_b}_n':     len(sub_b),
+                        f'{label_b}_death': int(sub_b['is_death'].sum()),
+                        'Total_n':          len(sub),
+                        'Total_death':      int(sub['is_death'].sum()),
+                        '_month_label':     month_label_str if first_row else "",
+                        '_period_key':      period_key_str,
+                        '_is_total':        False,
+                    })
+                    first_row = False
+        
+                # Total row
+                df_either = df_period[df_period['is_either']]
+                all_rows.append({
+                    'Ward':             '🔷 Total',
+                    f'{label_a}_n':     int(df_period['is_type_a'].sum()),
+                    f'{label_a}_death': int(df_period.loc[df_period['is_type_a'], 'is_death'].sum()),
+                    f'{label_b}_n':     int(df_period['is_type_b'].sum()),
+                    f'{label_b}_death': int(df_period.loc[df_period['is_type_b'], 'is_death'].sum()),
+                    'Total_n':          len(df_either),
+                    'Total_death':      int(df_either['is_death'].sum()),
+                    '_month_label':     "",
+                    '_period_key':      period_key_str,
+                    '_is_total':        True,
                 })
-    
-            # Total row (ทุก ward รวมกัน)
-            df_all_either = df_src[df_src['is_either']]
-            df_all_a = df_src[df_src['is_type_a']]
-            df_all_b = df_src[df_src['is_type_b']]
-            rows.append({
-                'Ward': '🔷 Total',
-                f'{label_a}_n':     len(df_all_a),
-                f'{label_a}_death': int(df_all_a['is_death'].sum()),
-                f'{label_b}_n':     len(df_all_b),
-                f'{label_b}_death': int(df_all_b['is_death'].sum()),
-                'Total_n':          len(df_all_either),
-                'Total_death':      int(df_all_either['is_death'].sum()),
-            })
-    
-            return pd.DataFrame(rows)
-
-
-
+        
+            return pd.DataFrame(all_rows)
+        
+        
         def build_matrix_3(df_src, codes_a, codes_b, codes_c, label_a, label_b, label_c):
-            """สร้าง summary matrix 3 ประเภท × N ward"""
             if 'pdx' not in df_src.columns:
                 return pd.DataFrame()
         
             df_src = df_src.copy()
             df_src['ward_group'] = df_src['ward_name'].apply(get_ward_group5) \
                                    if 'ward_name' in df_src.columns else None
-            df_src['is_a'] = df_src['pdx'].apply(lambda x: starts_with_any(x, codes_a))
-            df_src['is_b'] = df_src['pdx'].apply(lambda x: starts_with_any(x, codes_b))
-            df_src['is_c'] = df_src['pdx'].apply(lambda x: starts_with_any(x, codes_c))
+            df_src['is_a']   = df_src['pdx'].apply(lambda x: starts_with_any(x, codes_a))
+            df_src['is_b']   = df_src['pdx'].apply(lambda x: starts_with_any(x, codes_b))
+            df_src['is_c']   = df_src['pdx'].apply(lambda x: starts_with_any(x, codes_c))
             df_src['is_any'] = df_src['is_a'] | df_src['is_b'] | df_src['is_c']
         
-            rows = []
-            for ward in WARD_ORDER_5:
-                sub   = df_src[(df_src['ward_group'] == ward) & df_src['is_any']]
-                sub_a = sub[sub['is_a']]
-                sub_b = sub[sub['is_b']]
-                sub_c = sub[sub['is_c']]
-                rows.append({
-                    'Ward': ward,
-                    f'{label_a}_n':     len(sub_a),
-                    f'{label_a}_death': int(sub_a['is_death'].sum()),
-                    f'{label_b}_n':     len(sub_b),
-                    f'{label_b}_death': int(sub_b['is_death'].sum()),
-                    f'{label_c}_n':     len(sub_c),
-                    f'{label_c}_death': int(sub_c['is_death'].sum()),
-                    'Total_n':          len(sub),
-                    'Total_death':      int(sub['is_death'].sum()),
+            all_rows = []
+            for period, df_period in df_src.groupby('month_sort'):
+                month_label_str = df_period['month_label'].iloc[0] \
+                                  if 'month_label' in df_period.columns else str(period)
+                period_key_str  = str(period)
+                first_row = True
+        
+                for ward in WARD_ORDER_5:
+                    sub   = df_period[(df_period['ward_group'] == ward) & df_period['is_any']]
+                    sub_a = sub[sub['is_a']]
+                    sub_b = sub[sub['is_b']]
+                    sub_c = sub[sub['is_c']]
+                    all_rows.append({
+                        'Ward':             ward,
+                        f'{label_a}_n':     len(sub_a),
+                        f'{label_a}_death': int(sub_a['is_death'].sum()),
+                        f'{label_b}_n':     len(sub_b),
+                        f'{label_b}_death': int(sub_b['is_death'].sum()),
+                        f'{label_c}_n':     len(sub_c),
+                        f'{label_c}_death': int(sub_c['is_death'].sum()),
+                        'Total_n':          len(sub),
+                        'Total_death':      int(sub['is_death'].sum()),
+                        '_month_label':     month_label_str if first_row else "",
+                        '_period_key':      period_key_str,
+                        '_is_total':        False,
+                    })
+                    first_row = False
+        
+                df_any = df_period[df_period['is_any']]
+                all_rows.append({
+                    'Ward':             '🔷 Total',
+                    f'{label_a}_n':     int(df_period['is_a'].sum()),
+                    f'{label_a}_death': int(df_period.loc[df_period['is_a'], 'is_death'].sum()),
+                    f'{label_b}_n':     int(df_period['is_b'].sum()),
+                    f'{label_b}_death': int(df_period.loc[df_period['is_b'], 'is_death'].sum()),
+                    f'{label_c}_n':     int(df_period['is_c'].sum()),
+                    f'{label_c}_death': int(df_period.loc[df_period['is_c'], 'is_death'].sum()),
+                    'Total_n':          len(df_any),
+                    'Total_death':      int(df_any['is_death'].sum()),
+                    '_month_label':     "",
+                    '_period_key':      period_key_str,
+                    '_is_total':        True,
                 })
         
-            # Total row
-            df_any = df_src[df_src['is_any']]
-            rows.append({
-                'Ward': '🔷 Total',
-                f'{label_a}_n':     int(df_src['is_a'].sum()),
-                f'{label_a}_death': int(df_src.loc[df_src['is_a'], 'is_death'].sum()),
-                f'{label_b}_n':     int(df_src['is_b'].sum()),
-                f'{label_b}_death': int(df_src.loc[df_src['is_b'], 'is_death'].sum()),
-                f'{label_c}_n':     int(df_src['is_c'].sum()),
-                f'{label_c}_death': int(df_src.loc[df_src['is_c'], 'is_death'].sum()),
-                'Total_n':          len(df_any),
-                'Total_death':      int(df_any['is_death'].sum()),
-            })
-            return pd.DataFrame(rows)
+            return pd.DataFrame(all_rows)
+        
+         
         
         # ── Render HTML Table (reusable) ───────────────────────────
-        def render_two_type_table(df_m, label_a, label_b,
-                                   color_a, color_b, icon_a, icon_b):
-            """สร้าง HTML table แบบ 2-type matrix"""
-            if df_m.empty:
-                return "<p style='color:#757575;'>ไม่พบข้อมูล</p>"
+                                      
 
+        def render_two_type_table(df_m, label_a, label_b,
+                                   color_a, color_b, icon_a, icon_b, hn_data=None):
+            import json
+            if hn_data is None:
+                hn_data = {}
+            hn_json = json.dumps(hn_data, ensure_ascii=False)
+        
+            def num_td(val, color, period_key, wk, tlabel, flag="all"):
+                key = f"{period_key}||{wk}||{tlabel}||{flag}"
+                if val == 0:
+                    inner = '<span style="color:#BDBDBD;">0</span>'
+                else:
+                    inner = (
+                        f'<span class="clickable" data-key="{key}" '
+                        f'style="color:{color};font-weight:700;cursor:pointer;'
+                        f'border-bottom:2px dotted {color};">{val}</span>'
+                    )
+                return f'<td style="text-align:center;padding:0.6rem 0.8rem;">{inner}</td>'
+        
+            def death_td(val, period_key, wk, tlabel):
+                key = f"{period_key}||{wk}||{tlabel}||dead"
+                if val == 0:
+                    badge = '<span style="color:#9E9E9E;">—</span>'
+                else:
+                    badge = (
+                        f'<span class="clickable" data-key="{key}" '
+                        f'style="background:#FFCDD2;color:#C62828;padding:2px 8px;'
+                        f'border-radius:10px;font-size:0.85rem;font-weight:700;cursor:pointer;">{val}</span>'
+                    )
+                return f'<td style="text-align:center;padding:0.6rem 0.8rem;">{badge}</td>'
+        
+            rows_html = ""
+            for i, row in df_m.iterrows():
+                is_total   = row.get("_is_total", False)
+                ml_display = row.get("_month_label", "")
+                period_key = str(row.get("_period_key", ""))
+                bg = "#EDE7F6" if is_total else ("white" if i % 2 == 0 else "#F5F5F5")
+                fw = "700" if is_total else "400"
+                ward = str(row["Ward"])
+                wk   = ward.replace("🔷 ", "")
+        
+                rows_html += f"""
+                <tr style="background:{bg};font-weight:{fw};">
+                  <td style="padding:0.6rem 1rem;color:#E65100;font-weight:600;white-space:nowrap;">{ml_display}</td>
+                  <td style="padding:0.6rem 1rem;font-weight:{fw};color:#1565C0;white-space:nowrap;">{ward}</td>
+                  {num_td(row[f'{label_a}_n'], color_a, period_key, wk, label_a)}
+                  {death_td(row[f'{label_a}_death'], period_key, wk, label_a)}
+                  {num_td(row[f'{label_b}_n'], color_b, period_key, wk, label_b)}
+                  {death_td(row[f'{label_b}_death'], period_key, wk, label_b)}
+                  {num_td(row['Total_n'], '#4CAF50', period_key, wk, 'Total')}
+                  {death_td(row['Total_death'], period_key, wk, 'Total')}
+                </tr>"""
+        
+            return f"""<!DOCTYPE html>
+        <html><head><meta charset="utf-8">
+        <style>
+          body {{ margin:0; font-family:sans-serif; font-size:14px; }}
+          #overlay {{ display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center; }}
+          #overlay.show {{ display:flex; }}
+          #modal {{ background:#fff; border-radius:14px; padding:1.5rem 2rem; width:90%; max-width:560px; max-height:75vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.3); position:relative; }}
+          #modal-title {{ color:#1565C0; font-size:1rem; font-weight:700; margin:0 2rem 1rem 0; line-height:1.4; }}
+          #modal-list {{ list-style:none; padding:0; margin:0; }}
+          #modal-list li {{ padding:0.5rem 0.8rem; margin-bottom:0.35rem; border-radius:6px; background:#F5F9FC; border-left:3px solid #3949AB; font-family:monospace; font-size:0.85rem; color:#37474F; }}
+          .empty-msg {{ color:#9E9E9E; font-style:italic; }}
+          #btn-close {{ position:absolute; top:0.8rem; right:1rem; background:none; border:none; font-size:1.5rem; cursor:pointer; color:#9E9E9E; }}
+          #btn-close:hover {{ color:#3949AB; }}
+          #btn-copy {{ margin-top:1rem; padding:0.45rem 1.2rem; background:#3949AB; color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:0.88rem; font-weight:600; }}
+          .wrap {{ overflow-x:auto; overflow-y:auto; max-height:460px; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.08); }}
+          table {{ width:100%; border-collapse:collapse; min-width:800px; }}
+          thead {{ position:sticky; top:0; z-index:10; }}
+          .clickable:hover {{ opacity:0.75; }}
+        </style>
+        </head><body>
+        <div id="overlay">
+          <div id="modal">
+            <button id="btn-close">✕</button>
+            <div id="modal-title"></div>
+            <ul id="modal-list"></ul>
+            <button id="btn-copy">📋 คัดลอก HN ทั้งหมด</button>
+          </div>
+        </div>
+        <div class="wrap">
+        <table>
+          <thead>
+            <tr style="background:linear-gradient(135deg,#1A237E,#283593);color:white;">
+              <th rowspan="2" style="padding:0.8rem 1rem;text-align:left;min-width:100px;">📅 เดือน</th>
+              <th rowspan="2" style="padding:0.8rem 1rem;text-align:left;min-width:160px;">🏥 Ward</th>
+              <th colspan="2" style="padding:0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);">{icon_a} {label_a}</th>
+              <th colspan="2" style="padding:0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);">{icon_b} {label_b}</th>
+              <th colspan="2" style="padding:0.8rem;text-align:center;">📊 Total</th>
+            </tr>
+            <tr style="background:#283593;color:white;font-size:0.85rem;">
+              <th style="padding:0.5rem 0.8rem;text-align:center;">จำนวน</th>
+              <th style="padding:0.5rem 0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);">💀 ตาย</th>
+              <th style="padding:0.5rem 0.8rem;text-align:center;">จำนวน</th>
+              <th style="padding:0.5rem 0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);">💀 ตาย</th>
+              <th style="padding:0.5rem 0.8rem;text-align:center;">จำนวน</th>
+              <th style="padding:0.5rem 0.8rem;text-align:center;">💀 ตาย</th>
+            </tr>
+          </thead>
+          <tbody>{rows_html}</tbody>
+        </table>
+        </div>
+        <script>
+          const HN = {hn_json};
+          document.body.addEventListener('click', function(e) {{
+            const el = e.target.closest('.clickable');
+            if (el) openModal(el.dataset.key);
+          }});
+          function openModal(key) {{
+            const list  = HN[key] || [];
+            const parts = key.split('||');
+            const flag  = parts[3] || 'all';
+            document.getElementById('modal-title').textContent =
+              parts[1] + '  ·  ' + parts[2] + (flag==='dead' ? ' (เสียชีวิต)' : '') + '  —  ' + list.length + ' ราย';
+            const ul = document.getElementById('modal-list');
+            ul.innerHTML = list.length === 0
+              ? '<li class="empty-msg">ไม่มีข้อมูล</li>'
+              : list.map(h => '<li>' + h + '</li>').join('');
+            document.getElementById('overlay').classList.add('show');
+          }}
+          document.getElementById('btn-close').onclick = function() {{
+            document.getElementById('overlay').classList.remove('show');
+          }};
+          document.getElementById('overlay').onclick = function(e) {{
+            if (e.target === this) document.getElementById('overlay').classList.remove('show');
+          }};
+          document.getElementById('btn-copy').onclick = function() {{
+            const text = [...document.querySelectorAll('#modal-list li')].map(li => li.textContent).join('\\n');
+            navigator.clipboard.writeText(text).then(() => {{
+              this.textContent = '✅ คัดลอกแล้ว!';
+              setTimeout(() => this.textContent = '📋 คัดลอก HN ทั้งหมด', 2000);
+            }});
+          }};
+        </script>
+        </body></html>"""
+        
+        
         def render_three_type_table(df_m, label_a, label_b, label_c,
                                      color_a, color_b, color_c,
-                                     icon_a, icon_b, icon_c):
-            """สร้าง HTML table แบบ 3-type matrix"""
-            if df_m.empty:
-                return "<p style='color:#757575;'>ไม่พบข้อมูล</p>"                                       
-    
+                                     icon_a, icon_b, icon_c, hn_data=None):
+            import json
+            if hn_data is None:
+                hn_data = {}
+            hn_json = json.dumps(hn_data, ensure_ascii=False)
+        
+            def num_td(val, color, period_key, wk, tlabel, flag="all"):
+                key = f"{period_key}||{wk}||{tlabel}||{flag}"
+                if val == 0:
+                    inner = '<span style="color:#BDBDBD;">0</span>'
+                else:
+                    inner = (
+                        f'<span class="clickable" data-key="{key}" '
+                        f'style="color:{color};font-weight:700;cursor:pointer;'
+                        f'border-bottom:2px dotted {color};">{val}</span>'
+                    )
+                return f'<td style="text-align:center;padding:0.6rem 0.8rem;">{inner}</td>'
+        
+            def death_td(val, period_key, wk, tlabel):
+                key = f"{period_key}||{wk}||{tlabel}||dead"
+                if val == 0:
+                    badge = '<span style="color:#9E9E9E;">—</span>'
+                else:
+                    badge = (
+                        f'<span class="clickable" data-key="{key}" '
+                        f'style="background:#FFCDD2;color:#C62828;padding:2px 8px;'
+                        f'border-radius:10px;font-size:0.85rem;font-weight:700;cursor:pointer;">{val}</span>'
+                    )
+                return f'<td style="text-align:center;padding:0.6rem 0.8rem;">{badge}</td>'
+        
+            rows_html = ""
+            for i, row in df_m.iterrows():
+                is_total   = row.get("_is_total", False)
+                ml_display = row.get("_month_label", "")
+                period_key = str(row.get("_period_key", ""))
+                bg = "#EDE7F6" if is_total else ("white" if i % 2 == 0 else "#F5F5F5")
+                fw = "700" if is_total else "400"
+                ward = str(row["Ward"])
+                wk   = ward.replace("🔷 ", "")
+        
+                rows_html += f"""
+                <tr style="background:{bg};font-weight:{fw};">
+                  <td style="padding:0.6rem 1rem;color:#E65100;font-weight:600;white-space:nowrap;">{ml_display}</td>
+                  <td style="padding:0.6rem 1rem;font-weight:{fw};color:#1565C0;white-space:nowrap;">{ward}</td>
+                  {num_td(row[f'{label_a}_n'], color_a, period_key, wk, label_a)}
+                  {death_td(row[f'{label_a}_death'], period_key, wk, label_a)}
+                  {num_td(row[f'{label_b}_n'], color_b, period_key, wk, label_b)}
+                  {death_td(row[f'{label_b}_death'], period_key, wk, label_b)}
+                  {num_td(row[f'{label_c}_n'], color_c, period_key, wk, label_c)}
+                  {death_td(row[f'{label_c}_death'], period_key, wk, label_c)}
+                  {num_td(row['Total_n'], '#4CAF50', period_key, wk, 'Total')}
+                  {death_td(row['Total_death'], period_key, wk, 'Total')}
+                </tr>"""
+        
+            return f"""<!DOCTYPE html>
+        <html><head><meta charset="utf-8">
+        <style>
+          body {{ margin:0; font-family:sans-serif; font-size:14px; }}
+          #overlay {{ display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center; }}
+          #overlay.show {{ display:flex; }}
+          #modal {{ background:#fff; border-radius:14px; padding:1.5rem 2rem; width:90%; max-width:560px; max-height:75vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.3); position:relative; }}
+          #modal-title {{ color:#1565C0; font-size:1rem; font-weight:700; margin:0 2rem 1rem 0; line-height:1.4; }}
+          #modal-list {{ list-style:none; padding:0; margin:0; }}
+          #modal-list li {{ padding:0.5rem 0.8rem; margin-bottom:0.35rem; border-radius:6px; background:#F5F9FC; border-left:3px solid #BF360C; font-family:monospace; font-size:0.85rem; color:#37474F; }}
+          .empty-msg {{ color:#9E9E9E; font-style:italic; }}
+          #btn-close {{ position:absolute; top:0.8rem; right:1rem; background:none; border:none; font-size:1.5rem; cursor:pointer; color:#9E9E9E; }}
+          #btn-close:hover {{ color:#BF360C; }}
+          #btn-copy {{ margin-top:1rem; padding:0.45rem 1.2rem; background:#BF360C; color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:0.88rem; font-weight:600; }}
+          .wrap {{ overflow-x:auto; overflow-y:auto; max-height:460px; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.08); }}
+          table {{ width:100%; border-collapse:collapse; min-width:1000px; }}
+          thead {{ position:sticky; top:0; z-index:10; }}
+          .clickable:hover {{ opacity:0.75; }}
+        </style>
+        </head><body>
+        <div id="overlay">
+          <div id="modal">
+            <button id="btn-close">✕</button>
+            <div id="modal-title"></div>
+            <ul id="modal-list"></ul>
+            <button id="btn-copy">📋 คัดลอก HN ทั้งหมด</button>
+          </div>
+        </div>
+        <div class="wrap">
+        <table>
+          <thead>
+            <tr style="background:linear-gradient(135deg,#BF360C,#E64A19);color:white;">
+              <th rowspan="2" style="padding:0.8rem 1rem;text-align:left;min-width:100px;">📅 เดือน</th>
+              <th rowspan="2" style="padding:0.8rem 1rem;text-align:left;min-width:160px;">🏥 Ward</th>
+              <th colspan="2" style="padding:0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);">{icon_a} {label_a}</th>
+              <th colspan="2" style="padding:0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);">{icon_b} {label_b}</th>
+              <th colspan="2" style="padding:0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);">{icon_c} {label_c}</th>
+              <th colspan="2" style="padding:0.8rem;text-align:center;">📊 Total</th>
+            </tr>
+            <tr style="background:#E64A19;color:white;font-size:0.85rem;">
+              <th style="padding:0.5rem 0.8rem;text-align:center;">จำนวน</th>
+              <th style="padding:0.5rem 0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);">💀 ตาย</th>
+              <th style="padding:0.5rem 0.8rem;text-align:center;">จำนวน</th>
+              <th style="padding:0.5rem 0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);">💀 ตาย</th>
+              <th style="padding:0.5rem 0.8rem;text-align:center;">จำนวน</th>
+              <th style="padding:0.5rem 0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);">💀 ตาย</th>
+              <th style="padding:0.5rem 0.8rem;text-align:center;">จำนวน</th>
+              <th style="padding:0.5rem 0.8rem;text-align:center;">💀 ตาย</th>
+            </tr>
+          </thead>
+          <tbody>{rows_html}</tbody>
+        </table>
+        </div>
+        <script>
+          const HN = {hn_json};
+          document.body.addEventListener('click', function(e) {{
+            const el = e.target.closest('.clickable');
+            if (el) openModal(el.dataset.key);
+          }});
+          function openModal(key) {{
+            const list  = HN[key] || [];
+            const parts = key.split('||');
+            const flag  = parts[3] || 'all';
+            document.getElementById('modal-title').textContent =
+              parts[1] + '  ·  ' + parts[2] + (flag==='dead' ? ' (เสียชีวิต)' : '') + '  —  ' + list.length + ' ราย';
+            const ul = document.getElementById('modal-list');
+            ul.innerHTML = list.length === 0
+              ? '<li class="empty-msg">ไม่มีข้อมูล</li>'
+              : list.map(h => '<li>' + h + '</li>').join('');
+            document.getElementById('overlay').classList.add('show');
+          }}
+          document.getElementById('btn-close').onclick = function() {{
+            document.getElementById('overlay').classList.remove('show');
+          }};
+          document.getElementById('overlay').onclick = function(e) {{
+            if (e.target === this) document.getElementById('overlay').classList.remove('show');
+          }};
+          document.getElementById('btn-copy').onclick = function() {{
+            const text = [...document.querySelectorAll('#modal-list li')].map(li => li.textContent).join('\\n');
+            navigator.clipboard.writeText(text).then(() => {{
+              this.textContent = '✅ คัดลอกแล้ว!';
+              setTimeout(() => this.textContent = '📋 คัดลอก HN ทั้งหมด', 2000);
+            }});
+          }};
+        </script>
+        </body></html>"""
+
+
+
+
+
+                                         
             def death_badge(n):
                 if n == 0:
                     return '<span style="color:#BDBDBD;">—</span>'
@@ -1916,15 +2204,61 @@ def show_reports():
                 )
  
 
+        # ── สร้าง hn_data สำหรับ Stroke ──────────────────────────
+        hn_data_stroke = {}
+        if 'pdx' in df_sa.columns and 'month_sort' in df_sa.columns:
+            df_sa_stroke = df_sa.copy()
+            df_sa_stroke['is_ischemic']   = df_sa_stroke['pdx'].apply(lambda x: starts_with_any(x, ISCHEMIC_CODES))
+            df_sa_stroke['is_hemorrhagic']= df_sa_stroke['pdx'].apply(lambda x: starts_with_any(x, HEMORRHAGIC_CODES))
+            df_sa_stroke['is_either']     = df_sa_stroke['is_ischemic'] | df_sa_stroke['is_hemorrhagic']
+            df_sa_stroke['ward_group']    = df_sa_stroke['ward_name'].apply(get_ward_group5) \
+                                            if 'ward_name' in df_sa_stroke.columns else None
+            df_sa_stroke['is_death']      = df_sa_stroke['discharge_status'].str.contains('ตาย', na=False)
+        
+            for period, grp in df_sa_stroke.groupby('month_sort'):
+                period_key = str(period)
+                for ward_key in grp['ward_group'].dropna().unique():
+                    ward_key = str(ward_key)
+                    ward_df  = grp[(grp['ward_group'] == ward_key) & grp['is_either']]
+                    for t_col, t_label in [('is_ischemic','Ischemic'), ('is_hemorrhagic','Hemorrhagic')]:
+                        sub = ward_df[ward_df[t_col]]
+                        hn_data_stroke[f"{period_key}||{ward_key}||{t_label}||all"] = [
+                            str(r.get('hn','?')) for _, r in sub.iterrows()
+                        ]
+                        hn_data_stroke[f"{period_key}||{ward_key}||{t_label}||dead"] = [
+                            str(r.get('hn','?')) for _, r in sub[sub['is_death']].iterrows()
+                        ]
+                    hn_data_stroke[f"{period_key}||{ward_key}||Total||all"] = [
+                        str(r.get('hn','?')) for _, r in ward_df.iterrows()
+                    ]
+                    hn_data_stroke[f"{period_key}||{ward_key}||Total||dead"] = [
+                        str(r.get('hn','?')) for _, r in ward_df[ward_df['is_death']].iterrows()
+                    ]
+                # Total row
+                grp_either = grp[grp['is_either']]
+                for t_col, t_label in [('is_ischemic','Ischemic'), ('is_hemorrhagic','Hemorrhagic')]:
+                    sub = grp[grp[t_col]]
+                    hn_data_stroke[f"{period_key}||Total||{t_label}||all"] = [
+                        str(r.get('hn','?')) for _, r in sub.iterrows()
+                    ]
+                    hn_data_stroke[f"{period_key}||Total||{t_label}||dead"] = [
+                        str(r.get('hn','?')) for _, r in sub[sub['is_death']].iterrows()
+                    ]
+                hn_data_stroke[f"{period_key}||Total||Total||all"] = [
+                    str(r.get('hn','?')) for _, r in grp_either.iterrows()
+                ]
+                hn_data_stroke[f"{period_key}||Total||Total||dead"] = [
+                    str(r.get('hn','?')) for _, r in grp_either[grp_either['is_death']].iterrows()
+                ]
+        
         html_stroke = render_two_type_table(
             df_stroke, 'Ischemic', 'Hemorrhagic',
-            '#3949AB', '#C62828', '🔵', '🔴'
+            '#3949AB', '#C62828', '🔵', '🔴',
+            hn_data=hn_data_stroke
         )
-        components.html(
-            f"<div style='font-family:sans-serif;font-size:14px;'>{html_stroke}</div>",
-            height=300,
-            scrolling=False
-        )
+        components.html(html_stroke, height=560, scrolling=False)
+
+         
         # Download Stroke
         if not df_stroke.empty:
             csv_s = df_stroke.to_csv(
@@ -2094,18 +2428,63 @@ def show_reports():
                 ka7.metric("💀 ตาย UA", f"{ua_d} ราย",
                            f"{ua_d/ua_n*100:.1f}%" if ua_n else "0%",
                            delta_color="inverse")
+
+        # ── สร้าง hn_data สำหรับ ACS ──────────────────────────────
+        hn_data_acs = {}
+        if 'pdx' in df_sa.columns and 'month_sort' in df_sa.columns:
+            df_sa_acs = df_sa.copy()
+            df_sa_acs['is_stemi']  = df_sa_acs['pdx'].apply(lambda x: starts_with_any(x, STEMI_CODES))
+            df_sa_acs['is_nstemi'] = df_sa_acs['pdx'].apply(lambda x: starts_with_any(x, NSTEMI_CODES))
+            df_sa_acs['is_ua']     = df_sa_acs['pdx'].apply(lambda x: starts_with_any(x, UA_CODES))
+            df_sa_acs['is_any']    = df_sa_acs['is_stemi'] | df_sa_acs['is_nstemi'] | df_sa_acs['is_ua']
+            df_sa_acs['ward_group']= df_sa_acs['ward_name'].apply(get_ward_group5) \
+                                     if 'ward_name' in df_sa_acs.columns else None
+            df_sa_acs['is_death']  = df_sa_acs['discharge_status'].str.contains('ตาย', na=False)
         
-        # แสดงตาราง
+            for period, grp in df_sa_acs.groupby('month_sort'):
+                period_key = str(period)
+                for ward_key in grp['ward_group'].dropna().unique():
+                    ward_key = str(ward_key)
+                    ward_df  = grp[(grp['ward_group'] == ward_key) & grp['is_any']]
+                    for t_col, t_label in [('is_stemi','STEMI'),('is_nstemi','NSTEMI'),('is_ua','UA')]:
+                        sub = ward_df[ward_df[t_col]]
+                        hn_data_acs[f"{period_key}||{ward_key}||{t_label}||all"] = [
+                            str(r.get('hn','?')) for _, r in sub.iterrows()
+                        ]
+                        hn_data_acs[f"{period_key}||{ward_key}||{t_label}||dead"] = [
+                            str(r.get('hn','?')) for _, r in sub[sub['is_death']].iterrows()
+                        ]
+                    hn_data_acs[f"{period_key}||{ward_key}||Total||all"] = [
+                        str(r.get('hn','?')) for _, r in ward_df.iterrows()
+                    ]
+                    hn_data_acs[f"{period_key}||{ward_key}||Total||dead"] = [
+                        str(r.get('hn','?')) for _, r in ward_df[ward_df['is_death']].iterrows()
+                    ]
+                # Total row
+                grp_any = grp[grp['is_any']]
+                for t_col, t_label in [('is_stemi','STEMI'),('is_nstemi','NSTEMI'),('is_ua','UA')]:
+                    sub = grp[grp[t_col]]
+                    hn_data_acs[f"{period_key}||Total||{t_label}||all"] = [
+                        str(r.get('hn','?')) for _, r in sub.iterrows()
+                    ]
+                    hn_data_acs[f"{period_key}||Total||{t_label}||dead"] = [
+                        str(r.get('hn','?')) for _, r in sub[sub['is_death']].iterrows()
+                    ]
+                hn_data_acs[f"{period_key}||Total||Total||all"] = [
+                    str(r.get('hn','?')) for _, r in grp_any.iterrows()
+                ]
+                hn_data_acs[f"{period_key}||Total||Total||dead"] = [
+                    str(r.get('hn','?')) for _, r in grp_any[grp_any['is_death']].iterrows()
+                ]
+        
         html_acs = render_three_type_table(
             df_acs, 'STEMI', 'NSTEMI', 'UA',
             '#BF360C', '#F9A825', '#388E3C',
-            '🔴', '🟡', '🟢'
+            '🔴', '🟡', '🟢',
+            hn_data=hn_data_acs
         )
-        components.html(
-            f"<div style='font-family:sans-serif;font-size:14px;'>{html_acs}</div>",
-            height=320,
-            scrolling=False
-        )
+        components.html(html_acs, height=560, scrolling=False)
+         
         
         # Download
         if not df_acs.empty:
