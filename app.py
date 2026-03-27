@@ -972,7 +972,8 @@ def show_reports():
             TYPES      = ['cap', 'hap', 'vap']
             TYPE_LABEL = {'cap': 'CAP', 'hap': 'HAP', 'vap': 'VAP'}
             TYPE_COLOR = {'cap': '#1976D2', 'hap': '#F57C00', 'vap': '#D32F2F'}
-            
+             
+
             def build_summary_row(subset):
                 row = {}
                 for t in TYPES:
@@ -983,43 +984,59 @@ def show_reports():
                 row['Total_death'] = int(subset['is_death'].sum())
                 return row
             
-            table_rows = []
-            for ward in WARD_ORDER:
-                ward_df = df_pn2[df_pn2['ward_group'] == ward]
-                r = build_summary_row(ward_df)
-                r['Ward'] = ward
-                table_rows.append(r)
+            all_table_rows = []
             
-            # Total row
-            total_r = build_summary_row(df_pn2)
-            total_r['Ward'] = '🔷 Total (All Wards)'
-            table_rows.append(total_r)
+            # วนตามเดือน
+            for period, df_period in df_pn2.groupby('month_sort'):
+                month_label_str = df_period['month_label'].iloc[0] if 'month_label' in df_period.columns else str(period)
+                first_row = True
             
-            df_summary_matrix = pd.DataFrame(table_rows)
+                for ward in WARD_ORDER:
+                    ward_df = df_period[df_period['ward_group'] == ward]
+                    r = build_summary_row(ward_df)
+                    r['Ward'] = ward
+                    r['_month_label'] = month_label_str if first_row else ""
+                    r['_is_total'] = False
+                    all_table_rows.append(r)
+                    first_row = False
             
-            # ── แสดงตาราง ──────────────────────────────────────────────────
+                # Total row ของเดือนนั้น
+                total_r = build_summary_row(df_period)
+                total_r['Ward'] = '🔷 Total'
+                total_r['_month_label'] = ""
+                total_r['_is_total'] = True
+                all_table_rows.append(total_r)
+            
+            df_summary_matrix = pd.DataFrame(all_table_rows)
+            
+            # ── แสดงตาราง ──────────────────────────────────────────────────────────────
             st.markdown("#### 📊 ตารางสรุป CAP / HAP / VAP แยกตาม Ward")
-            
-            # สร้าง HTML table แบบ custom (เพราะต้องการ multi-header)
-            def render_matrix_table(df_m):
+
+
+            def render_matrix_table_v2(df_m):
                 rows_html = ""
                 for i, row in df_m.iterrows():
-                    is_total = 'Total' in str(row['Ward'])
+                    is_total = row.get('_is_total', False)
+                    month_label = row.get('_month_label', "")
                     bg = "#EDE7F6" if is_total else ("white" if i % 2 == 0 else "#F5F5F5")
                     fw = "700" if is_total else "400"
             
                     def cell(val, color="#37474F", bold=False):
                         b = "font-weight:700;" if bold else ""
-                        return f'<td style="text-align:center;padding:0.6rem 0.8rem;{b}color:{color};">{val}</td>'
+                        return f'<td style="text-align:center;padding:0.6rem 0.8rem;white-space:nowrap;{b}color:{color};">{val}</td>'
             
                     def death_badge(n):
                         if n == 0:
                             return '<span style="color:#9E9E9E;">—</span>'
                         return f'<span style="background:#FFCDD2;color:#C62828;padding:2px 8px;border-radius:10px;font-size:0.85rem;font-weight:700;">{n}</span>'
             
+                    month_cell = f'<td style="padding:0.6rem 1rem;white-space:nowrap;color:#E65100;font-weight:600;vertical-align:top;">{month_label}</td>'
+                    ward_cell  = f'<td style="padding:0.6rem 1rem;font-weight:{fw};color:#1565C0;white-space:nowrap;">{row["Ward"]}</td>'
+            
                     rows_html += f"""
                     <tr style="background:{bg};font-weight:{fw};">
-                        <td style="padding:0.6rem 1rem;font-weight:{fw};color:#1565C0;">{row['Ward']}</td>
+                        {month_cell}
+                        {ward_cell}
                         {cell(row['CAP_n'],   '#1976D2', True)}
                         {cell(death_badge(row['CAP_death']))}
                         {cell(row['HAP_n'],   '#F57C00', True)}
@@ -1030,6 +1047,142 @@ def show_reports():
                         {cell(death_badge(row['Total_death']))}
                     </tr>
                     """
+            
+                return f"""
+                <div style="overflow-x:auto;overflow-y:auto;max-height:500px;border-radius:12px;
+                            box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+                <table style="width:100%;border-collapse:collapse;min-width:900px;">
+                  <thead style="position:sticky;top:0;z-index:10;">
+                    <tr style="background:linear-gradient(135deg,#1565C0,#283593);color:white;">
+                      <th rowspan="2" style="padding:0.8rem 1rem;text-align:left;min-width:100px;background:#1565C0;">
+                          📅 เดือน
+                      </th>
+                      <th rowspan="2" style="padding:0.8rem 1rem;text-align:left;min-width:160px;background:#1565C0;">
+                          🏥 Ward
+                      </th>
+                      <th colspan="2" style="padding:0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);background:#1565C0;">
+                          🏘️ CAP
+                      </th>
+                      <th colspan="2" style="padding:0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);background:#1565C0;">
+                          🏥 HAP
+                      </th>
+                      <th colspan="2" style="padding:0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);background:#1565C0;">
+                          💨 VAP
+                      </th>
+                      <th colspan="2" style="padding:0.8rem;text-align:center;background:#1565C0;">
+                          📊 Total
+                      </th>
+                    </tr>
+                    <tr style="background:#1976D2;color:white;font-size:0.85rem;">
+                      <th style="padding:0.5rem 0.8rem;text-align:center;background:#1976D2;">จำนวน</th>
+                      <th style="padding:0.5rem 0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);background:#1976D2;">💀 ตาย</th>
+                      <th style="padding:0.5rem 0.8rem;text-align:center;background:#1976D2;">จำนวน</th>
+                      <th style="padding:0.5rem 0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);background:#1976D2;">💀 ตาย</th>
+                      <th style="padding:0.5rem 0.8rem;text-align:center;background:#1976D2;">จำนวน</th>
+                      <th style="padding:0.5rem 0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);background:#1976D2;">💀 ตาย</th>
+                      <th style="padding:0.5rem 0.8rem;text-align:center;background:#1976D2;">จำนวน</th>
+                      <th style="padding:0.5rem 0.8rem;text-align:center;background:#1976D2;">💀 ตาย</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows_html}
+                  </tbody>
+                </table>
+                </div>
+                """
+            
+            import streamlit.components.v1 as components
+            html_content = render_matrix_table_v2(df_summary_matrix)
+            components.html(
+                f"<div style='font-family:sans-serif;font-size:14px;'>{html_content}</div>",
+                height=520,
+                scrolling=True
+            )
+            
+            
+            def render_matrix_table(df_m, month_label=""):
+                rows_html = ""
+                for i, row in df_m.iterrows():
+                    is_total = 'Total' in str(row['Ward'])
+                    bg = "#EDE7F6" if is_total else ("white" if i % 2 == 0 else "#F5F5F5")
+                    fw = "700" if is_total else "400"
+            
+                    def cell(val, color="#37474F", bold=False):
+                        b = "font-weight:700;" if bold else ""
+                        return f'<td style="text-align:center;padding:0.6rem 0.8rem;white-space:nowrap;{b}color:{color};">{val}</td>'
+            
+                    def death_badge(n):
+                        if n == 0:
+                            return '<span style="color:#9E9E9E;">—</span>'
+                        return f'<span style="background:#FFCDD2;color:#C62828;padding:2px 8px;border-radius:10px;font-size:0.85rem;font-weight:700;">{n}</span>'
+            
+                    rows_html += f"""
+                    <tr style="background:{bg};font-weight:{fw};">
+                        <td style="padding:0.6rem 1rem;white-space:nowrap;color:#E65100;font-weight:600;">{month_label}</td>
+                        <td style="padding:0.6rem 1rem;font-weight:{fw};color:#1565C0;white-space:nowrap;">{row['Ward']}</td>
+                        {cell(row['CAP_n'],   '#1976D2', True)}
+                        {cell(death_badge(row['CAP_death']))}
+                        {cell(row['HAP_n'],   '#F57C00', True)}
+                        {cell(death_badge(row['HAP_death']))}
+                        {cell(row['VAP_n'],   '#D32F2F', True)}
+                        {cell(death_badge(row['VAP_death']))}
+                        {cell(row['Total_n'], '#4CAF50', True)}
+                        {cell(death_badge(row['Total_death']))}
+                    </tr>
+                    """
+            
+                return f"""
+                <div style="overflow-x:auto;overflow-y:auto;max-height:500px;border-radius:12px;
+                            box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+                <table style="width:100%;border-collapse:collapse;min-width:900px;">
+                  <thead style="position:sticky;top:0;z-index:10;">
+                    <tr style="background:linear-gradient(135deg,#1565C0,#283593);color:white;">
+                      <th rowspan="2" style="padding:0.8rem 1rem;text-align:left;min-width:100px;
+                                              position:sticky;top:0;background:#1565C0;">
+                          📅 เดือน
+                      </th>
+                      <th rowspan="2" style="padding:0.8rem 1rem;text-align:left;min-width:160px;
+                                              position:sticky;top:0;background:#1565C0;">
+                          🏥 Ward
+                      </th>
+                      <th colspan="2" style="padding:0.8rem;text-align:center;
+                                              border-right:2px solid rgba(255,255,255,0.3);
+                                              position:sticky;top:0;background:#1565C0;">
+                          🏘️ CAP
+                      </th>
+                      <th colspan="2" style="padding:0.8rem;text-align:center;
+                                              border-right:2px solid rgba(255,255,255,0.3);
+                                              position:sticky;top:0;background:#1565C0;">
+                          🏥 HAP
+                      </th>
+                      <th colspan="2" style="padding:0.8rem;text-align:center;
+                                              border-right:2px solid rgba(255,255,255,0.3);
+                                              position:sticky;top:0;background:#1565C0;">
+                          💨 VAP
+                      </th>
+                      <th colspan="2" style="padding:0.8rem;text-align:center;
+                                              position:sticky;top:0;background:#1565C0;">
+                          📊 Total
+                      </th>
+                    </tr>
+                    <tr style="background:#1976D2;color:white;font-size:0.85rem;">
+                      <th style="padding:0.5rem 0.8rem;text-align:center;position:sticky;top:41px;background:#1976D2;">จำนวน</th>
+                      <th style="padding:0.5rem 0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);position:sticky;top:41px;background:#1976D2;">💀 ตาย</th>
+                      <th style="padding:0.5rem 0.8rem;text-align:center;position:sticky;top:41px;background:#1976D2;">จำนวน</th>
+                      <th style="padding:0.5rem 0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);position:sticky;top:41px;background:#1976D2;">💀 ตาย</th>
+                      <th style="padding:0.5rem 0.8rem;text-align:center;position:sticky;top:41px;background:#1976D2;">จำนวน</th>
+                      <th style="padding:0.5rem 0.8rem;text-align:center;border-right:2px solid rgba(255,255,255,0.3);position:sticky;top:41px;background:#1976D2;">💀 ตาย</th>
+                      <th style="padding:0.5rem 0.8rem;text-align:center;position:sticky;top:41px;background:#1976D2;">จำนวน</th>
+                      <th style="padding:0.5rem 0.8rem;text-align:center;position:sticky;top:41px;background:#1976D2;">💀 ตาย</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows_html}
+                  </tbody>
+                </table>
+                </div>
+                """
+                
             
                 return f"""
                 <div style="overflow-x:auto;">
@@ -1086,7 +1239,9 @@ def show_reports():
             )
             
             # ── Download ────────────────────────────────────────────────────
-            csv_matrix = df_summary_matrix.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
+            csv_matrix = df_summary_matrix.drop(
+                columns=['_month_label', '_is_total'], errors='ignore'
+            ).to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
             st.download_button(
                 "📥 ดาวน์โหลดตาราง CSV",
                 csv_matrix,
@@ -1094,7 +1249,7 @@ def show_reports():
                 "text/csv",
                 key='dl_cap_hap_vap'
             )
-            
+ 
             # ── กราฟ Stacked Bar ───────────────────────────────────────────
             st.markdown("#### 📊 จำนวนผู้ป่วยแยกประเภทตาม Ward")
             
