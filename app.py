@@ -358,6 +358,62 @@ def init_supabase():
     """เชื่อมต่อ Supabase"""
     return SupabaseClient(SUPABASE_URL, SUPABASE_KEY)
 
+
+
+def convert_thai_date_to_iso(date_value):
+    """แปลงวันที่ พ.ศ. เป็น ค.ศ."""
+    if pd.isna(date_value) or date_value is None:
+        return None
+    
+    date_str = str(date_value).strip()
+    
+    # ถ้าว่างหรือ None string
+    if date_str in ['', 'None', 'nan', 'NaT', 'NaN']:
+        return None
+    
+    try:
+        # รูปแบบ YYYY-MM-DD (พ.ศ.) เช่น 2568-10-18
+        if re.match(r'^\d{4}-\d{2}-\d{2}', date_str):
+            year = int(date_str[:4])
+            rest = date_str[4:]
+            
+            # ถ้าปีมากกว่า 2300 = พ.ศ. → แปลงเป็น ค.ศ.
+            if year > 2300:
+                year_ce = year - 543
+                return f"{year_ce}{rest}"
+            else:
+                return date_str
+        
+        # รูปแบบ DD/MM/YYYY
+        elif re.match(r'^\d{1,2}/\d{1,2}/\d{4}', date_str):
+            parts = date_str.split('/')
+            day, month, year = int(parts[0]), int(parts[1]), int(parts[2])
+            if year > 2300:
+                year -= 543
+            return f"{year}-{month:02d}-{day:02d}"
+        
+        # รูปแบบ YYYY/MM/DD
+        elif re.match(r'^\d{4}/\d{2}/\d{2}', date_str):
+            parts = date_str.split('/')
+            year = int(parts[0])
+            if year > 2300:
+                year -= 543
+            return f"{year}-{parts[1]}-{parts[2]}"
+        
+        # ลอง parse ด้วย pandas
+        else:
+            parsed = pd.to_datetime(date_str, errors='coerce')
+            if pd.notna(parsed):
+                year = parsed.year
+                if year > 2300:
+                    year -= 543
+                return f"{year}-{parsed.month:02d}-{parsed.day:02d}"
+            return None
+            
+    except Exception:
+        return None
+
+
 def parse_month_year_from_filename(filename):
     thai_months = {
         'ม.ค.': 1, 'มกราคม': 1, 'ม.ค': 1,
@@ -5398,25 +5454,31 @@ def validate_and_prepare_data(df, filename):
     
     # เพิ่ม month_year ทุกแถว
     df_clean['month_year'] = month_year
-    
-    # แปลงวันที่
+
+
     date_columns = ['birth_date', 'admit_date', 'discharge_date']
     for col in date_columns:
         if col in df_clean.columns:
-            try:
-                df_clean[col] = pd.to_datetime(df_clean[col], errors='coerce')
-                # แปลงเป็น ISO format string
-                df_clean[col] = df_clean[col].apply(lambda x: x.isoformat() if pd.notna(x) else None)
-            except:
-                warnings.append(f"ไม่สามารถแปลงวันที่ในคอลัมน์ {col} บางรายการ")
+            df_clean[col] = df_clean[col].apply(convert_thai_date_to_iso)
     
-    # แปลง month_year เป็น datetime แล้วแปลงกลับเป็น string
+ 
+     
     df_clean['month_year'] = pd.to_datetime(df_clean['month_year']).dt.strftime('%Y-%m-%d')
     
     # คำนวณปีงบประมาณ
     df_clean['fiscal_year'] = pd.to_datetime(df_clean['month_year']).apply(get_fiscal_year)
+
+ # ถ้าไม่มี length_of_stay หรือเป็น null ให้คำนวณใหม่
+    if 'length_of_stay' not in df_clean.columns or df_clean['length_of_stay'].isna().all():
+        if 'admit_date' in df_clean.columns and 'discharge_date' in df_clean.columns:
+            admit_dates = pd.to_datetime(df_clean['admit_date'], errors='coerce')
+            discharge_dates = pd.to_datetime(df_clean['discharge_date'], errors='coerce')
+            df_clean['length_of_stay'] = (discharge_dates - admit_dates).dt.days
+            df_clean['length_of_stay'] = df_clean['length_of_stay'].apply(
+                lambda x: max(int(x), 0) if pd.notna(x) else None
+            )
     
-    # ถ้าไม่มี length_of_stay หรือเป็น null ให้คำนวณใหม่
+   
     if 'length_of_stay' not in df_clean.columns or df_clean['length_of_stay'].isna().any():
         if 'admit_date' in df_clean.columns and 'discharge_date' in df_clean.columns:
             # แปลงกลับเป็น datetime เพื่อคำนวณ
