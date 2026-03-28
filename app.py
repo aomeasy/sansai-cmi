@@ -359,11 +359,6 @@ def init_supabase():
     return SupabaseClient(SUPABASE_URL, SUPABASE_KEY)
 
 def parse_month_year_from_filename(filename):
-    """
-    แปลงชื่อไฟล์เป็น month_year
-    ตัวอย่าง: "3_ipd-ธ.ค.68.xlsx" -> "2025-12-01"
-    """
-    # Dictionary สำหรับแปลงเดือนภาษาไทยเป็นตัวเลข
     thai_months = {
         'ม.ค.': 1, 'มกราคม': 1, 'ม.ค': 1,
         'ก.พ.': 2, 'กุมภาพันธ์': 2, 'ก.พ': 2,
@@ -381,39 +376,45 @@ def parse_month_year_from_filename(filename):
     
     try:
         # ลบนามสกุลไฟล์
-        name = filename.replace('.xlsx', '').replace('.xls', '').replace('.csv', '')
+        name = filename
+        for ext in ['.xlsx', '.xls', '.csv', '.html']:
+            name = name.replace(ext, '').replace(ext.upper(), '')
+        
+        # Debug แสดงชื่อหลังตัด extension
+        st.info(f"🔍 ชื่อไฟล์หลังตัด extension: '{name}'")
         
         # หาเดือนภาษาไทย
         month_num = None
         for thai_month, num in thai_months.items():
             if thai_month in name:
                 month_num = num
+                st.info(f"📅 พบเดือน: '{thai_month}' = {num}")
                 break
         
         if month_num is None:
+            st.error(f"❌ ไม่พบชื่อเดือนภาษาไทยในชื่อไฟล์: '{name}'")
             return None
         
-        # หาปี (หาตัวเลข 2 หลักหลังจากเดือน)
-        year_match = re.search(r'(\d{2})(?:\.xlsx|\.xls|\.csv|$)', name)
-        if year_match:
-            year_buddhist = int(year_match.group(1))
-            # แปลงจากปี พ.ศ. 2 หลัก เป็น ค.ศ.
-            # 68 = 2568 - 543 = 2025
-            if year_buddhist >= 0 and year_buddhist <= 99:
-                year_christian = 2500 + year_buddhist - 543
-            else:
-                return None
-            
-            # สร้างวันที่ (วันแรกของเดือน)
-            month_year = f"{year_christian}-{month_num:02d}-01"
-            return month_year
+        # หาปี — ค้นหาตัวเลข 2 หลักทุกตำแหน่ง
+        year_matches = re.findall(r'\d{2}', name)
+        st.info(f"🔢 ตัวเลข 2 หลักที่พบ: {year_matches}")
         
-        return None
+        if not year_matches:
+            st.error(f"❌ ไม่พบปี (ตัวเลข 2 หลัก) ในชื่อไฟล์: '{name}'")
+            return None
+        
+        # ใช้ตัวเลข 2 หลักสุดท้ายเป็นปี
+        year_buddhist = int(year_matches[-1])
+        year_christian = 2500 + year_buddhist - 543
+        
+        month_year = f"{year_christian}-{month_num:02d}-01"
+        st.success(f"✅ แปลงชื่อไฟล์ได้: {month_year}")
+        return month_year
         
     except Exception as e:
-        st.error(f"ไม่สามารถแปลงชื่อไฟล์เป็น month_year: {str(e)}")
+        st.error(f"❌ parse error: {str(e)}")
         return None
-
+         
 
 
 def show_reports():
