@@ -5585,8 +5585,9 @@ def import_to_supabase(df, batch_size=100):
     progress_bar = st.progress(0)
     status_text = st.empty()
     
+    INT_COLUMNS = {'age', 'length_of_stay', 'fiscal_year'}
     def clean_record(record):
-        """แปลง NaN/inf/None ให้เป็น None ก่อนส่ง JSON"""
+        """แปลง NaN/inf/None ให้เป็น None และแปลง float → int สำหรับคอลัมน์ที่ต้องการ"""
         cleaned = {}
         for k, v in record.items():
             if v is None:
@@ -5595,13 +5596,16 @@ def import_to_supabase(df, batch_size=100):
                 import math
                 if math.isnan(v) or math.isinf(v):
                     cleaned[k] = None
+                elif k in INT_COLUMNS:
+                    cleaned[k] = int(v)      # ← แปลง 51.0 → 51
                 else:
                     cleaned[k] = v
             elif isinstance(v, str) and v.lower() in ['nan', 'none', 'nat', '']:
                 cleaned[k] = None
             else:
                 cleaned[k] = v
-        return cleaned
+        return cleaned    
+     
     
     for i in range(0, total_rows, batch_size):
         batch = df.iloc[i:i+batch_size]
