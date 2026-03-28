@@ -5061,6 +5061,7 @@ h1,h2,h3{{color:#1565C0;}} hr{{border-color:#E0E0E0;}}
                             'icon': '🏥',
                             'title': 'รับเข้าโรงพยาบาล',
                             'detail': f"Ward: {_ward} | PDX: {_pdx} | อายุ {_age} ปี",
+                            'note': '⚠️ admit_date = null — ใช้วันที่ 0 เป็นจุดอ้างอิง',
                             'color': '#1565C0',
                             'type': 'admit'
                         })
@@ -5072,6 +5073,7 @@ h1,h2,h3{{color:#1565C0;}} hr{{border-color:#E0E0E0;}}
                                 'icon': '💨',
                                 'title': 'เริ่มใช้เครื่องช่วยหายใจ',
                                 'detail': 'ใส่ท่อช่วยหายใจ (Endotracheal Tube)',
+                                'note': '⚠️ วันที่ประมาณจาก LOS × 20% — ไม่ใช่วันจริง',
                                 'color': '#E65100',
                                 'type': 'vent_on'
                             })
@@ -5152,33 +5154,39 @@ h1,h2,h3{{color:#1565C0;}} hr{{border-color:#E0E0E0;}}
                         _connector = "" if _is_last else f"""
                             <div style="width:2px;height:40px;background:linear-gradient({ev['color']},
                                  {_pj_events[i+1]['color']});margin:0 auto;opacity:.4;"></div>"""
+
+_note_html = f'<div style="color:#E65100;font-size:0.78rem;margin-top:0.2rem;">⚠️ {ev["note"]}</div>' \
+             if ev.get('note') else ''
+
                         _timeline_html_parts.append(f"""
-                        <div style="display:flex;align-items:flex-start;gap:1rem;margin-bottom:0;">
-                            <div style="display:flex;flex-direction:column;align-items:center;min-width:48px;">
-                                <div style="width:44px;height:44px;border-radius:50%;
-                                            background:{ev['color']};display:flex;align-items:center;
-                                            justify-content:center;font-size:1.3rem;
-                                            box-shadow:0 2px 8px {ev['color']}44;flex-shrink:0;">
-                                    {ev['icon']}
-                                </div>
-                                {_connector}
-                            </div>
-                            <div style="background:white;border:1px solid #E0E0E0;border-radius:10px;
-                                        padding:.7rem 1rem;flex:1;margin-bottom:0;
-                                        border-left:4px solid {ev['color']};">
-                                <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.2rem;">
-                                    <span style="background:{ev['color']}22;color:{ev['color']};
-                                                 padding:.1rem .6rem;border-radius:12px;
-                                                 font-size:.78rem;font-weight:600;">
-                                        วันที่ {ev['day']}
-                                    </span>
-                                    <span style="font-weight:600;color:#263238;font-size:.93rem;">
-                                        {ev['title']}
-                                    </span>
-                                </div>
-                                <div style="color:#607D8B;font-size:.83rem;">{ev['detail']}</div>
-                            </div>
-                        </div>""")
+                                    <div style="display:flex;align-items:flex-start;gap:1rem;margin-bottom:0;">
+                                        <div style="display:flex;flex-direction:column;align-items:center;min-width:48px;">
+                                            <div style="width:44px;height:44px;border-radius:50%;
+                                                        background:{ev['color']};display:flex;align-items:center;
+                                                        justify-content:center;font-size:1.3rem;
+                                                        box-shadow:0 2px 8px {ev['color']}44;flex-shrink:0;">
+                                                {ev['icon']}
+                                            </div>
+                                            {_connector}
+                                        </div>
+                                        <div style="background:white;border:1px solid #E0E0E0;border-radius:10px;
+                                                    padding:.7rem 1rem;flex:1;margin-bottom:0;
+                                                    border-left:4px solid {ev['color']};">
+                                            <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.2rem;">
+                                                <span style="background:{ev['color']}22;color:{ev['color']};
+                                                             padding:.1rem .6rem;border-radius:12px;
+                                                             font-size:.78rem;font-weight:600;">
+                                                    วันที่ {ev['day']}
+                                                </span>
+                                                <span style="font-weight:600;color:#263238;font-size:.93rem;">
+                                                    {ev['title']}
+                                                </span>
+                                            </div>
+                                            <div style="color:#607D8B;font-size:.83rem;">{ev['detail']}</div>
+                                            {_note_html}
+                                        </div>
+                                    </div>""")
+                         
             
                     _timeline_html = f"""
                     <div style="background:#F8F9FA;padding:1.2rem;border-radius:12px;margin:1rem 0;">
