@@ -5186,8 +5186,12 @@ h1,h2,h3{{color:#1565C0;}} hr{{border-color:#E0E0E0;}}
                             📅 Timeline ผู้ป่วย HN: {_pj_row.get('hn','N/A')} | AN: {_pj_row.get('an','N/A')}
                         </div>
                         {''.join(_timeline_html_parts)}
-                    </div>"""
-                    st.markdown(_timeline_html, unsafe_allow_html=True)
+                    </div>""" 
+                    st.write("DEBUG len:", len(_timeline_html_parts))
+                    st.write("DEBUG events:", len(_pj_events))
+                    st.code(_timeline_html[:300])
+                    #st.markdown(_timeline_html, unsafe_allow_html=True)
+                    components.html(_timeline_html, height=600, scrolling=True)
             
                     # ── AI Narrative ──────────────────────────────────
                     if st.button("🤖 ให้ AI อธิบาย Patient Journey", type="primary", key="pj_gen"):
