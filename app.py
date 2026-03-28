@@ -5411,6 +5411,27 @@ def map_columns(df):
         'discharge_status': 'discharge_status',
         'type_description': 'discharge_type',
         'clinic': 'clinic_name',
+
+        'วัน Admit':    'admit_date',
+        'วันAdmit':     'admit_date',
+        'วันที่ Admit': 'admit_date',
+        'วันที่admit':  'admit_date',
+        'admit':        'admit_date',
+        'วัน D/C':      'discharge_date',
+        'วันD/C':       'discharge_date',
+        'วัน DC':       'discharge_date',
+        'วันที่ D/C':   'discharge_date',
+        'วันที่จำหน่าย': 'discharge_date',
+        'วันเกิด':      'birth_date',
+        'อายุ':         'age',
+        'เพศ':          'sex',
+        'หอผู้ป่วย':    'ward_name',
+        'ward':         'ward_name',
+        'สิทธิ์':       'pttype_name',
+        'สิทธิ':        'pttype_name',
+        'รหัสโรค':      'pdx',
+        'สถานะจำหน่าย': 'discharge_status',
+        'คลินิก':       'clinic_name',
     }
     
     # lowercase mapping สำหรับ fallback
