@@ -5303,14 +5303,13 @@ def calculate_length_of_stay(admit_date, discharge_date):
     days = (discharge - admit).days
     return max(days, 0)
 
-
-
 def map_columns(df):
     """แปลงชื่อคอลัมน์จากไฟล์ Excel ให้ตรงกับ schema ของ database"""
     
-    # ทำความสะอาดชื่อคอลัมน์ก่อน (trim whitespace)
+    # ทำความสะอาดชื่อคอลัมน์ก่อน
     df.columns = df.columns.astype(str).str.strip()
     
+    # สร้าง mapping แบบ case-insensitive และรองรับหลายรูปแบบ
     column_mapping = {
         'No': None,
         'an': 'an',
@@ -5320,9 +5319,20 @@ def map_columns(df):
         'Age': 'age',
         'sex': 'sex',
         'AdmitDate': 'admit_date',
+        'admitdate': 'admit_date',
+        'admit_date': 'admit_date',
+        'Admit Date': 'admit_date',
+        'ADMITDATE': 'admit_date',
         'D/C Date': 'discharge_date',
+        'd/c date': 'discharge_date',
+        'D/C date': 'discharge_date',
+        'dc date': 'discharge_date',
+        'discharge_date': 'discharge_date',
+        'Discharge Date': 'discharge_date',
         'wardname': 'ward_name',
+        'ward_name': 'ward_name',
         'pttypename': 'pttype_name',
+        'pttype_name': 'pttype_name',
         'pdx': 'pdx',
         'dx0': 'dx0', 'dx1': 'dx1', 'dx2': 'dx2', 'dx3': 'dx3',
         'dx4': 'dx4', 'dx5': 'dx5', 'dx6': 'dx6', 'dx7': 'dx7',
@@ -5337,20 +5347,28 @@ def map_columns(df):
         'clinic': 'clinic_name'
     }
     
-    # Debug: แสดงคอลัมน์จริงในไฟล์
-    import streamlit as st
-    st.info(f"📋 คอลัมน์ในไฟล์: {df.columns.tolist()}")
+    # สร้าง lowercase mapping สำหรับ fallback
+    lower_mapping = {k.lower(): v for k, v in column_mapping.items() if v is not None}
     
     df_mapped = pd.DataFrame()
     
-    for old_col, new_col in column_mapping.items():
-        if old_col in df.columns and new_col is not None:
-            df_mapped[new_col] = df[old_col]
-    
-    # Debug: แสดงคอลัมน์หลัง mapping
-    st.info(f"✅ คอลัมน์หลัง mapping: {df_mapped.columns.tolist()}")
+    for col in df.columns:
+        col_str = str(col).strip()
+        col_lower = col_str.lower()
+        
+        # ลองหาจาก exact match ก่อน
+        if col_str in column_mapping:
+            target = column_mapping[col_str]
+            if target is not None and target not in df_mapped.columns:
+                df_mapped[target] = df[col]
+        # ลองหาจาก lowercase match
+        elif col_lower in lower_mapping:
+            target = lower_mapping[col_lower]
+            if target not in df_mapped.columns:
+                df_mapped[target] = df[col]
     
     return df_mapped
+ 
  
 
 def validate_and_prepare_data(df, filename):
