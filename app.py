@@ -5558,12 +5558,21 @@ def validate_and_prepare_data(df, filename):
         filled = int(missing_age_mask.sum())
         warnings.append(f"💡 คำนวณ age จาก birth_date สำเร็จ {filled} ราย")
 
-    
-    # แปลง string
-    df_clean['an']  = df_clean['an'].astype(str)
-    df_clean['hn']  = df_clean['hn'].astype(str)
-    if 'vn' in df_clean.columns:
-        df_clean['vn'] = df_clean['vn'].astype(str)
+     
+
+    # แปลง string — ตัด .0 ออกจาก id fields
+    def clean_id_field(val):
+        """แปลง 68400925.0 → 68400925"""
+        if val is None or str(val).lower() in ['nan', 'none', '']:
+            return None
+        s = str(val).strip()
+        if s.endswith('.0'):
+            s = s[:-2]
+        return s
+
+    df_clean['an'] = df_clean['an'].apply(clean_id_field)
+    df_clean['hn'] = df_clean['hn'].apply(clean_id_field)
+    df_clean['vn'] = df_clean['vn'].apply(clean_id_field)
 
     df_clean['sex'] = df_clean['sex'].astype(str).str[:1].replace({'n': None, 'N': None})
 
