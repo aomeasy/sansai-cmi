@@ -5486,10 +5486,25 @@ def validate_and_prepare_data(df, filename):
             discharge_dates = pd.to_datetime(df_clean['discharge_date'], errors='coerce')
             df_clean['length_of_stay'] = (discharge_dates - admit_dates).dt.days
             df_clean['length_of_stay'] = df_clean['length_of_stay'].apply(lambda x: max(x, 0) if pd.notna(x) else None)
-    
+            
     # แปลงตัวเลข
     if 'age' in df_clean.columns:
         df_clean['age'] = pd.to_numeric(df_clean['age'], errors='coerce')
+    
+    # คำนวณ age จาก birth_date ถ้า age เป็น null
+    if 'birth_date' in df_clean.columns:
+        for idx in df_clean[df_clean['age'].isna()].index:
+            bd = df_clean.loc[idx, 'birth_date']
+            ad = df_clean.loc[idx, 'admit_date']
+            if pd.notna(bd) and pd.notna(ad):
+                try:
+                    birth = pd.to_datetime(bd)
+                    admit = pd.to_datetime(ad)
+                    age_calc = (admit - birth).days // 365
+                    df_clean.loc[idx, 'age'] = age_calc
+                except:
+                    pass
+    
     
     if 'adjrw' in df_clean.columns:
         df_clean['adjrw'] = pd.to_numeric(df_clean['adjrw'], errors='coerce')
