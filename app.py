@@ -5302,12 +5302,16 @@ def calculate_length_of_stay(admit_date, discharge_date):
     days = (discharge - admit).days
     return max(days, 0)
 
+
+
 def map_columns(df):
     """แปลงชื่อคอลัมน์จากไฟล์ Excel ให้ตรงกับ schema ของ database"""
     
-    # Mapping dictionary สำหรับแปลงชื่อคอลัมน์
+    # ทำความสะอาดชื่อคอลัมน์ก่อน (trim whitespace)
+    df.columns = df.columns.astype(str).str.strip()
+    
     column_mapping = {
-        'No': None,  # ไม่ใช้
+        'No': None,
         'an': 'an',
         'hn': 'hn',
         'vn': 'vn',
@@ -5319,29 +5323,12 @@ def map_columns(df):
         'wardname': 'ward_name',
         'pttypename': 'pttype_name',
         'pdx': 'pdx',
-        'dx0': 'dx0',
-        'dx1': 'dx1',
-        'dx2': 'dx2',
-        'dx3': 'dx3',
-        'dx4': 'dx4',
-        'dx5': 'dx5',
-        'dx6': 'dx6',
-        'dx7': 'dx7',
-        'dx8': 'dx8',
-        'dx9': 'dx9',
-        'dx10': 'dx10',
-        'op0': 'op0',
-        'op1': 'op1',
-        'op2': 'op2',
-        'op3': 'op3',
-        'op4': 'op4',
-        'op5': 'op5',
-        'op6': 'op6',
-        'op7': 'op7',
-        'op8': 'op8',
-        'op9': 'op9',
-        'op10': 'op10',
-        'op11': 'op11',
+        'dx0': 'dx0', 'dx1': 'dx1', 'dx2': 'dx2', 'dx3': 'dx3',
+        'dx4': 'dx4', 'dx5': 'dx5', 'dx6': 'dx6', 'dx7': 'dx7',
+        'dx8': 'dx8', 'dx9': 'dx9', 'dx10': 'dx10',
+        'op0': 'op0', 'op1': 'op1', 'op2': 'op2', 'op3': 'op3',
+        'op4': 'op4', 'op5': 'op5', 'op6': 'op6', 'op7': 'op7',
+        'op8': 'op8', 'op9': 'op9', 'op10': 'op10', 'op11': 'op11',
         'จำนวนวันนอน': 'length_of_stay',
         'adjrw': 'adjrw',
         'discharge_status': 'discharge_status',
@@ -5349,14 +5336,21 @@ def map_columns(df):
         'clinic': 'clinic_name'
     }
     
-    # สร้าง DataFrame ใหม่ด้วยชื่อคอลัมน์ที่แปลงแล้ว
+    # Debug: แสดงคอลัมน์จริงในไฟล์
+    import streamlit as st
+    st.info(f"📋 คอลัมน์ในไฟล์: {df.columns.tolist()}")
+    
     df_mapped = pd.DataFrame()
     
     for old_col, new_col in column_mapping.items():
         if old_col in df.columns and new_col is not None:
             df_mapped[new_col] = df[old_col]
     
+    # Debug: แสดงคอลัมน์หลัง mapping
+    st.info(f"✅ คอลัมน์หลัง mapping: {df_mapped.columns.tolist()}")
+    
     return df_mapped
+ 
 
 def validate_and_prepare_data(df, filename):
     """ตรวจสอบและเตรียมข้อมูลก่อนนำเข้า"""
