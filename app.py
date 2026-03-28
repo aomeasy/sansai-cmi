@@ -5099,8 +5099,8 @@ h1,h2,h3{{color:#1565C0;}} hr{{border-color:#E0E0E0;}}
                     _pj_m3.metric("LOS", f"{_pj_los} วัน")
                     _pj_m4.metric("adjRW", f"{_pj_rw:.2f}")
                     _pj_m5.metric("Outcome", str(_pj_row.get('discharge_status', 'N/A')))
-            
-             
+
+
                     def _build_timeline_events(row):
                         events = []
                         _los = int(pd.to_numeric(row.get('length_of_stay', 0), errors='coerce') or 0)
@@ -5111,17 +5111,45 @@ h1,h2,h3{{color:#1565C0;}} hr{{border-color:#E0E0E0;}}
                         _ds = str(row.get('discharge_status', 'N/A'))
                         _pdx = str(row.get('pdx', 'N/A'))
                         _ward = str(row.get('ward_name', 'N/A'))
-            
-                        # admit
+                
+                        # ── แปลง admit_date และ discharge_date ──────────────
+                        def _parse_date(val):
+                            """แปลงวันที่ทุกรูปแบบ รองรับ timezone +00"""
+                            try:
+                                if not val or str(val).lower() in ['none', 'nan', 'nat', '']:
+                                    return None
+                                return pd.to_datetime(str(val), utc=True).tz_localize(None)
+                            except Exception:
+                                return None
+                
+                        _admit_dt     = _parse_date(row.get('admit_date'))
+                        _discharge_dt = _parse_date(row.get('discharge_date'))
+                
+                        # สร้าง detail วันที่จริง
+                        _admit_str     = _admit_dt.strftime('%d/%m/%Y')     if _admit_dt     else 'ไม่ระบุ'
+                        _discharge_str = _discharge_dt.strftime('%d/%m/%Y') if _discharge_dt else 'ไม่ระบุ'
+                
+                        # admit event
+                        if _admit_dt:
+                            _admit_note = None  # มีวันที่จริง ไม่ต้องแสดง warning
+                        else:
+                            _admit_note = '⚠️ admit_date = null — ใช้วันที่ 0 เป็นจุดอ้างอิง'
+                
                         events.append({
                             'day': 0,
                             'icon': '🏥',
                             'title': 'รับเข้าโรงพยาบาล',
-                            'detail': f"Ward: {_ward} | PDX: {_pdx} | อายุ {_age} ปี",
-                            'note': '⚠️ admit_date = null — ใช้วันที่ 0 เป็นจุดอ้างอิง',
+                            'detail': f"วันที่ admit: {_admit_str} | Ward: {_ward} | PDX: {_pdx} | อายุ {_age} ปี",
+                            'note': _admit_note,
                             'color': '#1565C0',
                             'type': 'admit'
                         })
+                
+                        # discharge event จะแสดงวันที่จริงด้วย
+                        # (ส่วนนี้จะถูก override ตอนสร้าง discharge event ด้านล่าง)
+                        _ds_detail_date = f"วันที่จำหน่าย: {_discharge_str} | LOS รวม {_los} วัน | adjRW {_rw:.2f}"                 
+                    
+             
             
                         # ventilator
                         if _vent:
