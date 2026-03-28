@@ -5513,6 +5513,31 @@ def validate_and_prepare_data(df, filename):
     df_clean['adjrw']         = pd.to_numeric(df_clean['adjrw'],         errors='coerce')
     df_clean['length_of_stay']= pd.to_numeric(df_clean['length_of_stay'],errors='coerce')
 
+    # ── คำนวณ age จาก birth_date + admit_date ถ้า age เป็น NULL ──
+    def calc_age(birth_str, admit_str):
+        try:
+            if not birth_str or not admit_str:
+                return None
+            birth = pd.to_datetime(birth_str, errors='coerce')
+            admit = pd.to_datetime(admit_str, errors='coerce')
+            if pd.isna(birth) or pd.isna(admit):
+                return None
+            age = admit.year - birth.year
+            if (admit.month, admit.day) < (birth.month, birth.day):
+                age -= 1
+            return max(age, 0)
+        except Exception:
+            return None
+
+    missing_age_mask = df_clean['age'].isna()
+    if missing_age_mask.any():
+        df_clean.loc[missing_age_mask, 'age'] = df_clean.loc[missing_age_mask].apply(
+            lambda r: calc_age(r['birth_date'], r['admit_date']), axis=1
+        )
+        filled = int(missing_age_mask.sum())
+        warnings.append(f"💡 คำนวณ age จาก birth_date สำเร็จ {filled} ราย")
+
+    
     # แปลง string
     df_clean['an']  = df_clean['an'].astype(str)
     df_clean['hn']  = df_clean['hn'].astype(str)
