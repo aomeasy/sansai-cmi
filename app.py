@@ -5549,9 +5549,6 @@ def validate_and_prepare_data(df, filename):
     return df_clean, errors, warnings
 
 
-
-
-
 def import_to_supabase(df, batch_size=100):
     """นำเข้าข้อมูลไปยัง Supabase"""
     client = init_supabase()
@@ -5560,22 +5557,42 @@ def import_to_supabase(df, batch_size=100):
     error_count = 0
     error_details = []
     
-    # แสดง progress bar
     progress_bar = st.progress(0)
     status_text = st.empty()
     
-    # แบ่งข้อมูลเป็น batch
+    def clean_record(record):
+        """แปลง NaN/inf/None ให้เป็น None ก่อนส่ง JSON"""
+        cleaned = {}
+        for k, v in record.items():
+            if v is None:
+                cleaned[k] = None
+            elif isinstance(v, float):
+                import math
+                if math.isnan(v) or math.isinf(v):
+                    cleaned[k] = None
+                else:
+                    cleaned[k] = v
+            elif isinstance(v, str) and v.lower() in ['nan', 'none', 'nat', '']:
+                cleaned[k] = None
+            else:
+                cleaned[k] = v
+        return cleaned
+    
     for i in range(0, total_rows, batch_size):
         batch = df.iloc[i:i+batch_size]
-        batch_data = batch.to_dict('records')
+        
+        # แปลง NaN → None ก่อน to_dict
+        batch_clean = batch.where(pd.notna(batch), None)
+        batch_data = batch_clean.to_dict('records')
+        
+        # clean แต่ละ record อีกรอบ (ดัก float NaN ที่หลุดมา)
+        batch_data = [clean_record(r) for r in batch_data]
         
         try:
-            # ลบคอลัมน์ id ถ้ามี (เพราะเป็น auto-increment)
+            # ลบ id ถ้ามี
             for record in batch_data:
-                if 'id' in record:
-                    del record['id']
+                record.pop('id', None)
             
-            # Insert ข้อมูล
             result = client.insert('ipd_monthly', batch_data)
             
             if result['error'] is None:
@@ -5583,12 +5600,11 @@ def import_to_supabase(df, batch_size=100):
             else:
                 error_count += len(batch_data)
                 error_details.append(f"Batch {i//batch_size + 1}: {result['error']}")
-            
+        
         except Exception as e:
             error_count += len(batch_data)
-            error_details.append(f"Batch {i//batch_size + 1}: {str(e)}")
+            error_details.append(f"Batch {i//batch_size + 1}: Error: {str(e)}")
         
-        # Update progress
         progress = min((i + batch_size) / total_rows, 1.0)
         progress_bar.progress(progress)
         status_text.text(f"กำลังนำเข้าข้อมูล... {min(i + batch_size, total_rows)}/{total_rows} รายการ")
