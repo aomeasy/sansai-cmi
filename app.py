@@ -5358,22 +5358,28 @@ def calculate_length_of_stay(admit_date, discharge_date):
     discharge = pd.to_datetime(discharge_date)
     days = (discharge - admit).days
     return max(days, 0)
+ 
+
+
+
 
 def map_columns(df):
-    """แปลงชื่อคอลัมน์จากไฟล์ Excel ให้ตรงกับ schema ของ database"""
-    
     # ทำความสะอาดชื่อคอลัมน์ก่อน
     df.columns = df.columns.astype(str).str.strip()
     
-    # สร้าง mapping แบบ case-insensitive และรองรับหลายรูปแบบ
     column_mapping = {
         'No': None,
         'an': 'an',
         'hn': 'hn',
         'vn': 'vn',
         'birthday': 'birth_date',
-        'Age': 'age',
+        'Birthday': 'birth_date',
+        'birth_date': 'birth_date',
+        'Age': 'age',       # ← ตัวใหญ่
+        'age': 'age',       # ← ตัวเล็ก
+        'AGE': 'age',       # ← ตัวใหญ่ทั้งหมด
         'sex': 'sex',
+        'Sex': 'sex',
         'AdmitDate': 'admit_date',
         'admitdate': 'admit_date',
         'admit_date': 'admit_date',
@@ -5387,9 +5393,12 @@ def map_columns(df):
         'Discharge Date': 'discharge_date',
         'wardname': 'ward_name',
         'ward_name': 'ward_name',
+        'Wardname': 'ward_name',
         'pttypename': 'pttype_name',
         'pttype_name': 'pttype_name',
+        'Pttypename': 'pttype_name',
         'pdx': 'pdx',
+        'PDX': 'pdx',
         'dx0': 'dx0', 'dx1': 'dx1', 'dx2': 'dx2', 'dx3': 'dx3',
         'dx4': 'dx4', 'dx5': 'dx5', 'dx6': 'dx6', 'dx7': 'dx7',
         'dx8': 'dx8', 'dx9': 'dx9', 'dx10': 'dx10',
@@ -5398,12 +5407,13 @@ def map_columns(df):
         'op8': 'op8', 'op9': 'op9', 'op10': 'op10', 'op11': 'op11',
         'จำนวนวันนอน': 'length_of_stay',
         'adjrw': 'adjrw',
+        'ADJRW': 'adjrw',
         'discharge_status': 'discharge_status',
         'type_description': 'discharge_type',
-        'clinic': 'clinic_name'
+        'clinic': 'clinic_name',
     }
     
-    # สร้าง lowercase mapping สำหรับ fallback
+    # lowercase mapping สำหรับ fallback
     lower_mapping = {k.lower(): v for k, v in column_mapping.items() if v is not None}
     
     df_mapped = pd.DataFrame()
@@ -5412,180 +5422,135 @@ def map_columns(df):
         col_str = str(col).strip()
         col_lower = col_str.lower()
         
-        # ลองหาจาก exact match ก่อน
         if col_str in column_mapping:
             target = column_mapping[col_str]
             if target is not None and target not in df_mapped.columns:
                 df_mapped[target] = df[col]
-        # ลองหาจาก lowercase match
         elif col_lower in lower_mapping:
             target = lower_mapping[col_lower]
             if target not in df_mapped.columns:
                 df_mapped[target] = df[col]
     
     return df_mapped
- 
- 
+
 
 def validate_and_prepare_data(df, filename):
-    """ตรวจสอบและเตรียมข้อมูลก่อนนำเข้า"""
     errors = []
     warnings = []
-    
-    # แปลง month_year จากชื่อไฟล์
+
     month_year = parse_month_year_from_filename(filename)
     if month_year is None:
-        errors.append("ไม่สามารถอ่าน month_year จากชื่อไฟล์ได้ กรุณาตั้งชื่อไฟล์ในรูปแบบ: 'ipd-ธ.ค.68.xlsx'")
+        errors.append("ไม่สามารถอ่าน month_year จากชื่อไฟล์ได้")
         return None, errors, warnings
-    
-    # แปลงชื่อคอลัมน์ให้ตรงกับ schema
+
     df_mapped = map_columns(df)
-    
-    # คอลัมน์ที่จำเป็น
+
+    # แสดงคอลัมน์ที่ map ได้ (debug)
+    st.info(f"📋 คอลัมน์หลัง mapping: {df_mapped.columns.tolist()}")
+
     required_columns = ['an', 'hn']
     missing_cols = [col for col in required_columns if col not in df_mapped.columns]
-    
     if missing_cols:
         errors.append(f"ขาดคอลัมน์ที่จำเป็น: {', '.join(missing_cols)}")
         return None, errors, warnings
-    
-    # ทำสำเนาข้อมูล
+
     df_clean = df_mapped.copy()
-    
-    # เพิ่ม month_year ทุกแถว
+
+    # ── กำหนดคอลัมน์ที่ต้องมี พร้อม default ──────────────────
+    REQUIRED_COLS = {
+        'birth_date':       None,
+        'admit_date':       None,
+        'discharge_date':   None,
+        'age':              None,
+        'sex':              None,
+        'vn':               None,
+        'adjrw':            None,
+        'length_of_stay':   None,
+        'discharge_status': None,
+        'discharge_type':   None,
+        'clinic_name':      None,
+        'pdx':              None,
+        'ward_name':        None,
+        'pttype_name':      None,
+    }
+    # dx0-dx10
+    for i in range(11):
+        REQUIRED_COLS[f'dx{i}'] = None
+    # op0-op11
+    for i in range(12):
+        REQUIRED_COLS[f'op{i}'] = None
+
+    # เพิ่มคอลัมน์ที่ขาดหายไปพร้อมแจ้งเตือน
+    for col, default in REQUIRED_COLS.items():
+        if col not in df_clean.columns:
+            df_clean[col] = default
+            warnings.append(f"⚠️ ไม่พบคอลัมน์ '{col}' ในไฟล์ — ตั้งค่าเป็น None")
+
+    # เพิ่ม month_year
     df_clean['month_year'] = month_year
 
+    # แปลงวันที่ (รองรับ พ.ศ.)
+    for col in ['birth_date', 'admit_date', 'discharge_date']:
+        df_clean[col] = df_clean[col].apply(convert_thai_date_to_iso)
 
-    date_columns = ['birth_date', 'admit_date', 'discharge_date']
-    for col in date_columns:
-        if col in df_clean.columns:
-            df_clean[col] = df_clean[col].apply(convert_thai_date_to_iso)
-    
- 
-     
+    # แปลง month_year
     df_clean['month_year'] = pd.to_datetime(df_clean['month_year']).dt.strftime('%Y-%m-%d')
-    
+
     # คำนวณปีงบประมาณ
     df_clean['fiscal_year'] = pd.to_datetime(df_clean['month_year']).apply(get_fiscal_year)
 
- # ถ้าไม่มี length_of_stay หรือเป็น null ให้คำนวณใหม่
-    if 'length_of_stay' not in df_clean.columns or df_clean['length_of_stay'].isna().all():
-        if 'admit_date' in df_clean.columns and 'discharge_date' in df_clean.columns:
-            admit_dates = pd.to_datetime(df_clean['admit_date'], errors='coerce')
-            discharge_dates = pd.to_datetime(df_clean['discharge_date'], errors='coerce')
-            df_clean['length_of_stay'] = (discharge_dates - admit_dates).dt.days
-            df_clean['length_of_stay'] = df_clean['length_of_stay'].apply(
-                lambda x: max(int(x), 0) if pd.notna(x) else None
-            )
-    
-   
-    if 'length_of_stay' not in df_clean.columns or df_clean['length_of_stay'].isna().any():
-        if 'admit_date' in df_clean.columns and 'discharge_date' in df_clean.columns:
-            # แปลงกลับเป็น datetime เพื่อคำนวณ
-            admit_dates = pd.to_datetime(df_clean['admit_date'], errors='coerce')
-            discharge_dates = pd.to_datetime(df_clean['discharge_date'], errors='coerce')
-            df_clean['length_of_stay'] = (discharge_dates - admit_dates).dt.days
-            df_clean['length_of_stay'] = df_clean['length_of_stay'].apply(lambda x: max(x, 0) if pd.notna(x) else None)
-            
-    # แปลงตัวเลข
-    if 'age' in df_clean.columns:
-        df_clean['age'] = pd.to_numeric(df_clean['age'], errors='coerce')
-    
-    # คำนวณ age จาก birth_date ถ้า age เป็น null
-    if 'birth_date' in df_clean.columns:
-        for idx in df_clean[df_clean['age'].isna()].index:
-            bd = df_clean.loc[idx, 'birth_date']
-            ad = df_clean.loc[idx, 'admit_date']
-            if pd.notna(bd) and pd.notna(ad):
-                try:
-                    birth = pd.to_datetime(bd)
-                    admit = pd.to_datetime(ad)
-                    age_calc = (admit - birth).days // 365
-                    df_clean.loc[idx, 'age'] = age_calc
-                except:
-                    pass
-    
-    
-    if 'adjrw' in df_clean.columns:
-        df_clean['adjrw'] = pd.to_numeric(df_clean['adjrw'], errors='coerce')
-    
-    if 'length_of_stay' in df_clean.columns:
-        df_clean['length_of_stay'] = pd.to_numeric(df_clean['length_of_stay'], errors='coerce')
-    
-    # แปลง AN และ HN เป็น string
-    df_clean['an'] = df_clean['an'].astype(str)
-    df_clean['hn'] = df_clean['hn'].astype(str)
+    # คำนวณ LOS ถ้าไม่มีหรือว่างทั้งหมด
+    if df_clean['length_of_stay'].isna().all():
+        admit_dates    = pd.to_datetime(df_clean['admit_date'],    errors='coerce')
+        discharge_dates= pd.to_datetime(df_clean['discharge_date'],errors='coerce')
+        df_clean['length_of_stay'] = (discharge_dates - admit_dates).dt.days
+        df_clean['length_of_stay'] = df_clean['length_of_stay'].apply(
+            lambda x: max(int(x), 0) if pd.notna(x) else None
+        )
+
+    # แปลงตัวเลข — ปลอดภัยเพราะเช็คแล้วว่ามีคอลัมน์
+    df_clean['age']           = pd.to_numeric(df_clean['age'],           errors='coerce')
+    df_clean['adjrw']         = pd.to_numeric(df_clean['adjrw'],         errors='coerce')
+    df_clean['length_of_stay']= pd.to_numeric(df_clean['length_of_stay'],errors='coerce')
+
+    # แปลง string
+    df_clean['an']  = df_clean['an'].astype(str)
+    df_clean['hn']  = df_clean['hn'].astype(str)
     if 'vn' in df_clean.columns:
         df_clean['vn'] = df_clean['vn'].astype(str)
-    
-    # แปลง sex เป็น string (1 ตัวอักษร)
-    if 'sex' in df_clean.columns:
-        df_clean['sex'] = df_clean['sex'].astype(str).str[:1]
-    
-    # ========================================
-    # ⚠️ สำคัญ: จัดการ Foreign Key Constraints
-    # ========================================
-    # ICD-10 codes ต้องมีอยู่ใน icd10_master table
-    # ถ้าไม่มี จะเกิด Foreign Key constraint error
-    # วิธีแก้: ตั้งเป็น NULL ถ้า code ไม่ถูกต้อง (ไม่ใช่รูปแบบ ICD-10)
-    
+
+    df_clean['sex'] = df_clean['sex'].astype(str).str[:1].replace({'n': None, 'N': None})
+
+    # ทำความสะอาด ICD-10
     icd_columns = ['pdx'] + [f'dx{i}' for i in range(11)]
-    op_columns = [f'op{i}' for i in range(12)]
-    
-    # ทำความสะอาด ICD-10 codes
-    invalid_icd_count = 0
-    for col in icd_columns:
-        if col in df_clean.columns:
-            # แปลงเป็น string และ clean
-            df_clean[col] = df_clean[col].apply(lambda x: str(x).strip().upper() if pd.notna(x) and str(x).strip() not in ['', 'nan', 'None', 'NaN'] else None)
-            
-            # นับ code ที่ไม่ valid (เพื่อแจ้งเตือน)
-            before_count = df_clean[col].notna().sum()
-            
-            # ถ้า code มีความยาวผิดปกติมาก (>10 ตัวอักษร) ให้ตั้งเป็น NULL
-            # เพราะ schema กำหนดไว้ varchar(10)
-            df_clean.loc[df_clean[col].str.len() > 10, col] = None
-            
-            after_count = df_clean[col].notna().sum()
-            if before_count > after_count:
-                invalid_icd_count += (before_count - after_count)
-    
-    if invalid_icd_count > 0:
-        warnings.append(f"⚠️ พบรหัส ICD-10 ที่ไม่ถูกต้อง {invalid_icd_count} รายการ (ตั้งเป็น NULL)")
-        warnings.append("💡 หมายเหตุ: ถ้ารหัสถูกต้องแต่ยังไม่มีใน icd10_master table ต้องเพิ่มเข้าไปก่อน")
-    
-    # ทำความสะอาด OP codes
-    invalid_op_count = 0
-    for col in op_columns:
-        if col in df_clean.columns:
-            before_count = df_clean[col].notna().sum()
-            
-            df_clean[col] = df_clean[col].apply(lambda x: str(x).strip() if pd.notna(x) and str(x).strip() not in ['', 'nan', 'None', 'NaN'] else None)
-            
-            # ตัด length ถ้ายาวเกิน 10
-            df_clean.loc[df_clean[col].str.len() > 10, col] = None
-            
-            after_count = df_clean[col].notna().sum()
-            if before_count > after_count:
-                invalid_op_count += (before_count - after_count)
-    
-    if invalid_op_count > 0:
-        warnings.append(f"⚠️ พบรหัส OP ที่ไม่ถูกต้อง {invalid_op_count} รายการ (ตั้งเป็น NULL)")
-    
-    # เพิ่มข้อมูลการนำเข้า
+    op_columns  = [f'op{i}' for i in range(12)]
+
+    for col in icd_columns + op_columns:
+        df_clean[col] = df_clean[col].apply(
+            lambda x: str(x).strip().upper()
+            if pd.notna(x) and str(x).strip() not in ['', 'nan', 'None', 'NaN', 'NONE']
+            else None
+        )
+        df_clean.loc[df_clean[col].str.len() > 10, col] = None
+
+    # metadata
     df_clean['imported_by'] = st.session_state.get('username', 'system')
-    df_clean['created_at'] = datetime.now().isoformat()
-    df_clean['updated_at'] = datetime.now().isoformat()
-    
-    # ตรวจสอบข้อมูลซ้ำ (AN + month_year)
+    df_clean['created_at']  = datetime.now().isoformat()
+    df_clean['updated_at']  = datetime.now().isoformat()
+
+    # ตรวจสอบซ้ำ
     duplicates = df_clean[df_clean.duplicated(subset=['an', 'month_year'], keep=False)]
     if not duplicates.empty:
-        warnings.append(f"พบข้อมูลซ้ำในไฟล์ {len(duplicates)} รายการ (AN + month_year ซ้ำ)")
-    
-    # แทนที่ NaN ด้วย None
+        warnings.append(f"พบข้อมูลซ้ำในไฟล์ {len(duplicates)} รายการ")
+
+    # แทน NaN ด้วย None
     df_clean = df_clean.where(pd.notna(df_clean), None)
-    
+
     return df_clean, errors, warnings
+
+
+
+
 
 def import_to_supabase(df, batch_size=100):
     """นำเข้าข้อมูลไปยัง Supabase"""
