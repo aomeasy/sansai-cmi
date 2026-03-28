@@ -5002,16 +5002,23 @@ h1,h2,h3{{color:#1565C0;}} hr{{border-color:#E0E0E0;}}
                 if _df_pj.empty:
                     st.info("ℹ️ ไม่พบผู้ป่วย — ลองค้นหาด้วย HN หรือ AN")
                 else:
-                    # สร้าง label สำหรับ selectbox
+                    # สร้าง label สำหรับ selectbox  
                     def _make_pj_label(r):
-                        hn  = r.get('hn', 'N/A')
-                        an  = r.get('an', 'N/A')
-                        age = int(pd.to_numeric(r.get('age', 0), errors='coerce') or 0)
-                        pdx = r.get('pdx', 'N/A')
-                        los = int(pd.to_numeric(r.get('length_of_stay', 0), errors='coerce') or 0)
-                        wd  = r.get('ward_name', 'N/A')
-                        ds  = r.get('discharge_status', 'N/A')
+                        hn  = r['hn']  if 'hn'  in r.index and pd.notna(r['hn'])  else 'N/A'
+                        an  = r['an']  if 'an'  in r.index and pd.notna(r['an'])  else 'N/A'
+                        pdx = r['pdx'] if 'pdx' in r.index and pd.notna(r['pdx']) else 'N/A'
+                        wd  = r['ward_name'] if 'ward_name' in r.index and pd.notna(r['ward_name']) else 'N/A'
+                        ds  = r['discharge_status'] if 'discharge_status' in r.index and pd.notna(r['discharge_status']) else 'N/A'
+                        try:
+                            age = int(pd.to_numeric(r['age'], errors='coerce') or 0) if 'age' in r.index else 0
+                        except:
+                            age = 0
+                        try:
+                            los = int(pd.to_numeric(r['length_of_stay'], errors='coerce') or 0) if 'length_of_stay' in r.index else 0
+                        except:
+                            los = 0
                         return f"HN:{hn} | AN:{an} | อายุ {age} ปี | {wd} | LOS {los}วัน | {pdx} | {ds}"
+                    
             
                     _pj_opts = _df_pj.head(50).apply(_make_pj_label, axis=1).tolist()
                     _pj_sel  = st.selectbox(
