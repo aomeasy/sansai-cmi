@@ -5155,8 +5155,8 @@ h1,h2,h3{{color:#1565C0;}} hr{{border-color:#E0E0E0;}}
                             <div style="width:2px;height:40px;background:linear-gradient({ev['color']},
                                  {_pj_events[i+1]['color']});margin:0 auto;opacity:.4;"></div>"""
 
-_note_html = f'<div style="color:#E65100;font-size:0.78rem;margin-top:0.2rem;">⚠️ {ev["note"]}</div>' \
-             if ev.get('note') else ''
+                        _note_html = f'<div style="color:#E65100;font-size:0.78rem;margin-top:0.2rem;">⚠️ {ev["note"]}</div>' \
+                                     if ev.get('note') else ''
 
                         _timeline_html_parts.append(f"""
                                     <div style="display:flex;align-items:flex-start;gap:1rem;margin-bottom:0;">
