@@ -5,6 +5,7 @@ import io
 import requests
 import json
 import re
+import os
 import altair as alt  # ⚠️ ต้องมีบรรทัดนี้
 import streamlit.components.v1 as components
 from sklearn.metrics import confusion_matrix, roc_auc_score, roc_curve
@@ -170,12 +171,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
  
- 
-    
-# ตั้งค่า Supabase
-SUPABASE_URL = "https://qwxnsusfydrhtfqdcsqn.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3eG5zdXNmeWRyaHRmcWRjc3FuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEwOTczNDcsImV4cCI6MjA4NjY3MzM0N30.1KiMRlJJ1jUpS7xfzocahJl3fH78m6CgM3Nm-UhhcRk"
-
+  
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "") 
 
 class SupabaseClient:
     """Simple Supabase client using REST API with improved error handling"""
