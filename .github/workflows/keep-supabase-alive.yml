@@ -1,0 +1,47 @@
+name: Keep Supabase Alive
+
+on:
+  schedule:
+    # รันทุกวันจันทร์ และพฤหัสบดี เวลา 08:00 UTC (15:00 น. ไทย)
+    - cron: '0 8 * * 1'   # จันทร์
+    - cron: '0 8 * * 4'   # พฤหัสบดี
+  
+  # กดรันเองด้วยมือได้ (สำหรับทดสอบ)
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'เหตุผลที่รันเอง (optional)'
+        required: false
+        default: 'Manual test'
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Ping Supabase REST API
+        run: |
+          echo "🏥 Pinging Supabase at $(date)"
+          
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/ipd_monthly?select=id&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}")
+          
+          echo "HTTP Status: $RESPONSE"
+          
+          if [ "$RESPONSE" = "200" ] || [ "$RESPONSE" = "206" ]; then
+            echo "✅ Supabase is alive! Status: $RESPONSE"
+          else
+            echo "❌ Unexpected status: $RESPONSE"
+            exit 1
+          fi
+
+      - name: Report Result
+        if: always()
+        run: |
+          echo "🕐 Completed at: $(date)"
+          echo "📋 Trigger: ${{ github.event_name }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "📝 Reason: ${{ github.event.inputs.reason }}"
+          fi
