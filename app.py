@@ -3373,6 +3373,35 @@ def show_reports():
     with tab6:
     
         st.write("✅ 1 - เข้า tab6")
+        try:
+            # step A
+            _mask = df_all['ward_name'].fillna('').str.strip() == 'หอผู้ป่วยหนัก ICU'
+            st.write(f"✅ A - mask สร้างได้ พบ ICU: {_mask.sum()} แถว")
+            
+            # step B
+            df_icu_risk = df_all[_mask].copy()
+            st.write(f"✅ B - copy ได้ {len(df_icu_risk)} แถว")
+            
+            # step C
+            df_icu_risk['is_death'] = df_icu_risk['discharge_status'].str.contains('ตาย', na=False)
+            st.write("✅ C - is_death เสร็จ")
+            
+            # step D
+            df_icu_risk['on_vent'] = df_icu_risk.apply(has_ventilator, axis=1)
+            st.write("✅ D - on_vent เสร็จ")
+            
+            # step E
+            df_icu_risk['pneu_type'] = df_icu_risk.apply(classify_pneumonia_type, axis=1) \
+                                       if 'pdx' in df_icu_risk.columns else 'other'
+            st.write("✅ E - pneu_type เสร็จ")
+    
+        except KeyError as e:
+            st.error(f"❌ KeyError — column ที่หาย: {repr(e)}")
+            st.stop()
+        except Exception as e:
+            st.error(f"❌ {type(e).__name__}: {repr(e)}")
+            st.stop()
+
         st.write(f"คอลัมน์ที่มี: {df_all.columns.tolist()}")  # ← เพิ่มบรรทัดนี้
         
         df_icu_risk = df_all[...].copy()
