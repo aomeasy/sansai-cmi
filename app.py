@@ -356,7 +356,34 @@ def init_supabase():
     """เชื่อมต่อ Supabase"""
     return SupabaseClient(SUPABASE_URL, SUPABASE_KEY)
 
+@st.cache_data(ttl=300)  # cache 5 นาที
+def load_ipd_data():
+    """โหลดข้อมูล IPD จาก Supabase — cache ไว้ 5 นาที"""
+    client = init_supabase()
+    result = client.select(
+        'ipd_monthly',
+        columns='id,an,hn,month_year,admit_date,discharge_date,ward_name,'
+                'pttype_name,pdx,dx0,dx1,dx2,dx3,dx4,dx5,dx6,dx7,dx8,dx9,dx10,'
+                'op0,op1,op2,op3,op4,op5,op6,op7,op8,op9,op10,op11,'
+                'age,sex,adjrw,length_of_stay,discharge_status,clinic_name,fiscal_year',
+        limit=50000
+    )
+    if result.get('error') or not result.get('data'):
+        return pd.DataFrame()
 
+    df = pd.DataFrame(result['data'])
+
+    # แปลงประเภทข้อมูลครั้งเดียวที่นี่
+    df['month_year']     = pd.to_datetime(df['month_year'],     errors='coerce')
+    df['admit_date']     = pd.to_datetime(df['admit_date'],     errors='coerce')
+    df['discharge_date'] = pd.to_datetime(df['discharge_date'], errors='coerce')
+    df['age']            = pd.to_numeric(df['age'],             errors='coerce')
+    df['adjrw']          = pd.to_numeric(df['adjrw'],           errors='coerce')
+    df['length_of_stay'] = pd.to_numeric(df['length_of_stay'],  errors='coerce')
+    df['month_label']    = df['month_year'].dt.strftime('%b %Y')
+    df['month_sort']     = df['month_year'].dt.to_period('M')
+
+    return df
 
 def convert_thai_date_to_iso(date_value):
     """แปลงวันที่ พ.ศ. เป็น ค.ศ."""
@@ -486,58 +513,14 @@ def show_reports():
 
     # ── โหลดข้อมูล ────────────────────────────────────────
     client = init_supabase()
-    
+   
     with st.spinner("กำลังโหลดข้อมูล..."):
-        try: 
-            result = client.select(
-                'ipd_monthly',
-                columns='id,an,hn,month_year,admit_date,discharge_date,ward_name,'
-                        'pttype_name,pdx,dx0,dx1,dx2,dx3,dx4,dx5,dx6,dx7,dx8,dx9,dx10,'
-                        'op0,op1,op2,op3,op4,op5,op6,op7,op8,op9,op10,op11,'
-                        'age,sex,adjrw,length_of_stay,discharge_status,clinic_name,fiscal_year',
-                limit=50000  # จำกัดไว้ก่อน
-            )
-
-        
-        except Exception as e:
-            st.error(f"❌ เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล: {str(e)}")
-            st.info("💡 ลองไปที่เมนู '🔧 ทดสอบการเชื่อมต่อ' เพื่อตรวจสอบปัญหา")
-            return
-
-    if result.get('error'):
-        st.error(f"❌ เกิดข้อผิดพลาดในการดึงข้อมูล: {result['error']}")
-        st.info("💡 ลองไปที่เมนู '🔧 ทดสอบการเชื่อมต่อ' เพื่อตรวจสอบปัญหา")
-        return
+        df_all = load_ipd_data()
     
-    if not result.get('data'):
-        st.warning("⚠️ ไม่พบข้อมูลในระบบ กรุณานำเข้าข้อมูลก่อน")
-        return
-
-    try:
-        df_all = pd.DataFrame(result['data'])
-    except Exception as e:
-        st.error(f"❌ ไม่สามารถแปลงข้อมูลเป็น DataFrame: {str(e)}")
-        return
-        
     if df_all.empty:
-        st.warning("⚠️ ไม่พบข้อมูล")
-        return
-
-    # ── แปลงประเภทข้อมูล ─────────────────────────────────
-    try:
-        df_all['month_year'] = pd.to_datetime(df_all['month_year'], errors='coerce')
-        df_all['admit_date'] = pd.to_datetime(df_all['admit_date'], errors='coerce')
-        df_all['discharge_date'] = pd.to_datetime(df_all['discharge_date'], errors='coerce')
-        df_all['age'] = pd.to_numeric(df_all.get('age', pd.Series()), errors='coerce')
-        df_all['adjrw'] = pd.to_numeric(df_all.get('adjrw', pd.Series()), errors='coerce')
-        df_all['length_of_stay'] = pd.to_numeric(df_all.get('length_of_stay', pd.Series()), errors='coerce')
-        df_all['month_label'] = df_all['month_year'].dt.strftime('%b %Y')
-        df_all['month_sort'] = df_all['month_year'].dt.to_period('M')
-    except Exception as e:
-        st.error(f"❌ เกิดข้อผิดพลาดในการแปลงประเภทข้อมูล: {str(e)}")
-        st.info("💡 ตรวจสอบว่าข้อมูลในฐานข้อมูลมีรูปแบบที่ถูกต้อง")
-        return
-
+        st.warning("⚠️ ไม่พบข้อมูลในระบบ กรุณานำเข้าข้อมูลก่อน")
+        return   
+    
     # ── helper ───────────────────────────────────────────
     def is_pneumonia(code):
         if pd.isna(code): 
@@ -5962,6 +5945,11 @@ def main():
                 </div>
             </div>
         """, unsafe_allow_html=True)
+
+        st.markdown("---")
+        if st.button("🔄 Refresh Data", key="clear_cache"):
+            load_ipd_data.clear()
+            st.rerun()    
     
     # ========================================
     # ROUTE TO PAGES
@@ -6000,31 +5988,14 @@ def show_home():
     try:
         client = init_supabase()
         
-        # โหลดข้อมูล
-        with st.spinner("⚡ Loading real-time data..."): 
-            result = client.select(
-                'ipd_monthly',
-                columns='id,an,hn,month_year,admit_date,discharge_date,ward_name,'
-                        'pttype_name,pdx,dx0,dx1,dx2,dx3,dx4,dx5,dx6,dx7,dx8,dx9,dx10,'
-                        'op0,op1,op2,op3,op4,op5,op6,op7,op8,op9,op10,op11,'
-                        'age,sex,adjrw,length_of_stay,discharge_status,clinic_name,fiscal_year',
-                limit=50000  # จำกัดไว้ก่อน
-            )
+          
+        with st.spinner("⚡ Loading real-time data..."):
+            df_all = load_ipd_data()
         
-        
-        if result['error'] or not result['data']:
+        if df_all.empty:
             st.warning("⚠️ ไม่สามารถโหลดข้อมูลได้ กรุณาตรวจสอบการเชื่อมต่อ")
             return
         
-        df_all = pd.DataFrame(result['data'])
-        
-        # แปลงประเภทข้อมูล
-        df_all['month_year'] = pd.to_datetime(df_all['month_year'], errors='coerce')
-        df_all['admit_date'] = pd.to_datetime(df_all['admit_date'], errors='coerce')
-        df_all['discharge_date'] = pd.to_datetime(df_all['discharge_date'], errors='coerce')
-        df_all['age'] = pd.to_numeric(df_all.get('age', pd.Series()), errors='coerce')
-        df_all['adjrw'] = pd.to_numeric(df_all.get('adjrw', pd.Series()), errors='coerce')
-        df_all['length_of_stay'] = pd.to_numeric(df_all.get('length_of_stay', pd.Series()), errors='coerce')
         
         # คำนวณเดือนปัจจุบันและเดือนก่อนหน้า
         latest_month = df_all['month_year'].max()
