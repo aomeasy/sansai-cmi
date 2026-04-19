@@ -568,8 +568,13 @@ def show_reports():
         _pdx_clean = df_all['pdx'].fillna('').astype(str).str.strip().str.upper()
         df_pneumonia = df_all[_sw_any_series(_pdx_clean, _PNEU_CODES)].copy()
 
+         
+        op_cols = [f'op{i}' for i in range(12) if f'op{i}' in df_pneumonia.columns]
+        mask = pd.Series(False, index=df_pneumonia.index)
+        for col in op_cols:
+            mask |= df_pneumonia[col].astype(str).str.startswith('96.7')
+        df_pneumonia['on_vent'] = mask
         
-        df_pneumonia['on_vent'] = df_pneumonia.apply(has_ventilator, axis=1)
         df_pneumonia['vent_codes'] = df_pneumonia.apply(get_vent_codes, axis=1)
 
     # ════════════════════════════════════════════════════
@@ -3368,6 +3373,7 @@ def show_reports():
     with tab6:
     
         st.write("✅ 1 - เข้า tab6")
+        st.write(f"คอลัมน์ที่มี: {df_all.columns.tolist()}")  # ← เพิ่มบรรทัดนี้
         
         df_icu_risk = df_all[...].copy()
         st.write(f"✅ 2 - filter ICU ได้ {len(df_icu_risk)} ราย")
@@ -3415,10 +3421,15 @@ def show_reports():
         """, unsafe_allow_html=True)
 
         # ── กรองเฉพาะ ICU ──────────────────────────────────────
+ 
+        # AFTER — ตรวจสอบก่อน
+        if 'ward_name' not in df_all.columns:
+            st.error("❌ ไม่พบคอลัมน์ 'ward_name' ในข้อมูล")
+            st.stop()
+        
         df_icu_risk = df_all[
-            df_all['ward_name'].str.strip() == 'หอผู้ป่วยหนัก ICU'
+            df_all['ward_name'].fillna('').str.strip() == 'หอผู้ป่วยหนัก ICU'
         ].copy()
-
         if df_icu_risk.empty:
             st.warning("⚠️ ไม่พบข้อมูลผู้ป่วย ICU")
             st.stop()
