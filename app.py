@@ -553,7 +553,22 @@ def show_reports():
         st.error("❌ ไม่พบคอลัมน์ 'pdx' ในข้อมูล ไม่สามารถวิเคราะห์โรคปอดบวมได้")
         df_pneumonia = pd.DataFrame()
     else:
-        df_pneumonia = df_all[df_all['pdx'].apply(is_pneumonia)].copy()
+         
+
+        # AFTER
+        _PNEU_CODES = ['J10','J11','J12','J13','J14','J15','J16','J17',
+                       'J18','J85.0','J85.1','J95.0','J95.85','J95.851','J22']
+        
+        def _sw_any_series(series, codes):
+            mask = pd.Series(False, index=series.index)
+            for c in codes:
+                mask |= series.str.startswith(c, na=False)
+            return mask
+        
+        _pdx_clean = df_all['pdx'].fillna('').astype(str).str.strip().str.upper()
+        df_pneumonia = df_all[_sw_any_series(_pdx_clean, _PNEU_CODES)].copy()
+
+        
         df_pneumonia['on_vent'] = df_pneumonia.apply(has_ventilator, axis=1)
         df_pneumonia['vent_codes'] = df_pneumonia.apply(get_vent_codes, axis=1)
 
@@ -3393,13 +3408,58 @@ def show_reports():
         df_icu_risk['adjrw']    = pd.to_numeric(df_icu_risk['adjrw'], errors='coerce').fillna(0)
         df_icu_risk['los']      = pd.to_numeric(
             df_icu_risk['length_of_stay'], errors='coerce').fillna(0)
-        df_icu_risk['on_vent']  = df_icu_risk.apply(has_ventilator, axis=1)
+        
+
+        # AFTER
+        _icu_op_cols = [c for c in [f'op{i}' for i in range(12)] if c in df_icu_risk.columns]
+        if _icu_op_cols:
+            df_icu_risk['on_vent'] = (
+                df_icu_risk[_icu_op_cols].fillna('').astype(str)
+                .apply(lambda col: col.str.startswith('96.7'))
+                .any(axis=1)
+            )
+        else:
+            df_icu_risk['on_vent'] = False        
 
         # pneu_type สำหรับ ICU
-        df_icu_risk['pneu_type'] = df_icu_risk.apply(classify_pneumonia_type, axis=1) \
-                                   if 'pdx' in df_icu_risk.columns \
-                                   else 'other'
-
+    
+        # AFTER
+        if 'pdx' in df_icu_risk.columns:
+            # helper: startswith แบบ vectorized รองรับหลาย codes
+            def _sw_any(series, codes):
+                mask = pd.Series(False, index=series.index)
+                for c in codes:
+                    mask |= series.str.startswith(c.upper(), na=False)
+                return mask
+        
+            _pdx_s  = df_icu_risk['pdx'].fillna('').astype(str).str.strip().str.upper()
+            _ward_s = (df_icu_risk['ward_name'].fillna('').astype(str).str.strip().str.upper()
+                       if 'ward_name' in df_icu_risk.columns
+                       else pd.Series('', index=df_icu_risk.index))
+            _los_s  = pd.to_numeric(df_icu_risk.get('length_of_stay'), errors='coerce').fillna(0)
+            _ov_s   = df_icu_risk['on_vent']  # ← ใช้ค่าที่คำนวณแล้ว ไม่คำนวณซ้ำ
+        
+            # -- logic เดิมทุกอย่าง แค่เปลี่ยนเป็น vectorized --
+            _CAP = ['J10','J11','J12','J13','J14','J15','J16','J17','J18']
+            _HAP = ['J95.0', 'J22']
+            _VAP = ['J95.851', 'J95.85']
+            _FLU = ['J10', 'J11']
+        
+            _is_cap     = _sw_any(_pdx_s, _CAP)
+            _is_flu     = _sw_any(_pdx_s, _FLU)
+            _is_icu_w   = _ward_s == 'หอผู้ป่วยหนัก ICU'
+            _vap_direct = _sw_any(_pdx_s, _VAP)
+            _hap_direct = _sw_any(_pdx_s, _HAP)
+            _est_vap    = _is_cap & _is_icu_w & _ov_s & (_los_s > 2)
+            _est_hap    = _is_cap & ~_is_flu & ~_ov_s & (_los_s > 2)
+        
+            # ลำดับ priority เดิม: VAP > HAP > CAP > other
+            df_icu_risk['pneu_type'] = 'other'
+            df_icu_risk.loc[_is_cap,               'pneu_type'] = 'cap'
+            df_icu_risk.loc[_hap_direct | _est_hap,'pneu_type'] = 'hap'
+            df_icu_risk.loc[_vap_direct | _est_vap,'pneu_type'] = 'vap'
+        else:
+            df_icu_risk['pneu_type'] = 'other'
         # ── Scoring ────────────────────────────────────────────
         # คะแนนแต่ละ factor
         df_icu_risk['score_vap']    = (df_icu_risk['pneu_type'] == 'vap').astype(int) * 3
