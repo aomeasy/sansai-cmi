@@ -604,27 +604,25 @@ def show_reports():
                 death_n = 0
                 
             death_pct = (death_n / total * 100) if total > 0 else 0
-            
+             
+
+
             readmit_n = 0
-            readmit_hn = set()
             if 'discharge_date' in df_all.columns and 'hn' in df_all.columns and 'admit_date' in df_all.columns:
                 try:
-                    for _, row in df_all.iterrows():
-                        if pd.isna(row.get('discharge_date')) or pd.isna(row.get('hn')): 
-                            continue
-                        same = df_all[
-                            (df_all['hn'] == row['hn']) &
-                            (df_all['admit_date'] > row['discharge_date']) &
-                            (df_all['admit_date'] <= row['discharge_date'] + pd.Timedelta(days=28))
-                        ]
-                        if len(same) > 0:
-                            readmit_hn.add(row['hn'])
-                    readmit_n = len(readmit_hn)
+                    _df_r = df_all[['hn','admit_date','discharge_date']].dropna(subset=['hn','admit_date','discharge_date'])
+                    _left  = _df_r[['hn','discharge_date']].copy()
+                    _right = _df_r[['hn','admit_date']].copy()
+                    _merged = _left.merge(_right, on='hn')
+                    _readmit_mask = (
+                        (_merged['admit_date'] > _merged['discharge_date']) &
+                        (_merged['admit_date'] <= _merged['discharge_date'] + pd.Timedelta(days=28))
+                    )
+                    readmit_n = _merged.loc[_readmit_mask, 'hn'].nunique()
                 except Exception:
                     pass
-                    
+            
             readmit_pct = (readmit_n / total * 100) if total > 0 else 0
-
             c1, c2, c3, c4, c5, c6 = st.columns(6)
         
             c1.metric(
@@ -810,21 +808,20 @@ def show_reports():
             death_pn = df_pn['discharge_status'].str.contains('ตาย',na=False).sum() if 'discharge_status' in df_pn.columns else 0
             improve_pn = df_pn['discharge_status'].str.contains('ดีขึ้น',na=False).sum() if 'discharge_status' in df_pn.columns else 0
             vent_pn = df_pn['on_vent'].sum() if 'on_vent' in df_pn.columns else 0
-            
+        
             readmit_pn = 0
             if 'discharge_date' in df_pn.columns and 'hn' in df_pn.columns:
-                for _, row in df_pn.iterrows():
-                    if pd.isna(row.get('discharge_date')) or pd.isna(row.get('hn')): 
-                        continue
-                    same = df_all[
-                        (df_all['hn'] == row['hn']) &
-                        (df_all['admit_date'] > row['discharge_date']) &
-                        (df_all['admit_date'] <= row['discharge_date'] + pd.Timedelta(days=28))
-                    ]
-                    if len(same) > 0:
-                        readmit_pn += 1
-
-  
+                try:
+                    _pn_left  = df_pn[['hn','discharge_date']].dropna(subset=['hn','discharge_date'])
+                    _all_right = df_all[['hn','admit_date']].dropna(subset=['hn','admit_date'])
+                    _merged_pn = _pn_left.merge(_all_right, on='hn')
+                    _readmit_mask_pn = (
+                        (_merged_pn['admit_date'] > _merged_pn['discharge_date']) &
+                        (_merged_pn['admit_date'] <= _merged_pn['discharge_date'] + pd.Timedelta(days=28))
+                    )
+                    readmit_pn = _merged_pn.loc[_readmit_mask_pn, 'hn'].nunique()
+                except Exception:
+                    pass
 
             k1,k2,k3,k4,k5 = st.columns(5)
             
@@ -1314,24 +1311,30 @@ def show_reports():
 
             # ── ตารางรายเดือน ──
             st.markdown("#### 📋 ตารางสรุปรายเดือน")
+           
+
+            # ── คำนวณ readmit ทุกเดือนพร้อมกันครั้งเดียว ก่อน loop ──
+            _pn_base   = df_pn[['hn','discharge_date','month_sort']].dropna(subset=['hn','discharge_date'])
+            _all_right = df_all[['hn','admit_date']].dropna(subset=['hn','admit_date'])
+            _merged_monthly = _pn_base.merge(_all_right, on='hn')
+            _readmit_monthly_mask = (
+                (_merged_monthly['admit_date'] > _merged_monthly['discharge_date']) &
+                (_merged_monthly['admit_date'] <= _merged_monthly['discharge_date'] + pd.Timedelta(days=28))
+            )
+            _readmit_by_month = (
+                _merged_monthly.loc[_readmit_monthly_mask]
+                .groupby('month_sort')['hn']
+                .nunique()
+            )
+            
             rows = []
             for period, grp in df_pn.groupby('month_sort'):
-                ml = grp['month_label'].iloc[0]
-                tot = len(grp)
-                dead = grp['discharge_status'].str.contains('ตาย',na=False).sum() if 'discharge_status' in grp.columns else 0
-                imp = grp['discharge_status'].str.contains('ดีขึ้น',na=False).sum() if 'discharge_status' in grp.columns else 0
-                vn = grp['on_vent'].sum() if 'on_vent' in grp.columns else 0
-                ra = 0
-                for _, row in grp.iterrows():
-                    if pd.isna(row.get('discharge_date')) or pd.isna(row.get('hn')): 
-                        continue
-                    same = df_all[
-                        (df_all['hn'] == row['hn']) &
-                        (df_all['admit_date'] > row['discharge_date']) &
-                        (df_all['admit_date'] <= row['discharge_date'] + pd.Timedelta(days=28))
-                    ]
-                    if len(same) > 0: 
-                        ra += 1
+                ml   = grp['month_label'].iloc[0]
+                tot  = len(grp)
+                dead = grp['discharge_status'].str.contains('ตาย', na=False).sum() if 'discharge_status' in grp.columns else 0
+                imp  = grp['discharge_status'].str.contains('ดีขึ้น', na=False).sum() if 'discharge_status' in grp.columns else 0
+                vn   = grp['on_vent'].sum() if 'on_vent' in grp.columns else 0
+                ra   = int(_readmit_by_month.get(period, 0))      # ← ดึงจาก dict แทน loop
                 rows.append({
                     'เดือน': ml,
                     'จำหน่ายทั้งหมด': tot,
@@ -1342,6 +1345,10 @@ def show_reports():
                     'อัตรา Readmit (%)': round(ra/tot*100, 1) if tot else 0,
                     'On Ventilator': int(vn),
                 })
+            df_stat = pd.DataFrame(rows)
+
+
+            
             df_stat = pd.DataFrame(rows)
             df_stat.index = range(1, len(df_stat)+1)
             st.dataframe(df_stat, use_container_width=True)
