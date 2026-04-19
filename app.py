@@ -3366,6 +3366,28 @@ def show_reports():
     # TAB 6 : ICU EARLY WARNING RISK SCORE
     # ════════════════════════════════════════════════════
     with tab6:
+    
+        st.write("✅ 1 - เข้า tab6")
+        
+        df_icu_risk = df_all[...].copy()
+        st.write(f"✅ 2 - filter ICU ได้ {len(df_icu_risk)} ราย")
+        
+        df_icu_risk['on_vent'] = df_icu_risk.apply(has_ventilator, axis=1)
+        st.write("✅ 3 - on_vent เสร็จ")
+        
+        df_icu_risk['pneu_type'] = df_icu_risk.apply(classify_pneumonia_type, axis=1)
+        st.write("✅ 4 - pneu_type เสร็จ")
+        
+        # ... scoring ...
+        st.write("✅ 5 - scoring เสร็จ")
+        
+        # roc/auc
+        st.write("✅ 6 - validation เสร็จ")
+        
+        st.session_state['_icu_metrics'] = {...}
+        st.write("✅ 7 - session_state เขียนแล้ว")
+
+        
         st.markdown("""
         <div style="background:linear-gradient(135deg,#B71C1C,#37474F);
                     padding:1.2rem 2rem;border-radius:12px;margin-bottom:1.2rem;">
