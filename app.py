@@ -3404,7 +3404,9 @@ def show_reports():
 
         st.write(f"คอลัมน์ที่มี: {df_all.columns.tolist()}")  # ← เพิ่มบรรทัดนี้
         
-        df_icu_risk = df_all[...].copy()
+        df_icu_risk = df_all[
+            df_all['ward_name'].fillna('').str.strip() == 'หอผู้ป่วยหนัก ICU'
+        ].copy()
         st.write(f"✅ 2 - filter ICU ได้ {len(df_icu_risk)} ราย")
         
         df_icu_risk['on_vent'] = df_icu_risk.apply(has_ventilator, axis=1)
